@@ -177,8 +177,13 @@ The profile is in `plan.md` section 23.1; drop it at
 
 **Upgrades must stay disabled on every Radarr and Sonarr instance.** That is
 what makes `full` jobs safe: with upgrades off, a rescan cannot trigger an
-upgrade search regardless of what the refreshed mediainfo says. *arr renaming
-must also stay off, or its naming format must use no `{MediaInfo ...}` tokens.
+upgrade search regardless of what the refreshed mediainfo says.
+
+**The naming formats must stay free of `{MediaInfo ...}` tokens.** They are, as
+of 2026-09-01: title, year and id only. That is what lets renaming stay on
+safely. Reintroducing a codec or audio token would make a `full` job change the
+name an *arr wants, and the next rename pass would churn every path Codarr had
+touched.
 
 Also worth fixing while in that repo: `docs/30_media.md:335` still says hardware
 transcoding is not wired up. The device plugin is installed and Plex holds a

@@ -27,29 +27,35 @@ nothing to regress. Two consequences:
 - Dolby Vision cannot be verified at all: an RPU cannot be synthesised. Item 3
   stays open until a real DV file exists.
 
-### All four *arr instances have renaming ON, with MediaInfo tokens (2026-09-01)
+### The *arr naming formats carry no MediaInfo tokens (2026-09-01, resolved)
 
-This contradicts `plan.md` 23.2, which requires renaming off **or** a naming
-format with no `{MediaInfo ...}` tokens. Neither holds.
+`plan.md` 23.2 requires renaming off **or** a naming format with no
+`{MediaInfo ...}` tokens. The formats originally contained
+`{Mediainfo VideoCodec}`, `{Mediainfo AudioCodec}`, `{Mediainfo AudioChannels}`
+and `{MediaInfo VideoDynamicRangeType}`, so neither held.
+
+The user rewrote all four to title, year and id only. Verified:
 
 ```
-GET /api/v3/config/naming on each instance
-radarr-yama, radarr-kostas:  renameMovies=true
-sonarr-yama, sonarr-kostas:  renameEpisodes=true
+GET /api/v3/config/naming on each instance -> 0 MediaInfo tokens on all four
+
+radarr-*  standardMovieFormat
+  {Movie CleanTitle} ({Release Year}) {tmdb-{TmdbId}}{ edition-{Edition Tags}}
+sonarr-*  standardEpisodeFormat
+  {Series CleanTitleWithoutYear} ({Series Year}) - S{season:00}E{episode:00} - {Episode CleanTitle}
+          seriesFolderFormat
+  {Series CleanTitleWithoutYear} {(Series Year)} {tvdb-{TvdbId}}
 ```
 
-Every format contains `{Mediainfo VideoCodec}`, `{Mediainfo AudioCodec}`,
-`{Mediainfo AudioChannels}` and `{MediaInfo VideoDynamicRangeType}`.
+23.2 is now satisfied on its second limb rather than waived, and renaming can
+stay on. Nothing left in a filename derives from the file's contents, so the name
+a rename pass would compute is invariant under everything Codarr does: a `full`
+job changing the codec and an `audio_only` job changing the audio no longer move
+the path. A future rename pass is a guaranteed no-op.
 
-Why it matters: Codarr never renames, and keeps the path stable so a rescan is a
-no-op rather than a delete-plus-add. But a `full` job changes the codec, and a
-DTS to AC3 conversion changes the audio tokens. The next *arr rename pass then
-churns the path anyway, which is exactly what `plan.md` 16.2 wants to avoid, and
-Plex sees one file removed and another added.
-
-**This is not something Codarr can fix from its side.** Either renaming goes off
-on all four instances, or the `{MediaInfo ...}` tokens come out of the four
-formats, before the write path is pointed at the real library.
+Consequence worth recording: `{Quality Full}` is gone too, so an *arr database
+rebuilt from filenames alone would import everything as Unknown quality. The user
+weighed that and does not want it.
 
 ### Upgrades are off on every instance (2026-09-01, confirms 23.2)
 
@@ -199,7 +205,7 @@ folder finding above.
 | 2 | Plex `analyze` verb and path on the running PMS | TODO, blocked: no items in any library |
 | 3 | ffprobe JSON path for the Dolby Vision profile | **CONFIRMED**, but the record does NOT survive a copy. See below |
 | 4 | Chrome client profile produces Direct Stream for 8-bit and 10-bit HEVC | TODO, needs a browser and a real file |
-| 5 | *arr renaming is off on all four instances | Deviation accepted by the user, see decisions.md |
+| 5 | *arr naming format uses no `{MediaInfo ...}` tokens | **CONFIRMED**, resolved by the user 2026-09-01 |
 | 6 | Current jellyfin-ffmpeg Debian package name and repo path | **CONFIRMED** |
 | 7 | `vainfo` inside the container, and which driver loaded | **CONFIRMED**, Intel iHD 25.4.6, jellyfin-bundled |
 | 8 | 7.1 to 5.1 downmix produces a sensible channel layout | **CONFIRMED** |

@@ -1,0 +1,50 @@
+{
+  "streams": [
+    {
+      "index": 0,
+      "codec_name": "h264",
+      "profile": "High",
+      "codec_type": "video",
+      "width": 1920,
+      "height": 1080,
+      "pix_fmt": "yuv420p",
+      "level": 40,
+      "refs": 4,
+      "field_order": "progressive",
+      "r_frame_rate": "24000/1001",
+      "avg_frame_rate": "24000/1001",
+      "bit_rate": "4200000",
+      "disposition": {"default": 1, "forced": 0, "comment": 0, "hearing_impaired": 0, "visual_impaired": 0, "attached_pic": 0},
+      "tags": {"language": "und"}
+    },
+    {
+      "index": 1,
+      "codec_name": "aac",
+      "profile": "LC",
+      "codec_type": "audio",
+      "sample_rate": "48000",
+      "channels": 6,
+      "channel_layout": "5.1",
+      "bit_rate": "384000",
+      "disposition": {"default": 1, "forced": 0, "comment": 0, "hearing_impaired": 0, "visual_impaired": 0, "attached_pic": 0},
+      "tags": {"language": "eng"}
+    },
+    {
+      "index": 2,
+      "codec_name": "mov_text",
+      "codec_type": "subtitle",
+      "disposition": {"default": 0, "forced": 0, "comment": 0, "hearing_impaired": 0, "visual_impaired": 0, "attached_pic": 0},
+      "tags": {"language": "eng"}
+    }
+  ],
+  "chapters": [],
+  "format": {
+    "filename": "/media/movies/Tagged (2020)/Tagged (2020) WEBDL-1080p.mp4",
+    "nb_streams": 3,
+    "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+    "duration": "6300.000000",
+    "size": "3600000000",
+    "bit_rate": "4571428",
+    "tags": {"major_brand": "isom", "CODARR": "1", "CODARR_VERSION": "0.4.0", "CODARR_POLICY": "914f0f87"}
+  }
+}

@@ -6,6 +6,7 @@ package promote
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"path/filepath"
 	"time"
@@ -50,11 +51,31 @@ type Notifier interface {
 	NotifyPromoted(ctx context.Context, path string) error
 }
 
-// Copier moves the staging file onto the destination filesystem when the temp
-// fallback was used. fsx.FS is a read, stat and rename boundary and has no
-// write primitive, so this is its own seam.
+// Copier moves the staging file onto the destination filesystem when the
+// staging file landed on another device. It is its own seam so the promote
+// tests can fail a copy without a real filesystem.
 type Copier interface {
 	Copy(ctx context.Context, src, dst string) (int64, error)
+}
+
+// FSCopier is the Copier every caller should use. fsx.Copy fsyncs the
+// destination before returning, which the promote sequence relies on.
+type FSCopier struct {
+	fs fsx.FS
+}
+
+var _ Copier = (*FSCopier)(nil)
+
+// NewFSCopier returns a Copier backed by fs.
+func NewFSCopier(fs fsx.FS) *FSCopier { return &FSCopier{fs: fs} }
+
+func (c *FSCopier) Copy(ctx context.Context, src, dst string) (int64, error) {
+	n, err := c.fs.Copy(ctx, src, dst)
+	if err != nil {
+		return n, fmt.Errorf("copy staged output: %w", err)
+	}
+
+	return n, nil
 }
 
 // Deps is everything a Promoter needs. Nothing is instantiated internally.
@@ -128,11 +149,21 @@ type Request struct {
 	OnBlocked func(reason string)
 }
 
-// Result is what promotion produced.
+// Result is what promotion produced. It is returned on the error paths too, as
+// far as promotion got.
 type Result struct {
 	Identity   domain.OutputIdentity
 	OutputSize int64
 	Warnings   []string
+
+	// Renamed reports that step 7 of plan.md 15.2 completed: the source inode is
+	// freed and the destination path now holds Codarr's output.
+	//
+	// When it is true the caller MUST persist Identity even though Promote also
+	// returned an error. Skipping it leaves codarr_output_fingerprint NULL on a
+	// file Codarr wrote, which reads as provenance "untouched" forever (12).
+	// Identity is zero only if the post-rename fingerprint itself failed.
+	Renamed bool
 }
 
 // Promote verifies the staging file and replaces the source with it. Every
@@ -141,50 +172,66 @@ type Result struct {
 func (p *Promoter) Promote(ctx context.Context, req Request) (Result, error) {
 	warnings, err := p.Verify(ctx, req)
 	if err != nil {
-		return Result{}, err
+		return Result{Warnings: warnings}, err
 	}
 
 	fullHash, err := p.fullHash(req)
 	if err != nil {
-		return Result{}, err
+		return Result{Warnings: warnings}, err
 	}
 
 	origin, err := p.originState(req.SourcePath)
 	if err != nil {
-		return Result{}, err
+		return Result{Warnings: warnings}, err
 	}
 
 	staging, err := p.stageOnDestination(ctx, req)
 	if err != nil {
-		return Result{}, err
+		return Result{Warnings: warnings}, err
 	}
 
 	if err := p.replace(ctx, req, staging); err != nil {
-		return Result{}, err
+		return Result{Warnings: warnings}, err
 	}
 
-	restoreWarnings, err := p.restore(ctx, req.SourcePath, origin)
+	return p.settle(ctx, req, fullHash, origin, warnings)
+}
 
+// settle runs everything after the rename. The source is already gone here, so
+// nothing in it may abandon the output identity: every path returns a Result
+// with Renamed set.
+func (p *Promoter) settle(
+	ctx context.Context,
+	req Request,
+	fullHash *string,
+	origin fsx.FileInfo,
+	warnings []string,
+) (Result, error) {
+	restoreWarnings, restoreErr := p.restore(ctx, req.SourcePath, origin)
 	warnings = append(warnings, restoreWarnings...)
-
-	if err != nil {
-		return Result{}, err
-	}
 
 	// plan.md 15.2 step 9: after the metadata restore, because restoring mtime
 	// changes what a later scan compares against.
-	identity, err := p.recordIdentity(req, fullHash)
-	if err != nil {
-		return Result{}, err
+	identity, identityErr := p.recordIdentity(req, fullHash)
+
+	result := Result{Identity: identity, OutputSize: identity.SizeBytes, Warnings: warnings, Renamed: true}
+
+	if restoreErr != nil {
+		return result, restoreErr
+	}
+
+	if identityErr != nil {
+		return result, identityErr
 	}
 
 	if err := p.notifier.NotifyPromoted(ctx, req.SourcePath); err != nil {
-		warnings = append(warnings, "the file was promoted but notifying Plex and the *arr failed: "+err.Error())
+		result.Warnings = append(result.Warnings,
+			"the file was promoted but notifying Plex and the *arr failed: "+err.Error())
 		p.log.WarnContext(ctx, "post-promotion notification failed",
 			slog.Int64("job_id", req.JobID), slog.String("path", req.SourcePath), slog.Any("error", err))
 	}
 
-	return Result{Identity: identity, OutputSize: identity.SizeBytes, Warnings: warnings}, nil
+	return result, nil
 }
 
 func (p *Promoter) fullHash(req Request) (*string, error) {
@@ -229,6 +276,10 @@ func (p *Promoter) stageOnDestination(ctx context.Context, req Request) (string,
 		return req.Staging.Path, nil
 	}
 
+	if err := p.checkRoomForCopy(req); err != nil {
+		return "", err
+	}
+
 	if _, err := p.copier.Copy(ctx, req.Staging.Path, req.Staging.FinalPath); err != nil {
 		return "", wrap(domain.FailPromote, err,
 			"copying the staged output from %s onto the destination filesystem at %s failed",
@@ -236,6 +287,31 @@ func (p *Promoter) stageOnDestination(ctx context.Context, req Request) (string,
 	}
 
 	return req.Staging.FinalPath, nil
+}
+
+// checkRoomForCopy closes the gap in plan.md 15.1: preflight gated on 1.2x the
+// SOURCE size, but what gets copied back is the OUTPUT, and nothing had
+// measured it. Running out of space mid-copy leaves a partial dotfile.
+func (p *Promoter) checkRoomForCopy(req Request) error {
+	info, err := p.fs.Stat(req.Staging.Path)
+	if err != nil {
+		return wrap(domain.FailPreflight, err, "the staged output %s could not be stat'd", req.Staging.Path)
+	}
+
+	destDir := filepath.Dir(req.Staging.FinalPath)
+
+	space, err := p.fs.Statfs(destDir)
+	if err != nil {
+		return wrap(domain.FailPreflight, err, "free space on %s could not be read", destDir)
+	}
+
+	if need := uint64(info.Size); space.FreeBytes < need {
+		return fail(domain.FailPreflight,
+			"the destination %s has %d bytes free, which is not enough for the %d byte staged output",
+			destDir, space.FreeBytes, need)
+	}
+
+	return nil
 }
 
 func (p *Promoter) replace(ctx context.Context, req Request, staging string) error {
@@ -250,48 +326,68 @@ func (p *Promoter) replace(ctx context.Context, req Request, staging string) err
 			return err
 		}
 
-		streaming, err := p.recheckAndRename(ctx, staging, req.SourcePath)
+		blocked, reason, err := p.recheckAndRename(ctx, staging, req.SourcePath)
 		if err != nil {
 			return wrap(domain.FailPromote, err, "replacing %s with the staged output failed", req.SourcePath)
 		}
 
-		if !streaming {
+		if !blocked {
 			return nil
 		}
 
-		// A stream started inside the re-check window. Nothing was renamed;
-		// go back to waiting.
-		p.log.InfoContext(ctx, "a stream started during the final check, deferring the replace",
-			slog.Int64("job_id", req.JobID), slog.String("path", req.SourcePath))
+		// The final check changed its mind. Nothing was renamed; go back to
+		// waiting.
+		if err := p.deferReplace(ctx, req, reason); err != nil {
+			return err
+		}
 	}
 }
 
 func (p *Promoter) waitForStreamEnd(ctx context.Context, req Request) error {
 	for {
-		streaming, who, err := p.guard.IsStreaming(ctx, req.SourcePath)
-		if err != nil {
-			// Fail closed. plan.md 15.6: an unknown answer is not a safe answer,
-			// because replacing a streamed file gives the reader ESTALE.
-			return wrap(domain.FailPromote, err,
-				"could not determine whether Plex is streaming %s, so the replace was not attempted", req.SourcePath)
-		}
-
-		if !streaming {
+		blocked, reason := p.blocked(ctx, req.SourcePath)
+		if !blocked {
 			return nil
 		}
 
-		if req.OnBlocked != nil {
-			req.OnBlocked(who)
+		if err := p.deferReplace(ctx, req, reason); err != nil {
+			return err
 		}
+	}
+}
 
-		p.log.InfoContext(ctx, "target is being streamed, waiting",
-			slog.Int64("job_id", req.JobID), slog.String("path", req.SourcePath), slog.String("session", who))
+// blocked collapses "Plex says the file is streaming" and "Plex could not
+// answer" into one verdict. plan.md 15.6 makes an unknown answer unsafe, and
+// awaiting_stream_end is the closed state that costs nothing: the verified
+// staging file is kept, the retry is automatic, and 19.2 resumes it across a
+// restart. Failing here would throw away a finished encode and need a human.
+func (p *Promoter) blocked(ctx context.Context, path string) (bool, string) {
+	streaming, who, err := p.guard.IsStreaming(ctx, path)
 
-		select {
-		case <-ctx.Done():
-			return wrap(domain.FailPromote, ctx.Err(), "waiting for the stream on %s to end was cancelled", req.SourcePath)
-		case <-p.clk.After(p.streamRetry):
-		}
+	switch {
+	case err != nil:
+		return true, "Plex could not be asked whether the file is streaming: " + err.Error()
+	case streaming:
+		return true, who
+	default:
+		return false, ""
+	}
+}
+
+// deferReplace reports the block and waits out one retry interval.
+func (p *Promoter) deferReplace(ctx context.Context, req Request, reason string) error {
+	if req.OnBlocked != nil {
+		req.OnBlocked(reason)
+	}
+
+	p.log.InfoContext(ctx, "the replace is blocked, waiting",
+		slog.Int64("job_id", req.JobID), slog.String("path", req.SourcePath), slog.String("reason", reason))
+
+	select {
+	case <-ctx.Done():
+		return wrap(domain.FailPromote, ctx.Err(), "waiting to replace %s was cancelled", req.SourcePath)
+	case <-p.clk.After(p.streamRetry):
+		return nil
 	}
 }
 
@@ -309,17 +405,25 @@ func (p *Promoter) sync(staging, destDir string) error {
 	return nil
 }
 
-// recheckAndRename is three statements on purpose. plan.md 15.6 requires no
-// logging, no database write and no allocation between the final Plex check and
-// the rename: a stream starting in that window dies with ESTALE rather than
-// degrading. Everything else has already happened by the time this is called.
-func (p *Promoter) recheckAndRename(ctx context.Context, staging, dest string) (bool, error) {
-	streaming, _, err := p.guard.IsStreaming(ctx, dest)
-	if streaming || err != nil {
-		return streaming, err
+// recheckAndRename holds the window plan.md 15.6 cares about. Nothing may be
+// logged, written to the database or allocated between the check and the
+// rename: a stream starting in that gap dies with ESTALE rather than degrading.
+// The happy path below is two constant-folded branches and the rename itself;
+// every string it can build is on a path that has already decided not to
+// rename. It returns (blocked, reason, renameError) so the caller can tell a
+// deferral apart from a real failure without inspecting an error.
+func (p *Promoter) recheckAndRename(ctx context.Context, staging, dest string) (bool, string, error) {
+	streaming, who, err := p.guard.IsStreaming(ctx, dest)
+	if err != nil {
+		//nolint:nilerr // deliberate: an unanswerable Plex is a deferral, not a failure
+		return true, "Plex could not be asked whether the file is streaming: " + err.Error(), nil
 	}
 
-	return false, p.fs.Rename(staging, dest)
+	if streaming {
+		return true, who, nil
+	}
+
+	return false, "", p.fs.Rename(staging, dest) //nolint:wrapcheck // wrapped by the caller; nothing may allocate here
 }
 
 // restore is plan.md 15.2 step 8. A chown failure is expected under root_squash
@@ -334,17 +438,21 @@ func (p *Promoter) restore(ctx context.Context, dest string, origin fsx.FileInfo
 			slog.String("path", dest), slog.Int("uid", origin.UID), slog.Int("gid", origin.GID), slog.Any("error", err))
 	}
 
+	// Both are attempted even when the first fails, so the promoted file ends up
+	// as close to the original as the export allows.
+	var failure error
+
 	if err := p.fs.Chmod(dest, origin.Mode.Perm()); err != nil {
-		return warnings, wrap(domain.FailPromote, err,
+		failure = wrap(domain.FailPromote, err,
 			"the replace succeeded but restoring mode %o on %s failed", origin.Mode.Perm(), dest)
 	}
 
-	if err := p.fs.Chtimes(dest, origin.MTime, origin.MTime); err != nil {
-		return warnings, wrap(domain.FailPromote, err,
+	if err := p.fs.Chtimes(dest, origin.MTime, origin.MTime); err != nil && failure == nil {
+		failure = wrap(domain.FailPromote, err,
 			"the replace succeeded but restoring the modification time on %s failed", dest)
 	}
 
-	return warnings, nil
+	return warnings, failure
 }
 
 func (p *Promoter) recordIdentity(req Request, fullHash *string) (domain.OutputIdentity, error) {

@@ -107,6 +107,9 @@ linters:
         - empty
         - stdlib
         - io.ReadSeekCloser
+        # fsx defines WriteSyncCloser, so every implementation of fsx.FS,
+        # including the test doubles, has to return it.
+        - fsx.WriteSyncCloser
     gosec:
       excludes:
         - G115  # integer overflow conversion int<->uint

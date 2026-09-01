@@ -28,61 +28,72 @@ func (p *Promoter) Sweep(ctx context.Context, roots, claimed []string) ([]string
 		}
 	}
 
-	var (
-		removed []string
-		errs    []error
-	)
-
-	remove := func(path string) {
-		if held[filepath.Clean(path)] {
-			return
-		}
-
-		if err := p.fs.Remove(path); err != nil {
-			errs = append(errs, err)
-			p.log.WarnContext(ctx, "orphan sweep could not remove an entry",
-				slog.String("path", path), slog.Any("error", err))
-
-			return
-		}
-
-		removed = append(removed, path)
-		p.log.InfoContext(ctx, "orphan sweep removed a leftover", slog.String("path", path))
-	}
+	s := &sweeper{promoter: p, ctx: ctx, held: held}
 
 	for _, root := range roots {
-		err := p.fs.WalkDir(root, func(path string, _ fsx.FileInfo, err error) error {
-			if err != nil {
-				errs = append(errs, err)
-
-				return nil
-			}
-
-			if isDebris(filepath.Base(path)) {
-				remove(path)
-			}
-
-			return nil
-		})
-		if err != nil {
-			errs = append(errs, err)
-		}
+		s.walk(root)
 	}
 
-	if p.tempDir != "" {
-		matches, err := p.fs.Glob(filepath.Join(p.tempDir, ".codarr-*"))
-		if err != nil {
-			errs = append(errs, err)
+	s.temp()
+	sort.Strings(s.removed)
+
+	return s.removed, errors.Join(s.errs...)
+}
+
+type sweeper struct {
+	promoter *Promoter
+	ctx      context.Context //nolint:containedctx // one sweep, one context; the alternative is threading it through every helper
+	held     map[string]bool
+	removed  []string
+	errs     []error
+}
+
+func (s *sweeper) walk(root string) {
+	err := s.promoter.fs.WalkDir(root, func(path string, _ fsx.FileInfo, err error) error {
+		switch {
+		case err != nil:
+			s.errs = append(s.errs, err)
+		case isDebris(filepath.Base(path)):
+			s.remove(path)
 		}
 
-		for _, m := range matches {
-			remove(m)
-		}
+		return nil
+	})
+	if err != nil {
+		s.errs = append(s.errs, err)
+	}
+}
+
+func (s *sweeper) temp() {
+	if s.promoter.tempDir == "" {
+		return
 	}
 
-	sort.Strings(removed)
+	matches, err := s.promoter.fs.Glob(filepath.Join(s.promoter.tempDir, ".codarr-*"))
+	if err != nil {
+		s.errs = append(s.errs, err)
+	}
 
-	return removed, errors.Join(errs...)
+	for _, m := range matches {
+		s.remove(m)
+	}
+}
+
+func (s *sweeper) remove(path string) {
+	if s.held[filepath.Clean(path)] {
+		return
+	}
+
+	if err := s.promoter.fs.Remove(path); err != nil {
+		s.errs = append(s.errs, err)
+		s.promoter.log.WarnContext(s.ctx, "orphan sweep could not remove an entry",
+			slog.String("path", path), slog.Any("error", err))
+
+		return
+	}
+
+	s.removed = append(s.removed, path)
+	s.promoter.log.InfoContext(s.ctx, "orphan sweep removed a leftover", slog.String("path", path))
 }
 
 func isDebris(name string) bool {

@@ -174,7 +174,7 @@ func TestImportRoots_FourInstancesReportingTheSamePath(t *testing.T) {
 		{40, "/media/kostas/tv"},
 	}
 
-	var candidates []domain.Root
+	candidates := make([]domain.Root, 0, len(instances))
 
 	for _, inst := range instances {
 		m := pathmap.New(mappings([2]string{inst.local, "/media"}))
@@ -203,7 +203,7 @@ func TestImportRoots_FourInstancesReportingTheSamePath(t *testing.T) {
 func TestImportRoots_WithoutMappingsAllFourCollide(t *testing.T) {
 	t.Parallel()
 
-	var candidates []domain.Root
+	candidates := make([]domain.Root, 0, 4)
 
 	for _, id := range []int64{10, 20, 30, 40} {
 		imported := pathmap.ImportRoots(pathmap.New(nil), id, []string{"/media"})

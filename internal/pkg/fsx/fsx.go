@@ -4,6 +4,7 @@
 package fsx
 
 import (
+	"context"
 	"io"
 	"os"
 	"time"
@@ -31,11 +32,29 @@ type SpaceInfo struct {
 	FreeBytes  uint64
 }
 
+// WriteSyncCloser is a file open for writing. Sync has to run before Close on
+// anything that will be renamed into place: the data and the directory entry
+// are separately durable (plan.md 15.2).
+type WriteSyncCloser interface {
+	io.WriteCloser
+	Sync() error
+}
+
 type FS interface {
 	Stat(path string) (FileInfo, error)
 	Statfs(path string) (SpaceInfo, error)
 	Open(path string) (io.ReadSeekCloser, error)
 	Remove(path string) error
+
+	// Create fails when the path already exists, which is what makes a staging
+	// name a claim rather than a race.
+	Create(path string, mode os.FileMode) (WriteSyncCloser, error)
+
+	// Copy writes src over dst and fsyncs dst before returning. Promotion needs
+	// it when the staging file landed on another filesystem, where rename(2)
+	// returns EXDEV (plan.md 15.1). Unlike Create it overwrites, so a partial
+	// file left by a crashed attempt does not block the retry.
+	Copy(ctx context.Context, src, dst string) (int64, error)
 
 	// Rename replaces newpath atomically. On NFSv4 this is a single server-side
 	// RENAME, which is why staging is always a sibling of the target.

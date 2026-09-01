@@ -81,7 +81,7 @@ func TestPreflight_SourceIsADirectory(t *testing.T) {
 	requireFailure(t, err, domain.FailPreflight, "is a directory")
 }
 
-// plan.md 15.4: one stat call, and it prevents damaging a hardlinked seeding copy.
+// plan.md 15.4: one stat call, and it prevents damaging a hard-linked seeding copy.
 func TestPreflight_HardlinkedSourceFails(t *testing.T) {
 	t.Parallel()
 
@@ -168,11 +168,21 @@ func TestPreflight_UnwritableDestination(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	h.fs.failOn("fs.MkdirAll", destDir+"/.codarr-writetest-42", os.ErrPermission)
+	h.fs.failOn("fs.Create", destDir+"/.codarr-writetest-42", os.ErrPermission)
 
 	_, err := h.promoter.Preflight(preflightRequest())
 	requireFailure(t, err, domain.FailPreflight, "is not writable")
 	require.ErrorIs(t, err, os.ErrPermission)
+}
+
+func TestPreflight_WritabilityProbeThatCannotBeClosed(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	h.fs.failOn("fs.Close", destDir+"/.codarr-writetest-42", os.ErrPermission)
+
+	_, err := h.promoter.Preflight(preflightRequest())
+	requireFailure(t, err, domain.FailPreflight, "could not be closed")
 }
 
 func TestPreflight_WritabilityProbeThatCannotBeRemoved(t *testing.T) {

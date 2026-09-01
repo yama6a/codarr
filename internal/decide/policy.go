@@ -225,7 +225,7 @@ type policySnapshot struct {
 }
 
 func currentPolicy() policySnapshot {
-	var targets []audioTarget
+	targets := make([]audioTarget, 0, 10)
 
 	for _, c := range []domain.Container{domain.ContainerMatroska, domain.ContainerMP4} {
 		for _, ch := range []int{1, 2, 3, 6, 8} {

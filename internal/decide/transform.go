@@ -114,7 +114,7 @@ func predictedVideoState(before domain.VideoState, p domain.Plan) *domain.VideoS
 	plan, _ := p.VideoStream()
 	if plan.Decision != domain.DecisionEncode {
 		if p.LevelRewrite {
-			after.Level = formatLevel(levelRewriteTarget)
+			after.Level = strconv.FormatFloat(levelRewriteTarget, 'f', 1, 64)
 		}
 
 		return &after
@@ -278,8 +278,4 @@ func titlePtr(title string) *string {
 	}
 
 	return &title
-}
-
-func formatLevel(level float64) string {
-	return strconv.FormatFloat(level, 'f', 1, 64)
 }

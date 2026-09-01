@@ -169,8 +169,14 @@ func verifyVideoCopy(req Request, out Output) error {
 		return fail(domain.FailVerification, "the plan copies the video stream but the output has no video stream")
 	}
 
-	src := req.Source.Video
+	if err := verifyVideoIdentity(*req.Source.Video, got); err != nil {
+		return err
+	}
 
+	return verifyLevel(req.Plan, req.Source.Video.Level, got.Level)
+}
+
+func verifyVideoIdentity(src domain.VideoState, got OutputStream) error {
 	if src.Codec != "" && got.Codec != src.Codec {
 		return fail(domain.FailVerification,
 			"the output video codec is %q and the source was %q, but the plan said copy", got.Codec, src.Codec)
@@ -187,7 +193,7 @@ func verifyVideoCopy(req Request, out Output) error {
 			got.Width, got.Height, src.Width, src.Height)
 	}
 
-	return verifyLevel(req.Plan, src.Level, got.Level)
+	return nil
 }
 
 // verifyLevel: the level is exempt from the copy check exactly when the plan

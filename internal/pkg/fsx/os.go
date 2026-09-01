@@ -1,6 +1,7 @@
 package fsx
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -9,6 +10,10 @@ import (
 	"syscall"
 	"time"
 )
+
+// copyBuffer is large enough that a multi-gigabyte remux is not dominated by
+// syscall overhead, and small enough to stay off the large-object heap path.
+const copyBuffer = 1 << 20
 
 type osFS struct{}
 
@@ -66,6 +71,66 @@ func (osFS) Open(path string) (io.ReadSeekCloser, error) {
 	}
 
 	return f, nil
+}
+
+func (osFS) Create(path string, mode os.FileMode) (WriteSyncCloser, error) {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|os.O_EXCL, mode)
+	if err != nil {
+		return nil, fmt.Errorf("create %s: %w", path, err)
+	}
+
+	return f, nil
+}
+
+func (osFS) Copy(ctx context.Context, src, dst string) (int64, error) {
+	in, err := os.Open(src)
+	if err != nil {
+		return 0, fmt.Errorf("open %s for copy: %w", src, err)
+	}
+
+	defer func() { _ = in.Close() }()
+
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		return 0, fmt.Errorf("open %s for copy: %w", dst, err)
+	}
+
+	defer func() { _ = out.Close() }()
+
+	n, err := io.CopyBuffer(out, &ctxReader{ctx: ctx, r: in}, make([]byte, copyBuffer))
+	if err != nil {
+		return n, fmt.Errorf("copy %s to %s: %w", src, dst, err)
+	}
+
+	if err := out.Sync(); err != nil {
+		return n, fmt.Errorf("fsync %s after copy: %w", dst, err)
+	}
+
+	if err := out.Close(); err != nil {
+		return n, fmt.Errorf("close %s after copy: %w", dst, err)
+	}
+
+	return n, nil
+}
+
+// ctxReader aborts a copy on cancellation. A cross-filesystem promotion copy
+// can run for minutes, and a shutdown should not have to wait it out.
+type ctxReader struct {
+	ctx context.Context //nolint:containedctx // io.Reader has nowhere else to carry it
+	r   io.Reader
+}
+
+func (c *ctxReader) Read(p []byte) (int, error) {
+	if err := c.ctx.Err(); err != nil {
+		return 0, fmt.Errorf("copy cancelled: %w", err)
+	}
+
+	n, err := c.r.Read(p)
+	if err != nil && err != io.EOF {
+		return n, fmt.Errorf("read: %w", err)
+	}
+
+	return n, err //nolint:wrapcheck // io.EOF must stay comparable for io.Copy
 }
 
 func (osFS) Remove(path string) error {

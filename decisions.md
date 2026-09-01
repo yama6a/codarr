@@ -335,6 +335,98 @@ and anything under 60 seconds falls back to a single whole-file sample.
 Rung 5 of 8.4 leaves it at zero, and clamping against zero would floor every
 target to nothing.
 
+### Stream indices are per-type ordinals, not absolute
+
+`StreamPlan.SourceIndex` and `OutputIndex` count within a stream type, so
+subtitle 1 is `0:s:1`. This matches 17.2's own example, which numbers subtitles
+0, 1, 2 in a file whose global indices would be 3, 4, 5, and it matches the
+`-map 0:s:1` form throughout 14.1. It is the one assumption shared across
+`decide` and `ffmpeg` that would silently produce a wrong file if the two
+disagreed, so it is stated here rather than left implicit.
+
+### `Container.OutputExt` takes the source path
+
+The first cut was `Ext()` returning `.mp4` for the MP4 family, which renames an
+`.m4v` source and breaks 6.1's "the filename never changes". The extension now
+comes from the source path when the container family is unchanged, preserving
+case, and only a legacy container (which is becoming MKV anyway) gets a new one.
+
+### The 8.4 chain lives in `decide` only
+
+It was briefly implemented in both `decide` and `ffmpeg`: same rung order, same
+2% container allowance, two test suites to keep in step. `decide` keeps it,
+because the transform record's `before` needs it and it already depends on
+ffprobe. The encoder takes the resolved number as a parameter.
+
+### Dropping attachments or cover art does not by itself force a rewrite
+
+6.4 says "drop all attachments" and 6.2 says always drop attached pictures, but
+7's Kind table says a file whose streams all copy is `skip`. Read literally,
+every anime MKV with font attachments and every MP4 with cover art becomes
+`audio_only` forever, purely to strip them, and gets rewritten on every pass.
+
+Treated as mapping rules for a file already being rebuilt for a real reason.
+This is the judgement call in wave 2 with the least support in the text.
+
+### A level rewrite forces at least `remux`
+
+7's Kind table calls an all-copy MKV `skip`, which would mean a level-5.1 1080p
+file is skipped and the flag is never actually rewritten. 6.2 says the kind
+stays "remux or audio_only". Followed 6.2. Never `full`.
+
+### Dolby Vision profile 5 does not force `audio_only`
+
+9 says detecting it "downgrades the plan to `audio_only`", but if nothing else
+needs work there is no audio work to do and the honest kind is `skip`.
+Implemented as "never `full`", with the kind falling out of the other streams.
+
+### Default deny extended to two cases the spec leaves open
+
+An h264 stream with no reported level encodes, and the level-rewrite guard
+requires `1 <= refs <= 4`, so an absent `refs` is a rejection rather than a
+pass. Both follow 6.2's stated default-deny posture.
+
+### The hardware-decode set is not in the policy hash
+
+It selects a decode path, not what ends up in the output. Including it would
+make a driver-support change invalidate the whole library on the next
+"re-check all done items".
+
+### Promotion defers on a Plex error rather than failing
+
+15.2 does not say what to do when Plex cannot be reached. Failing closed was the
+first cut, but `awaiting_stream_end` is equally closed: it never replaces the
+file, it keeps the verified staging output, it retries every 60 seconds, and
+19.2 makes it resumable across a restart. Failing throws away a completed encode
+and needs a human. Only an unambiguous "not streaming" reaches the rename.
+
+### The same-device check is made load-bearing rather than tautological
+
+15.4 asks that the staging and destination directories report the same device,
+but 15.1 makes staging a sibling of the destination, so on the primary path they
+are the same directory and the comparison can never fail. `Staging.CrossDevice`
+carries the real signal: a hard preflight failure on the non-temp path, and on
+the temp path it decides whether the copy is needed at all. Kept as 15.6's
+tripwire, because NFSv4 hides a dataset split behind identical client-side paths
+while `rename()` silently starts returning EXDEV.
+
+### A free-space re-check runs before the cross-device copy
+
+15.1 falls back to the temp dir when the destination lacks space, then requires
+copying the output back to a destination-side staging file. Nothing in the spec
+checks that the output fits before that copy starts, and a mid-copy ENOSPC
+leaves a partial dotfile only the sweep cleans up. The output is stat'd and the
+destination statfs'd first.
+
+### A post-rename failure still surrenders the output identity
+
+If `chmod`, `chtimes` or the fingerprint fails after the rename, the file is
+promoted but the job failed. `Result.Renamed` tells the caller the source is
+already gone and that it must persist whatever `Identity` was computed. Without
+it, `codarr_output_fingerprint` stays NULL on a file Codarr wrote and provenance
+reads `untouched` forever. Not a safety problem, since the decision engine plans
+a compliant file as `skip` regardless, but wrong in the UI.
+
 ## Known spec conflicts, implemented as written
 
 Both are recorded rather than fixed, because the plan is explicit and the

@@ -2,10 +2,6 @@ package ffmpeg
 
 import (
 	"sort"
-	"strconv"
-	"strings"
-
-	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
 // HardwareCorrection scales an x265 measurement up to what the UHD 630
@@ -176,68 +172,4 @@ func Median(v []int) int {
 	}
 
 	return (s[mid-1] + s[mid]) / 2
-}
-
-// SourceBitrateInput is the probe-derived facts the 8.4 resolution chain reads.
-type SourceBitrateInput struct {
-	StreamBitrate int
-	BPSTag        string
-	FileSizeBytes int64
-	DurationSec   float64
-	AudioBitrates []int
-	FormatBitrate int
-}
-
-// ResolveSourceBitrate walks the 8.4 chain, first match wins, and reports which
-// rung produced the answer. ffprobe's per-stream bit_rate is usually absent for
-// Matroska, so the later rungs are the common case.
-func ResolveSourceBitrate(in SourceBitrateInput) (int, domain.BitrateSource) {
-	if in.StreamBitrate > 0 {
-		return in.StreamBitrate, domain.BitrateFromStream
-	}
-
-	if bps, ok := parseBPSTag(in.BPSTag); ok {
-		return bps, domain.BitrateFromBPSTag
-	}
-
-	if bps, ok := computeVideoBitrate(in); ok {
-		return bps, domain.BitrateFromComputed
-	}
-
-	if in.FormatBitrate > 0 {
-		return in.FormatBitrate, domain.BitrateFromFormat
-	}
-
-	return 0, domain.BitrateUnresolved
-}
-
-func parseBPSTag(tag string) (int, bool) {
-	bps, err := strconv.Atoi(strings.TrimSpace(tag))
-	if err != nil || bps <= 0 {
-		return 0, false
-	}
-
-	return bps, true
-}
-
-// computeVideoBitrate is rung 3: total bits minus the known audio and a 2%
-// container allowance, over the duration.
-func computeVideoBitrate(in SourceBitrateInput) (int, bool) {
-	if in.FileSizeBytes <= 0 || in.DurationSec <= 0 {
-		return 0, false
-	}
-
-	fileBits := float64(in.FileSizeBytes) * 8
-
-	audioBits := 0.0
-	for _, a := range in.AudioBitrates {
-		audioBits += float64(a) * in.DurationSec
-	}
-
-	videoBits := fileBits - audioBits - fileBits*0.02
-	if videoBits <= 0 {
-		return 0, false
-	}
-
-	return int(videoBits / in.DurationSec), true
 }

@@ -2,6 +2,11 @@
 // here talks to a database, a filesystem or a subprocess.
 package domain
 
+import (
+	"path/filepath"
+	"strings"
+)
+
 // Decision is what happens to one stream of one file.
 type Decision string
 
@@ -39,13 +44,33 @@ const (
 	ContainerMP4      Container = "mp4"
 )
 
-// Ext is the file extension Codarr writes for a container.
-func (c Container) Ext() string {
-	if c == ContainerMP4 {
-		return ".mp4"
-	}
+// OutputExt is the extension the output must carry for a given source path.
+//
+// It takes the source path rather than returning a constant because plan.md 6.1
+// requires the filename never to change for an MKV or MP4 source: an .m4v file
+// stays .m4v, and returning ".mp4" for it would rename the file, which makes an
+// *arr rescan a delete-plus-add instead of a no-op. Only a legacy container,
+// which is becoming MKV anyway, gets a new extension.
+func (c Container) OutputExt(sourcePath string) string {
+	srcExt := filepath.Ext(sourcePath)
+	lower := strings.ToLower(srcExt)
 
-	return ".mkv"
+	switch c {
+	case ContainerMP4:
+		if lower == ".m4v" || lower == ".mp4" {
+			return srcExt
+		}
+
+		return ".mp4"
+	case ContainerMatroska:
+		if lower == ".mkv" {
+			return srcExt
+		}
+
+		return ".mkv"
+	default:
+		return ".mkv"
+	}
 }
 
 // DecodePath records whether the video was decoded on the iGPU or in software.

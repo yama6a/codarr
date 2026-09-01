@@ -13,9 +13,9 @@ import (
 // sibling so rename() never crosses a filesystem boundary.
 const StagingPrefix = ".codarr-staging-"
 
-// writeProbePrefix names the directory the writability check of plan.md 15.4
-// creates and removes. fsx.FS has no create primitive, so a mkdir-and-remove is
-// the only honest test that the destination is writable.
+// writeProbePrefix names the dotfile the writability check of plan.md 15.4
+// creates and removes. Checking mode bits would be a guess; creating a file is
+// the only answer that accounts for the export options and the effective uid.
 const writeProbePrefix = ".codarr-writetest-"
 
 // SourceState is what analysis recorded about the file being replaced.
@@ -78,10 +78,13 @@ func (p *Promoter) Preflight(req PreflightRequest) (Staging, error) {
 		return Staging{}, err
 	}
 
-	// plan.md 15.4: the staging directory and the destination must report the
-	// same device number. On the primary path they are the same directory, so a
-	// mismatch means the mount changed under Codarr and rename() would no longer
-	// be the atomic replace 15.6 depends on.
+	// plan.md 15.4 asks that the staging and destination directories report the
+	// same device number. On the primary path they ARE the same directory, so
+	// the literal comparison can never fail; it is kept as the tripwire 15.6
+	// asks for. NFSv4 presents every export inside one pseudo-filesystem, so a
+	// dataset split leaves the client-side paths looking identical while
+	// rename() silently starts returning EXDEV and stops being the atomic
+	// replace the whole sequence depends on.
 	if staging.CrossDevice && !staging.UsedTempDir {
 		return Staging{}, fail(domain.FailPreflight,
 			"the staging directory %s and the destination %s report different device numbers, so the replace would not be atomic",
@@ -101,7 +104,7 @@ func (p *Promoter) checkSourceUnchanged(req PreflightRequest) error {
 		return fail(domain.FailPreflight, "the source %s is a directory", req.SourcePath)
 	}
 
-	// plan.md 15.4: one stat call, and it prevents renaming over a hardlinked
+	// plan.md 15.4: one stat call, and it prevents renaming over a hard-linked
 	// seeding copy.
 	if info.NLink != 1 {
 		return fail(domain.FailPreflight,
@@ -141,8 +144,13 @@ func (p *Promoter) checkSourceUnchanged(req PreflightRequest) error {
 func (p *Promoter) checkWritable(jobID int64, destDir string) error {
 	probe := filepath.Join(destDir, writeProbePrefix+strconv.FormatInt(jobID, 10))
 
-	if err := p.fs.MkdirAll(probe, 0o700); err != nil {
+	f, err := p.fs.Create(probe, 0o600)
+	if err != nil {
 		return wrap(domain.FailPreflight, err, "the destination directory %s is not writable", destDir)
+	}
+
+	if err := f.Close(); err != nil {
+		return wrap(domain.FailPreflight, err, "the writability probe %s could not be closed", probe)
 	}
 
 	if err := p.fs.Remove(probe); err != nil {

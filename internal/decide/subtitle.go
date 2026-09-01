@@ -31,13 +31,15 @@ func planSubtitle(s ffprobe.Stream, container domain.Container) subtitleVerdict 
 
 	target := SubtitleTargetForContainer(container)
 	if s.CodecName == target {
-		return subtitleVerdict{decision: domain.DecisionCopy, target: target}
+		return subtitleVerdict{decision: domain.DecisionCopy}
 	}
 
+	// The plan carries the ffmpeg encoder name, since that is what -c:s:N
+	// takes; the transform record carries the codec ffprobe will report back.
 	return subtitleVerdict{
 		decision: domain.DecisionConvert,
 		reason:   fmt.Sprintf("%s to %s", s.CodecName, SubtitleEncoder(target)),
-		target:   target,
+		target:   SubtitleEncoder(target),
 	}
 }
 

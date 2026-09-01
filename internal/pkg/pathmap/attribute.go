@@ -113,39 +113,12 @@ func Attribute(roots []domain.Root, filePath string) (Attribution, bool) {
 		return Attribution{}, false
 	}
 
-	var (
-		best    []domain.Root
-		bestLen = -1
-	)
-
-	for _, r := range roots {
-		root := Normalise(r.Path)
-		if root == "" || !r.Enabled || !UnderPrefix(norm, root) {
-			continue
-		}
-
-		switch {
-		case len(root) > bestLen:
-			best, bestLen = []domain.Root{r}, len(root)
-		case len(root) == bestLen:
-			best = append(best, r)
-		}
-	}
-
-	if bestLen < 0 {
+	best := longestPrefixMatches(roots, norm)
+	if len(best) == 0 {
 		return Attribution{}, false
 	}
 
-	sort.SliceStable(best, func(i, j int) bool { return best[i].ID < best[j].ID })
-
-	var ids []int64
-
-	for _, r := range best {
-		if r.ArrInstanceID != nil {
-			ids = appendDistinct(ids, *r.ArrInstanceID)
-		}
-	}
-
+	ids := distinctInstances(best)
 	att := Attribution{Root: best[0]}
 
 	switch len(ids) {
@@ -154,11 +127,48 @@ func Attribute(roots []domain.Root, filePath string) (Attribution, bool) {
 		att.ArrInstanceID = &ids[0]
 		att.Root = rootFor(best, ids[0])
 	default:
-		sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 		att.Conflict = &Conflict{Path: Normalise(best[0].Path), InstanceIDs: ids}
 	}
 
 	return att, true
+}
+
+func longestPrefixMatches(roots []domain.Root, filePath string) []domain.Root {
+	best := make([]domain.Root, 0, len(roots))
+	bestLen := -1
+
+	for _, r := range roots {
+		root := Normalise(r.Path)
+		if root == "" || !r.Enabled || !UnderPrefix(filePath, root) {
+			continue
+		}
+
+		if len(root) > bestLen {
+			best, bestLen = best[:0], len(root)
+		}
+
+		if len(root) == bestLen {
+			best = append(best, r)
+		}
+	}
+
+	sort.SliceStable(best, func(i, j int) bool { return best[i].ID < best[j].ID })
+
+	return best
+}
+
+func distinctInstances(roots []domain.Root) []int64 {
+	var ids []int64
+
+	for _, r := range roots {
+		if r.ArrInstanceID != nil {
+			ids = appendDistinct(ids, *r.ArrInstanceID)
+		}
+	}
+
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+
+	return ids
 }
 
 func rootFor(roots []domain.Root, instanceID int64) domain.Root {

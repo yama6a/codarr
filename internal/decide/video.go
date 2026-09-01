@@ -3,6 +3,7 @@ package decide
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/yama6a/codarr/internal/ffprobe"
@@ -60,8 +61,9 @@ func planVideo(s ffprobe.Stream, scan domain.Scan, idetPending bool) videoVerdic
 	if len(fails) == 1 && fails[0].kind == failLevel && levelRewriteApplies(s) {
 		v.decision = domain.DecisionCopy
 		v.levelRewrite = true
+		target := strconv.FormatFloat(levelRewriteTarget, 'f', 1, 64)
 		v.reason = fmt.Sprintf("level %s -> %s flag rewrite (content fits %s, refs=%d)",
-			s.LevelString(), formatLevel(levelRewriteTarget), formatLevel(levelRewriteTarget), s.Refs)
+			s.LevelString(), target, target, s.Refs)
 		v.reason = appendDV(v.reason, v)
 
 		return v
@@ -151,7 +153,7 @@ func levelFailure(s ffprobe.Stream) (copyFailure, bool) {
 	}
 
 	if level > h264MaxLevel {
-		return copyFailure{failLevel, fmt.Sprintf("level %s is above %s", s.LevelString(), formatLevel(h264MaxLevel))}, true
+		return copyFailure{failLevel, fmt.Sprintf("level %s is above %s", s.LevelString(), strconv.FormatFloat(h264MaxLevel, 'f', 1, 64))}, true
 	}
 
 	return copyFailure{}, false

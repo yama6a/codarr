@@ -21,33 +21,61 @@ const (
 func ChromaOf(pixFmt string) Chroma {
 	f := strings.ToLower(pixFmt)
 
-	switch f {
-	case "":
-		return ChromaUnknown
-	case "nv12", "nv21", "p010le", "p010be", "p012le", "p012be", "p016le", "p016be":
-		return Chroma420
-	case "nv16", "nv20le", "nv20be", "p210le", "p210be", "p216le", "p216be",
-		"yuyv422", "yvyu422", "uyvy422", "nv24", "nv42":
-		return Chroma422
-	case "p410le", "p410be", "p416le", "p416be", "ayuv64le", "ayuv64be", "xyz12le", "xyz12be":
+	if c, ok := namedChroma(f); ok {
+		return c
+	}
+
+	if isMono(f) {
+		return ChromaMono
+	}
+
+	if c, ok := tokenChroma(f); ok {
+		return c
+	}
+
+	if isRGB(f) {
 		return Chroma444
 	}
 
+	return ChromaUnknown
+}
+
+func isMono(f string) bool {
+	return strings.HasPrefix(f, "gray") || strings.HasPrefix(f, "ya") || f == "monow" || f == "monob"
+}
+
+// tokenChroma reads the subsampling out of the name, which is where every
+// planar format carries it.
+func tokenChroma(f string) (Chroma, bool) {
 	switch {
-	case strings.HasPrefix(f, "gray") || strings.HasPrefix(f, "ya") || f == "monow" || f == "monob":
-		return ChromaMono
 	case strings.Contains(f, "444"):
-		return Chroma444
+		return Chroma444, true
 	case strings.Contains(f, "422"):
-		return Chroma422
+		return Chroma422, true
 	case strings.Contains(f, "420"):
-		return Chroma420
+		return Chroma420, true
 	case strings.Contains(f, "411"), strings.Contains(f, "410"), strings.Contains(f, "440"):
-		return ChromaSub
-	case isRGB(f):
-		return Chroma444
+		return ChromaSub, true
 	default:
-		return ChromaUnknown
+		return ChromaUnknown, false
+	}
+}
+
+// namedChroma covers the packed and semi-planar formats whose names carry no
+// subsampling token.
+func namedChroma(f string) (Chroma, bool) {
+	switch f {
+	case "":
+		return ChromaUnknown, true
+	case "nv12", "nv21", "p010le", "p010be", "p012le", "p012be", "p016le", "p016be":
+		return Chroma420, true
+	case "nv16", "nv20le", "nv20be", "p210le", "p210be", "p216le", "p216be",
+		"yuyv422", "yvyu422", "uyvy422", "nv24", "nv42":
+		return Chroma422, true
+	case "p410le", "p410be", "p416le", "p416be", "ayuv64le", "ayuv64be", "xyz12le", "xyz12be":
+		return Chroma444, true
+	default:
+		return ChromaUnknown, false
 	}
 }
 

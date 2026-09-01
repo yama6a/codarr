@@ -2,7 +2,7 @@ package fingerprint_test
 
 import (
 	"bytes"
-	"errors"
+	"context"
 	"io"
 	"math/rand"
 	"os"
@@ -23,6 +23,11 @@ func (nopCloser) Close() error { return nil }
 type memFS struct {
 	files   map[string][]byte
 	openErr error
+
+	// failSeekAfter and failReadAfter make the nth call fail, which is how the
+	// head and tail read paths are exercised separately.
+	failSeekAfter int
+	failReadAfter int
 }
 
 var _ fsx.FS = (*memFS)(nil)
@@ -37,8 +42,40 @@ func (m *memFS) Open(path string) (io.ReadSeekCloser, error) {
 		return nil, os.ErrNotExist
 	}
 
+	if m.failSeekAfter > 0 || m.failReadAfter > 0 {
+		return &flakyReader{r: bytes.NewReader(b), seekAfter: m.failSeekAfter, readAfter: m.failReadAfter}, nil
+	}
+
 	return nopCloser{bytes.NewReader(b)}, nil
 }
+
+type flakyReader struct {
+	r         *bytes.Reader
+	seekAfter int
+	readAfter int
+	seeks     int
+	reads     int
+}
+
+func (f *flakyReader) Seek(offset int64, whence int) (int64, error) {
+	f.seeks++
+	if f.seekAfter > 0 && f.seeks >= f.seekAfter {
+		return 0, os.ErrClosed
+	}
+
+	return f.r.Seek(offset, whence) //nolint:wrapcheck // a test double
+}
+
+func (f *flakyReader) Read(p []byte) (int, error) {
+	f.reads++
+	if f.readAfter > 0 && f.reads >= f.readAfter {
+		return 0, os.ErrClosed
+	}
+
+	return f.r.Read(p) //nolint:wrapcheck // a test double
+}
+
+func (f *flakyReader) Close() error { return nil }
 
 func (*memFS) Stat(string) (fsx.FileInfo, error)                             { panic("unused") }
 func (*memFS) Statfs(string) (fsx.SpaceInfo, error)                          { panic("unused") }
@@ -52,6 +89,8 @@ func (*memFS) Chown(string, int, int) error                                  { p
 func (*memFS) WalkDir(string, func(string, fsx.FileInfo, error) error) error { panic("unused") }
 func (*memFS) MkdirAll(string, os.FileMode) error                            { panic("unused") }
 func (*memFS) Glob(string) ([]string, error)                                 { panic("unused") }
+func (*memFS) Create(string, os.FileMode) (fsx.WriteSyncCloser, error)       { panic("unused") }
+func (*memFS) Copy(context.Context, string, string) (int64, error)           { panic("unused") }
 
 func body(t *testing.T, seed int64, n int) []byte {
 	t.Helper()
@@ -228,6 +267,37 @@ func TestFull_EmptyFile(t *testing.T) {
 	require.Equal(t, "xxh3-128", fingerprint.AlgoOf(got))
 }
 
+// The head read, the tail seek and the tail read are three separate failure
+// points inside one Sparse call.
+func TestSparse_PropagatesReadAndSeekFailures(t *testing.T) {
+	t.Parallel()
+
+	files := map[string][]byte{"/f": body(t, 12, 3*mib)}
+
+	for name, fs := range map[string]*memFS{
+		"size seek": {files: files, failSeekAfter: 1},
+		"head seek": {files: files, failSeekAfter: 2},
+		"head read": {files: files, failReadAfter: 1},
+		"tail seek": {files: files, failSeekAfter: 3},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := fingerprint.New(fs).Sparse("/f")
+			require.ErrorIs(t, err, os.ErrClosed)
+		})
+	}
+}
+
+func TestFull_PropagatesReadFailure(t *testing.T) {
+	t.Parallel()
+
+	fs := &memFS{files: map[string][]byte{"/f": body(t, 13, 3*mib)}, failReadAfter: 1}
+
+	_, err := fingerprint.New(fs).Full("/f")
+	require.ErrorIs(t, err, os.ErrClosed)
+}
+
 func TestFull_PropagatesOpenError(t *testing.T) {
 	t.Parallel()
 
@@ -259,5 +329,5 @@ func TestSparse_MatchesRealFilesystem(t *testing.T) {
 	require.Equal(t, sparse(t, b), got)
 
 	_, err = fingerprint.New(fsx.OS()).Sparse(dir + "/missing.mkv")
-	require.True(t, errors.Is(err, os.ErrNotExist))
+	require.ErrorIs(t, err, os.ErrNotExist)
 }

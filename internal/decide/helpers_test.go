@@ -13,7 +13,6 @@ func withLang(l string) opt       { return func(s *ffprobe.Stream) { setTag(s, "
 func withTitle(t string) opt      { return func(s *ffprobe.Stream) { setTag(s, "title", t) } }
 func withBitRate(b string) opt    { return func(s *ffprobe.Stream) { s.BitRate = b } }
 func withProfile(p string) opt    { return func(s *ffprobe.Stream) { s.Profile = p } }
-func withLayout(l string) opt     { return func(s *ffprobe.Stream) { s.ChannelLayout = l } }
 func withLevel(l int) opt         { return func(s *ffprobe.Stream) { s.Level = l } }
 func withBPSTag(b string) opt     { return func(s *ffprobe.Stream) { setTag(s, "BPS-eng", b) } }
 

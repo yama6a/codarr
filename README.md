@@ -104,13 +104,32 @@ one. A third claimant would sit `Pending`.
 | Volume | Claim | Mount | Notes |
 |---|---|---|---|
 | library | `media-library` | `/media` | **No `subPath`.** Codarr needs both owners' trees |
-| config | `codarr-config` | `/data` | `longhorn-r2-retained-with-backups`, RWO |
+| config | `codarr-config` | `/data` | `longhorn-r2-retained-with-backups`, RWO, 5Gi |
 
 `media-downloads` is not mounted. Codarr never touches the staging area.
 
 `replicas: 1` and `strategy: Recreate`, because two processes on one SQLite
-directory corrupt it. Size the config PVC against `tc-w1`'s remaining Longhorn
-headroom, which is tight.
+directory corrupt it.
+
+5Gi is generous for the config volume. The database holds one row per file with
+its full ffprobe output, plus a transform record per job, so a library of a few
+thousand files lands in the low hundreds of megabytes. `tc-w1` had 854Gi of
+Longhorn storage available and 188Gi scheduled when this was written, so there is
+room; `docs/30_media.md`'s claim of roughly 64Gi of headroom is out of date.
+
+**Staging never touches this volume.** Codarr writes its output as a dotfile
+sibling of the target on the NAS, so `rename()` is a single atomic server-side
+operation. That was verified on the real mount: renaming from a local volume into
+`/media` returns EXDEV.
+
+### The GPU slot is the last one
+
+`sharedDevNum` is 2. Plex holds one and Codarr takes the other, so a third
+claimant would sit `Pending` on `Insufficient gpu.intel.com/i915`.
+
+Verified on the node: QSV and VAAPI both encode HEVC Main and Main10, VP9
+hardware decode works, and the driver is the jellyfin-bundled Intel iHD 25.4.6.
+See `VERIFY.md`.
 
 ### Security context
 

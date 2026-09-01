@@ -278,6 +278,45 @@ legacy container becomes MKV.
 Upgrades are off on every instance, which is the other half of 23.2 and was
 already confirmed.
 
+## Post-verification changes
+
+Two things changed on the strength of the second cluster run. Both are in
+`VERIFY.md` with their evidence.
+
+### Dolby Vision in MP4 is tagged `dvh1`, not `hvc1`
+
+`plan.md` 14.1 mandates `-tag:v hvc1` for HEVC in MP4, because ffmpeg's default
+`hev1` is refused by Apple-derived players. On a Dolby Vision source that flag
+silently destroys the `dvcC` configuration record: the mov muxer writes it only
+for a `dvh1`/`dvhe` sample entry with `-strict unofficial`, and warns at no log
+level when it declines.
+
+15.3 would then have failed the job as a hard error for profile 5, correctly, on
+a record Codarr had itself destroyed. A DV plan targeting MP4 now emits
+`-strict unofficial -tag:v dvh1`; everything else still gets `hvc1`.
+
+### The hardware correction is 1.25
+
+8.1 proposes 1.35 and explicitly says to tune it after the VMAF spot-check in 27.
+Measured on the real UHD 630 across six clips of differing complexity: ratios of
+1.17, 1.20, 1.24, 1.29, 1.33 and 1.33, mean and median both 1.26.
+
+1.35 was about 8% conservative. Reverting is a one-constant change in
+`internal/ffmpeg/bitrate.go` if the output looks soft in practice. The three
+tests that asserted the old figure now derive it from the constant, so a future
+retune does not break tests that are about the multiplication rather than the
+value.
+
+Note the constant is only meaningful paired with the probe's `-preset veryfast`.
+
+### Only `analyze` matters after an in-place replacement
+
+16.1 lists the partial refresh first and `analyze` second. Measured against the
+live server, a refresh does **not** re-read a changed file at a path Plex already
+knows; only `analyze` updates it. The refresh does pick up a genuinely new file
+in a known directory, which is the legacy-container case where the extension
+changes (6.1). So both calls stay, but `analyze` is the load-bearing one.
+
 ## Open items
 
 Recorded in `VERIFY.md` rather than here: everything `plan.md` section 27 asks

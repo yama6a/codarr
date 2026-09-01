@@ -291,6 +291,30 @@ func TestBuild_Golden(t *testing.T) {
 			},
 		},
 		{
+			// plan.md 14.1 mandates -tag:v hvc1 for HEVC in MP4, but on a Dolby
+			// Vision source that silently destroys the dvcC record. Verified on
+			// jellyfin-ffmpeg 7.1.4: the mov muxer needs dvh1 plus -strict
+			// unofficial, and warns at no log level when it declines.
+			name: "audio_only_mp4_dolby_vision",
+			req: ffmpeg.Request{
+				Source: ffmpeg.Source{Path: "/library/dv.mp4", VideoCodec: "hevc"},
+				Output: "/library/.codarr-staging-19.mp4",
+				Tags:   tags(),
+				Plan: domain.Plan{
+					Kind:               domain.KindAudioOnly,
+					SourceContainer:    "mp4",
+					OutputContainer:    domain.ContainerMP4,
+					HDR:                true,
+					DolbyVision:        true,
+					DolbyVisionProfile: 5,
+					Streams: []domain.StreamPlan{
+						{Type: domain.StreamVideo, SourceIndex: 0, Decision: domain.DecisionCopy, Default: true},
+						{Type: domain.StreamAudio, SourceIndex: 0, Decision: domain.DecisionEncode, TargetCodec: "aac", TargetBitrate: 384_000, TargetChannels: 6, Language: "eng", Default: true},
+					},
+				},
+			},
+		},
+		{
 			// plan.md 9 calls a stream HDR on smpte2084 OR arib-std-b67, then
 			// prescribes -color_trc smpte2084 unconditionally. An HLG source
 			// stamped PQ renders wrong, so the transfer is carried through.

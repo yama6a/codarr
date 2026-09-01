@@ -202,8 +202,8 @@ folder finding above.
 | # | Claim | Status |
 |---|---|---|
 | 1 | HDR10 metadata survives a `hevc_qsv` round trip | **CONFIRMED** |
-| 2 | Plex `analyze` verb and path on the running PMS | TODO, blocked: no items in any library |
-| 3 | ffprobe JSON path for the Dolby Vision profile | **CONFIRMED**, but the record does NOT survive a copy. See below |
+| 2 | Plex `analyze` verb and path on the running PMS | **CONFIRMED**, `PUT`, 200 empty body |
+| 3 | DOVI record survives a copy, and its ffprobe path | **CONFIRMED** for MKV; MP4 needs `dvh1` + `-strict unofficial` |
 | 4 | Chrome client profile produces Direct Stream for 8-bit and 10-bit HEVC | TODO, needs a browser and a real file |
 | 5 | *arr naming format uses no `{MediaInfo ...}` tokens | **CONFIRMED**, resolved by the user 2026-09-01 |
 | 6 | Current jellyfin-ffmpeg Debian package name and repo path | **CONFIRMED** |
@@ -213,7 +213,7 @@ folder finding above.
 | 10 | `rename()` atomicity and same device number on the NFS mount | **CONFIRMED** |
 | 11 | Whether `chown` succeeds on the NFS mount | **FAILS**, expected and tolerated |
 | 12 | CODARR tag survives a round trip into MP4 | **CONFIRMED**, MP4 output is not gated |
-| 13 | VMAF spot-check, tuning the 1.35 hardware correction | TODO, needs real content |
+| 13 | VMAF spot-check, tuning the hardware correction | **DONE**, retuned 1.35 to 1.25 |
 | 14 | VP9 hardware decode on this Gen 9.5 driver stack | **CONFIRMED**, stays in the hardware set |
 | 15 | A level-rewritten file plays on the pickiest client | Bitstream rewrite **CONFIRMED**; playback still needs a television |
 | 16 | Whether Bazarr preserves the CODARR global tag | Moot, Bazarr writes sidecars here |
@@ -317,41 +317,112 @@ With no GPU passed through, the hardware probe correctly failed over and logged
 `software_fallback: true` with `encoder: libx265`, which is 10.2's loud
 reporting doing its job.
 
-## The one finding that contradicts the plan
+## Dolby Vision, settled with a real file
 
-### The Dolby Vision configuration record does not survive `-c:v copy`
+The earlier synthetic test was wrong, and it was wrong in the way it suspected.
 
-Neither into MKV nor into MP4, at any `-strict` level including `unofficial`.
-MP4 warns `Not writing 'dvcC'/'dvvC' box. Requires -strict unofficial.` and then
-declines anyway; MKV drops it silently. Confirmed three ways: unchanged file
-size, no box in a full MP4 box walk, and `side_data_list: null` on reprobe.
-Verbose logs show the record reaching the muxer intact, so the muxer is dropping
-it.
+A genuine profile 5 file was built with `dovi_tool 2.3.3`: `generate` a profile 5
+RPU (240 frames, L5 and L6), `inject-rpu` into a 10-bit HEVC elementary stream,
+muxed with `mkvmerge 99.0`. `dovi_tool info` confirms 240 real RPUs, profile 5,
+CM v2.9.
 
-The profile number's location IS confirmed, which closes half of 27.3:
+**The configuration record DOES survive `-c:v copy` into MKV.** ffprobe reads it
+back intact (`dv_profile: 5`, `dv_level: 3`, `rpu_present_flag: 1`), including on
+a realistic `audio_only` job with the video copied and the audio re-encoded to
+AC-3. The earlier finding was an artifact of a hand-injected record with no RPUs
+behind it: the muxers were refusing a record the bitstream did not back up.
+
+**`plan.md` 9's profile 5 gate is satisfiable and needs no change.**
+
+The ffprobe path, confirmed against a real file:
 
 ```
 .streams[].side_data_list[]
   | select(.side_data_type == "DOVI configuration record")
-  | .dv_profile          # integer, at stream level
+  | .dv_profile
 ```
 
-**Caveat, and it matters.** The test record was hand-injected with no real RPU
-behind it, so the muxers may be refusing a configuration record the bitstream
-does not actually back up. This is not proof that a genuine Dolby Vision file
-loses it. It does mean the necessary condition 9 assumes is unproven rather than
-established.
+**The in-band RPUs always survive**, 240 of 240 frames, in every container, with
+or without the container record. The distinction section 9 draws between the two
+is exactly right.
 
-Consequence if it holds for real files: 9's profile 5 gate makes verification a
-hard failure whenever the record is missing from the output, so **every profile 5
-file would fail verification permanently** and never be processed. That fails
-safe, since the source is untouched and the staging file is kept, but those files
-would sit in a failing state forever rather than being skipped cleanly.
+### MP4 exposed a real bug in plan.md 14.1, now fixed
 
-No policy change has been made on the strength of a synthetic test. Resolving it
-needs one real Dolby Vision profile 5 file.
+The mov muxer writes the record only when the sample entry tag is `dvh1` or
+`dvhe` **and** `-strict unofficial` is set. With `hvc1` it writes nothing **and
+warns at no log level**.
 
-## Smaller findings
+`plan.md` 14.1 mandates `-tag:v hvc1` for HEVC in MP4. On a Dolby Vision source
+that flag silently destroys the configuration record, which 15.3 then correctly
+fails as a hard error for profile 5. Verified directly: DV MP4 in, `-tag:v hvc1`
+out, record gone; the same command without the tag override keeps it.
+
+Fixed in `internal/ffmpeg`: a Dolby Vision plan targeting MP4 emits
+`-strict unofficial -tag:v dvh1` instead. Everything else still gets `hvc1`, as
+14.1 requires. Covered by a golden file.
+
+One thing that cannot be done at all: an MP4 tagged `dvh1` will not remux into
+MKV (`Tag dvh1 incompatible with output codec id '173'`, header write fails), and
+neither `-tag:v 0` nor `-tag:v ""` clears it. Container preservation (6.1) means
+Codarr never attempts that.
+
+## The hardware correction should be 1.25, not 1.35
+
+`plan.md` 8.1 proposes 1.35 and says to tune it after this check.
+
+jellyfin-ffmpeg 7.1.4 has no `libvmaf` (only `vmafmotion`), so a static build was
+used for scoring; every encode ran on the jellyfin build against the real UHD
+630. For each clip: the bitrate at which `hevc_qsv` reaches the same VMAF as the
+probe's own `libx265 -crf 21 -preset veryfast` on identical frames.
+
+| clip | reference kbps | reference VMAF | QSV kbps at equal VMAF | ratio |
+|---|---|---|---|---|
+| Tears of Steel, live action A | 1368 | 81.73 | 1604 | 1.17 |
+| Sintel t=204 | 3674 | 97.19 | 4395 | 1.20 |
+| Xiph in_to_tree | 18304 | 90.86 | 22677 | 1.24 |
+| Tears of Steel, live action B | 1125 | 73.09 | 1453 | 1.29 |
+| Sintel t=444 | 2706 | 75.06 | 3610 | 1.33 |
+| Sintel t=684 | 2761 | 87.11 | 3683 | 1.33 |
+
+Mean and median both **1.26**. Changed to **1.25**. 1.35 was not wrong, just
+about 8% conservative.
+
+The constant is only meaningful paired with the probe's `-preset veryfast`;
+change one and the other has to be re-measured. Source material was Xiph's test
+corpus and the Blender open movies, all freely licensed.
+
+Side finding: `hevc_qsv` overshoots high targets (+6.6% at 18 Mbps, +8.7% at
+46 Mbps) but lands within 1.5% below 5 Mbps, which is where this library sits.
+
+## Plex analyze, confirmed against a real item
+
+PMS 1.43.3.10896. One synthetic file was placed in `Movies-Yama`, scanned,
+tested, and removed; the library is back to 0 items.
+
+- **`PUT /library/metadata/{ratingKey}/analyze` returns 200 with an empty body.**
+  GET and POST both 404, so the verb is required rather than preferred. A bad key
+  404s, no token 401s.
+- **It is non-destructive and sufficient on its own.** The file was replaced in
+  place with a completely different encode and `analyze` called alone: duration,
+  width, video codec and audio codec all updated within 15 seconds, while
+  `title`, `addedAt`, `viewCount` and `userRating` were untouched. That is
+  exactly Codarr's case, since the path does not change.
+
+Two caveats worth folding into 16.1:
+
+- **A partial refresh does not re-read a changed file at a known path.** Four
+  polls over 48 seconds after an in-place swap still showed stale duration and
+  codec; only `analyze` updated it. The refresh does pick up a *new* file in a
+  known directory within 12 seconds, and does nothing at all for a directory Plex
+  has never seen. Since Codarr replaces in place and never creates directories,
+  **`analyze` is the load-bearing call and the refresh is the optional one**,
+  which is the reverse of how 16.1 reads.
+- **`file=` is a case-insensitive substring match**, not an exact one. A bogus
+  path correctly returns nothing and an unknown filter is silently ignored, so
+  the filter does work, but the client's re-check of every returned `Part.file`
+  is load-bearing. Keep it.
+
+## Smaller findings## Smaller findings
 
 - **The native `eac3` encoder refuses 7.1** and downmixes to `5.1(side)` without
   being asked. Codarr never encodes to E-AC-3 (6.3's targets are AAC and AC-3),

@@ -5,9 +5,18 @@ import (
 )
 
 // HardwareCorrection scales an x265 measurement up to what the UHD 630
-// fixed-function encoder needs for the same quality (8.1). Policy constant,
-// tunable after the VMAF spot-check in 27.
-const HardwareCorrection = 1.35
+// fixed-function encoder needs for the same quality (8.1).
+//
+// 8.1 proposes 1.35 and says to tune it after the VMAF spot-check in 27. That
+// was run on the real silicon against six clips of differing complexity,
+// measuring the hevc_qsv bitrate that reaches the same VMAF as the probe's own
+// libx265 -crf 21 -preset veryfast on identical frames. The per-clip ratios were
+// 1.17, 1.20, 1.24, 1.29, 1.33 and 1.33; mean and median both 1.26. See
+// VERIFY.md.
+//
+// Only meaningful paired with SamplePreset: change the probe's preset and this
+// has to be re-measured.
+const HardwareCorrection = 1.25
 
 // Resolution is the tier the BPP, floor and ceiling tables are keyed on.
 type Resolution string

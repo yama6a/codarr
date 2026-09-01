@@ -305,7 +305,7 @@ func videoArgs(req Request, o outStream, decode domain.DecodePath) []string {
 	}
 
 	if req.Plan.OutputContainer == domain.ContainerMP4 {
-		args = append(args, "-tag:v", "hvc1")
+		args = append(args, mp4HEVCTagArgs(req.Plan)...)
 	}
 
 	return append(args, rateControlArgs(req.Plan.TargetVideoBitrate)...)
@@ -315,7 +315,7 @@ func copiedVideoArgs(req Request) []string {
 	args := []string{"-c:v", "copy"}
 
 	if req.Plan.OutputContainer == domain.ContainerMP4 && req.Source.VideoCodec == "hevc" {
-		args = append(args, "-tag:v", "hvc1")
+		args = append(args, mp4HEVCTagArgs(req.Plan)...)
 	}
 
 	// 6.2: a level-only failure that fits 4.2 is a flag rewrite in the copied
@@ -486,4 +486,15 @@ func hdrTransfer(p domain.Plan) string {
 	}
 
 	return "smpte2084"
+}
+
+// mp4HEVCTagArgs picks the MP4 sample entry tag for an HEVC stream. 14.1 says
+// hvc1 unconditionally, which is right for everything except Dolby Vision: see
+// HEVCTagMP4DolbyVision.
+func mp4HEVCTagArgs(p domain.Plan) []string {
+	if p.DolbyVision {
+		return append(DolbyVisionStrictness(), "-tag:v", HEVCTagMP4DolbyVision)
+	}
+
+	return []string{"-tag:v", HEVCTagMP4}
 }

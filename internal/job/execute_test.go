@@ -88,12 +88,12 @@ func TestService_FullJobFillsTheTargetBitrateTheTransformLeftNull(t *testing.T) 
 
 	written := h.store.executions
 	require.NotEmpty(t, written)
-	require.True(t, containsArg(written[0].FfmpegArgv, "5400000"),
+	require.True(t, containsArg(written[0].FfmpegArgv, sampledTarget()),
 		"the measured target reaches the argv: %v", written[0].FfmpegArgv)
 
 	// The transform is overwritten with the measured result at completion, so
 	// the value under test is the one the encode actually used.
-	require.Contains(t, strings.Join(written[0].FfmpegArgv, " "), "-b:v 5400000")
+	require.Contains(t, strings.Join(written[0].FfmpegArgv, " "), "-b:v "+sampledTarget())
 }
 
 func TestService_FullJobFallsBackToTheFormulaWhenTheSampleProbeFails(t *testing.T) {
@@ -294,7 +294,7 @@ func TestService_SpaceSweepJobForcesAVideoEncodeThePolicyWouldCopy(t *testing.T)
 
 	encode := strings.Join(runs[3], " ")
 	require.Contains(t, encode, "-c:v hevc_qsv")
-	require.Contains(t, encode, "-b:v 5400000")
+	require.Contains(t, encode, "-b:v "+sampledTarget())
 }
 
 func TestService_ThroughputIsMeasuredAtCompletion(t *testing.T) {
@@ -414,4 +414,11 @@ func TestService_TheFinalOutTimeIsPersistedWhenTheEncodeEnds(t *testing.T) {
 	promoteCalls := h.promoter.PromoteCalls()
 	require.Len(t, promoteCalls, 1)
 	require.InDelta(t, mediaDur, promoteCalls[0].Req.FinalOutTimeSeconds, 0.001)
+}
+
+// sampledTarget is the bitrate the fake sample probe produces once the 8.1
+// hardware correction is applied. Derived so retuning the constant after a VMAF
+// pass does not fail tests that are about the plumbing, not the value.
+func sampledTarget() string {
+	return strconv.Itoa(int(4_000_000 * ffmpeg.HardwareCorrection))
 }

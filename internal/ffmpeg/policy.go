@@ -47,3 +47,19 @@ const (
 // MP4Movflags are the flags every MP4 output is muxed with: faststart moves the
 // moov atom to the front, use_metadata_tags carries the loop-prevention tag.
 func MP4Movflags() []string { return []string{"+faststart", "+use_metadata_tags"} }
+
+// HEVCTagMP4 is the sample entry tag for HEVC in MP4. plan.md 14.1 mandates
+// hvc1, because ffmpeg's default hev1 is refused by Apple-derived players.
+const HEVCTagMP4 = "hvc1"
+
+// HEVCTagMP4DolbyVision is the tag a Dolby Vision stream must carry in MP4
+// instead. Verified on jellyfin-ffmpeg 7.1.4: the mov muxer writes the dvcC/dvvC
+// configuration record only when the sample entry is dvh1 or dvhe AND -strict
+// unofficial is set. With hvc1 it writes nothing and warns at no log level, so
+// following 14.1 literally silently destroys the record on a DV source, which
+// 15.3 then correctly fails as a hard error for profile 5.
+const HEVCTagMP4DolbyVision = "dvh1"
+
+// DolbyVisionStrictness is what the mov muxer demands before it will write the
+// configuration record at all.
+func DolbyVisionStrictness() []string { return []string{"-strict", "unofficial"} }

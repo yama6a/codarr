@@ -214,7 +214,7 @@ folder finding above.
 | 11 | Whether `chown` succeeds on the NFS mount | **FAILS**, expected and tolerated |
 | 12 | CODARR tag survives a round trip into MP4 | **CONFIRMED**, MP4 output is not gated |
 | 13 | VMAF spot-check, tuning the hardware correction | **DONE**, retuned 1.35 to 1.25 |
-| 14 | VP9 hardware decode on this Gen 9.5 driver stack | **CONFIRMED**, stays in the hardware set |
+| 14 | VP9 hardware decode on this Gen 9.5 driver stack | **PARTIAL**: VAAPI yes, QSV no. See below |
 | 15 | A level-rewritten file plays on the pickiest client | Bitstream rewrite **CONFIRMED**; playback still needs a television |
 | 16 | Whether Bazarr preserves the CODARR global tag | Moot, Bazarr writes sidecars here |
 | - | Upgrades disabled on all four instances (23.2) | **CONFIRMED** |
@@ -250,8 +250,9 @@ re-running them to real files rather than `-f null` confirms the pixel formats.
 **Main10 does not fail**, so 10.1's "the cause is almost certainly the driver
 stack" caveat does not apply here.
 
-VP9 hardware decode works on both profile 0 and profile 2, including a full
-GPU-to-GPU `vp9_qsv` to `hevc_qsv` chain. `vp9` stays in the hardware-decode set.
+VP9 hardware decode worked in the verification pod on both profile 0 and profile
+2. It does not work in the deployed pod: see the corrections at the end. This is
+the one thing the throwaway-pod run got wrong.
 
 ### The level rewrite works end to end
 
@@ -433,3 +434,41 @@ Two caveats worth folding into 16.1:
   after roughly five minutes of retries if the NAS hiccups. 15.6 discusses
   `softerr` as a node-wedging tradeoff but says nothing about that failure
   landing mid-job. Verification catches a truncated output, so it fails safe.
+
+
+---
+
+## Corrections from the deployed pod, 2026-09-01
+
+codarr runs in the `media` namespace on `tc-w1`, holding the second i915 slot.
+Its startup probe re-ran the 10.1 matrix against the real device, which is the
+first time these numbers came from the shipping binary rather than a hand-run
+command.
+
+Confirmed, matching the earlier run: QSV HEVC encode Main and Main10, VAAPI HEVC
+encode Main and Main10, the Intel iHD 25.4.6 driver, `/dev/dri/renderD128`
+present as `crw-rw-rw- 568 568`, the process running as uid 568, and `/media`
+showing both owners' trees and writable.
+
+### VP9 QSV decode fails, which reverses item 14
+
+```
+qsv    vp9   decode  FAIL
+vaapi  vp9   decode  OK
+```
+
+`vp9_qsv` returns `Decoding error: Internal bug, should not have happened`,
+error `-1145393733`, on the sample the probe generates. The verification pod
+reported VP9 decode working, but it was testing a clip built to different
+settings. The honest reading is that `vp9_qsv` is unreliable on this driver
+rather than absent, since VAAPI decodes the same content without complaint.
+
+This is the case 10.1 anticipates, and the handling worked with no intervention:
+the probe recorded `works: false`, wrote remediation text saying VP9 will decode
+in software, and the capability cache now overrides ffmpeg's own hardware-decode
+guess for VP9. The cost is CPU on VP9 sources, which are rare, and nothing is
+incorrect.
+
+No code change. `vp9` stays in the hard-coded Gen 9.5 decode set because the
+silicon does have the decoder; the probe decides whether it is used, and it
+decided correctly.

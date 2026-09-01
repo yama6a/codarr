@@ -1,0 +1,11 @@
+# Chi router plus the strict interface implemented by hand in internal/api.
+package: api
+output: ./server.gen.go
+generate:
+  chi-server: true
+  strict-server: true
+  embedded-spec: true
+output-options:
+  skip-prune: true
+compatibility:
+  always-prefix-enum-values: true

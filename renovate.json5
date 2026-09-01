@@ -1,0 +1,91 @@
+{
+  // Opens dependency-update PRs for every pin in the repo. Which manager owns what:
+  //   gomod           go.mod + go.sum, including the `go` directive
+  //   npm             web/package.json + web/package-lock.json (found by autodiscovery, it is not at the root)
+  //   dockerfile      the three base images in .build/Dockerfile
+  //   github-actions  the action pins in .github/workflows/*.yaml
+  // Cadence is the cron in .github/workflows/renovate.yaml, not an internal `schedule`, so a manual
+  // workflow_dispatch works too.
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "config:recommended",
+    ":dependencyDashboard", // one issue listing every pending/failed update (needs repo Issues enabled)
+    "helpers:pinGitHubActionDigestsToSemver", // action pins carry a readable version alongside the digest
+  ],
+  prConcurrentLimit: 12,
+  prHourlyLimit: 0, // no hourly throttle
+  dependencyDashboardTitle: "Renovate dependency dashboard",
+
+  // Automerge through Renovate's own API call, not GitHub's native auto-merge. Renovate waits for a PR's
+  // required CI checks by default, so the combined PR lands on a LATER run once CI is green. That is why the
+  // cron runs every 3h rather than weekly.
+  platformAutomerge: false,
+
+  postUpdateOptions: ["gomodTidy", "gomodUpdateImportPaths"],
+
+  packageRules: [
+    {
+      // ONE combined, auto-merged PR for every NON-major update, gated on the `ci` check.
+      // WARNING: merging to main runs build-push.yaml, which cuts a new GitHub release and pushes a new
+      // ghcr.io image tag. Every automerged bump therefore produces a release, which the cluster only picks
+      // up when someone bumps the tag in offgrid-private.
+      description: "combine all non-major updates into one auto-merged PR",
+      matchUpdateTypes: ["minor", "patch", "digest", "pin", "lockFileMaintenance"],
+      groupName: "all non-major dependencies",
+      automerge: true,
+    },
+    {
+      // Deliberately NOT excluded from the automerge rule above. bolan-admin-fe holds its codegen back
+      // because its CI cannot see generated-type drift; ours regenerates and runs `git diff --exit-code`
+      // over api/ and web/src/api/, so a codegen bump that changes the output fails CI and the automerge
+      // never happens. Keep those two checks in ci.yaml or this comment stops being true.
+      description: "oapi-codegen and openapi-typescript stay on automerge: CI catches generated-code drift",
+      matchUpdateTypes: ["minor", "patch", "digest", "pin"], // majors still get reviewed, like everything else
+      matchPackageNames: [
+        "github.com/oapi-codegen/oapi-codegen/v2",
+        "openapi-typescript",
+      ],
+      automerge: true,
+    },
+    {
+      // typescript-eslint 8 peers `typescript >=4.8.4 <6.1.0`, and TS 7 makes its parser throw outright,
+      // so a TS 7 bump takes `npm run lint` down. Lift this once typescript-eslint ships TS 7 support.
+      description: "hold typescript on 5.x until typescript-eslint supports 7",
+      matchPackageNames: ["typescript"],
+      allowedVersions: "<6.0.0",
+    },
+    {
+      // @vitejs/plugin-react peers an exact vite major, so a lone bump of either fails `npm ci` with ERESOLVE.
+      description: "bump vite and its react plugin in one PR",
+      matchUpdateTypes: ["major"], // non-majors stay in the combined PR above, which already ships them together
+      matchPackageNames: ["vite", "@vitejs/plugin-react", "@tailwindcss/vite"],
+      groupName: "vite",
+    },
+    {
+      // eslint 10 needs typescript-eslint >= 8.67; older ones peer `eslint ^8 || ^9` and fail `npm ci`.
+      description: "bump eslint and its plugins in one PR",
+      matchUpdateTypes: ["major"],
+      matchPackageNames: [
+        "eslint",
+        "@eslint/js",
+        "typescript-eslint",
+        "eslint-plugin-react-hooks",
+        "eslint-plugin-react-refresh",
+      ],
+      groupName: "eslint",
+    },
+    {
+      // Pin action refs to commit digests, so a moving tag cannot swap the action's code under us.
+      description: "pin github action refs to digests",
+      matchManagers: ["github-actions"],
+      pinDigests: true,
+    },
+    {
+      // node:24-alpine, golang:<major>.<minor>-alpine and debian:bookworm-slim are rolling tags whose
+      // patch releases move underneath, so a digest pin is the only way Renovate can track them.
+      description: "pin base images to digests",
+      matchManagers: ["dockerfile"],
+      pinDigests: true,
+    },
+  ],
+}

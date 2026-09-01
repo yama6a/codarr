@@ -150,6 +150,135 @@ probes skip CORS, logging and auth middleware. Both are served: the `/api` pair
 because the spec says so, the bare pair because that is what the cluster's
 probes should point at.
 
+## Wave 1
+
+### Generated API code lives in `api/`, not `internal/api/generated.go`
+
+`plan.md` 2.1 shows `output: internal/api/generated.go`. Everything else in that
+section, and bolan-api's layout, puts the spec and its generated output together
+in `api/` and the hand-written handlers in `internal/api/`. Went with `api/`, in
+two files (`models.gen.go`, `server.gen.go`) as bolan does. The `oapi-codegen.yaml`
+snippet in 2.1 is now stale.
+
+### `//go:generate go run github.com/oapi-codegen/...` rather than a bare binary
+
+Pinned through `tools.go`, so `make generate` and CI need no separate install
+step. This is the form `plan.md` 2.1 shows.
+
+### `always-prefix-enum-values: true` on both codegen configs
+
+Without it oapi-codegen only prefixes enum constants when two enums collide, so
+the `MediaSort` values `plan_kind` and `provenance` emitted bare `PlanKind` and
+`Provenance` constants that collided with the type names of the same spelling.
+
+### `recheck-selected` takes a filter as well as ids
+
+`plan.md` 18.2 asks for "select all matching filter" in the library table but
+section 20 gives no filter-based bulk endpoint, so selecting a 40k-file filter
+would have meant shipping 40k integers. `RecheckSelectedRequest` now accepts
+either `ids` or a `MediaFilter` mirroring the library table's own filters. An
+empty body selects nothing rather than everything.
+
+### Errors are one `default` response, not enumerated status codes
+
+`{error, message, details}` on every operation. Enumerating 400/404/409 per
+operation multiplies the generated response types by four for no gain.
+
+### The Plex PIN poll never returns the token
+
+`{authorized, token_stored}` only. Returning it would contradict "never return
+secrets" on the one path where a secret is legitimately in flight.
+
+### Timestamps are fixed-width RFC 3339 UTC strings
+
+Nine fractional digits, always. `time.RFC3339Nano` strips trailing zeros, which
+breaks `ORDER BY queued_at` in `ClaimNextJob`: the stored text has to sort like
+the instant it represents. `mtime` columns stay unix seconds, which is what
+`os.FileInfo` gives and what the next scan compares against.
+
+### The read pool carries `_query_only=1`
+
+`plan.md` 17 asks for a single write connection alongside a read pool. Marking
+the read pool query-only makes "every write goes through the write pool" a
+property SQLite enforces rather than a convention the next contributor has to
+know about.
+
+### The interrupted-job sweep is three-way, and never guesses
+
+`running` and `verifying` are requeued or failed in the store. `promoting` and
+`awaiting_stream_end` come back as "needs check" and are **left in the state
+they were found in**, because deciding them needs the filesystem: whether the
+`rename()` landed (19.2's CODARR-tag check) or whether the staging file still
+verifies. Leaving them in place also keeps the partial unique index holding, so
+the worker cannot claim them mid-decision.
+
+### Migration 002 adds the throughput_stats natural key
+
+`plan.md` 17.1 ships no unique constraint on `(kind, encoder, resolution)`,
+which is plainly that table's key given 14.3. Without it an upsert is
+UPDATE-then-INSERT, correct only because there is one write connection. The
+index makes it correct regardless. `COALESCE` on the two nullable columns,
+since NULLs never compare equal in a unique index.
+
+### `Store` is one wide interface, but consumers define narrow ones
+
+`plan.md` 2.2's table lists `Store | all DB access` as a single boundary, and
+that is what `internal/pkg/store` exposes: 74 methods. The same section also
+says interfaces should be small and defined by the consumer. Both hold, at
+different layers: the store package publishes the wide interface, and each
+consumer declares the three or four methods it actually uses, satisfied by the
+same concrete value. Tests mock the narrow one.
+
+### Icons are inline SVG via `lucide-react`, not an icon font
+
+The first cut pulled `material-symbols`, whose woff2 is 3.8 MB. `go:embed` puts
+the whole `dist` inside the binary, so a handful of icons cost 3.8 MB of
+executable. `lucide-react` tree-shakes to the ~20 icons actually imported.
+`internal/web/dist` went from 4.4 MB to 360 KB.
+
+Inter is pinned to the latin subset by a hand-written `@font-face` for the same
+reason: fontsource's stylesheet also ships cyrillic, greek and vietnamese, none
+of which this UI renders.
+
+### `web/go.mod` exists so `./...` stops at `web/`
+
+npm packages occasionally ship Go source (`flatted` does), and Go's `...`
+pattern does not skip `node_modules`. On a fresh CI checkout `go test ./...`
+would try to build a dependency's vendored Go. A nested module is the
+documented way to cut a subtree out of the parent module. There is no Go code
+under `web/`.
+
+### CI checks formatting drift, not just generated-code drift
+
+`make ci` runs `gofumpt -w .`, which rewrites rather than reports. Without a
+following `git diff --exit-code` the runner silently fixes formatting and the
+branch stays unformatted forever.
+
+## *arr configuration
+
+### Renaming stays on, with its existing MediaInfo tokens
+
+All four instances rename on import using formats containing
+`{Mediainfo VideoCodec}`, `{Mediainfo AudioCodec}`, `{Mediainfo AudioChannels}`
+and `{MediaInfo VideoBitDepth}`. `plan.md` 23.2 asks for renaming off, or those
+tokens removed.
+
+Reviewed with the user and left as it is. Codarr never renames, so nothing it
+does moves a path. What the tokens cost is that after a `full` job the filename
+carries stale codec info, and a *manual* rename pass would then move the file.
+Neither Radarr nor Sonarr renames existing files on a rescan, so this does not
+fire on its own.
+
+If a rename pass does run, the cost is bounded: the path changes, Plex sees one
+part removed and another added, and Codarr's row for the old path goes `missing`
+while the new path comes in fresh and loses its provenance link. It does **not**
+cause a re-encode loop, because the decision engine independently plans an
+already-compliant file as `skip`. The CODARR tag is an optimisation; the real
+protection is that a compliant file plans to nothing.
+
+Upgrades are off on every instance, which is the load-bearing half of 23.2 and
+is confirmed. See `VERIFY.md`.
+
 ## Open items
 
 Recorded in `VERIFY.md` rather than here: everything `plan.md` section 27 asks

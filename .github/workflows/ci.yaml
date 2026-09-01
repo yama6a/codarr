@@ -1,0 +1,88 @@
+name: ci
+
+# This repo commits straight to main, so the push trigger is the one that actually gates.
+# The pull_request trigger is there for the Renovate PRs, whose automerge waits on this check.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install golangci-lint
+        run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b "$(go env GOPATH)/bin"
+
+      - name: Install gofumpt
+        run: go install mvdan.cc/gofumpt@latest
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: npm ci
+        working-directory: web
+        run: npm ci
+
+      # fumpt, generate, lint, vet, govulncheck, go test
+      - name: make ci
+        run: make ci
+
+      # `make ci` runs `make generate`. If that changed anything under api/, the committed generated
+      # Go is stale.
+      - name: Check generated Go is in sync
+        run: |
+          git diff --exit-code -- api/ || {
+            echo "::error::api/ is out of sync with api/openapi.yaml. Run 'make generate' and commit the result."
+            exit 1
+          }
+
+      # `make ci` also runs `gofumpt -w .`, which REWRITES rather than reports. Without this the
+      # runner silently fixes formatting drift and the branch stays unformatted forever.
+      - name: Check formatting is in sync
+        run: |
+          git diff --exit-code -- '*.go' || {
+            echo "::error::Go files are not gofumpt-formatted. Run 'make fumpt' and commit the result."
+            exit 1
+          }
+
+      - name: Regenerate the TypeScript API types
+        working-directory: web
+        run: npm run openapi-ts
+
+      - name: Check generated TypeScript is in sync
+        run: |
+          git diff --exit-code -- web/src/api/ || {
+            echo "::error::web/src/api/ is out of sync with api/openapi.yaml. Run 'npm run openapi-ts' in web/ and commit the result."
+            exit 1
+          }
+
+      # lint, typecheck, test, build
+      - name: npm run ci
+        working-directory: web
+        run: npm run ci
+
+      # Renovate silently falls back to its defaults on a broken config, so validate it here instead.
+      - name: Validate renovate config
+        run: npx --yes --package renovate -- renovate-config-validator --strict

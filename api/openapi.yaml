@@ -1,0 +1,3580 @@
+openapi: 3.0.3
+info:
+  title: Codarr API
+  version: 1.0.0
+  description: |
+    HTTP surface for Codarr, served under `/api`.
+
+    There is no authentication anywhere in this API. Access is secured externally
+    by the cluster's SSO (plan.md section 21). There are no security schemes and
+    there is no auth middleware.
+
+    There is no streaming. The UI polls `GET /api/dashboard` and
+    `GET /api/events` every 10 seconds (plan.md 18.6), so every operation here is
+    a plain request/response.
+
+    Secrets (*arr API keys, the Plex token) are stored in plaintext but never
+    returned. Every GET returns the masked placeholder `********`, and a PUT
+    carrying that exact value leaves the stored secret untouched.
+
+    `GET /metrics` is Prometheus and sits outside `/api`, so it is deliberately
+    absent from this spec.
+servers:
+  - url: /
+    description: The Codarr server itself; it serves both the API and the SPA.
+
+tags:
+  - name: health
+  - name: policy
+  - name: settings
+  - name: plex
+  - name: arr
+  - name: roots
+  - name: media
+  - name: spaceSweep
+  - name: jobs
+  - name: queue
+  - name: hardware
+  - name: webhook
+  - name: dashboard
+
+paths:
+  /api/health:
+    get:
+      operationId: getHealth
+      tags: [health]
+      summary: Liveness.
+      responses:
+        '200':
+          description: The process is alive.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/ready:
+    get:
+      operationId: getReady
+      tags: [health]
+      summary: Readiness, including the per-dependency checks.
+      responses:
+        '200':
+          description: Every check passed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Readiness'
+        '503':
+          description: At least one check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Readiness'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/version:
+    get:
+      operationId: getVersion
+      tags: [health]
+      summary: Build identity of the running binary.
+      responses:
+        '200':
+          description: Version information.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Version'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/policy:
+    get:
+      operationId: getPolicy
+      tags: [policy]
+      summary: The hard-coded encoding policy, for read-only display.
+      description: |
+        Policy is compiled into the binary (plan.md section 6) and nothing in the
+        API can change it. This returns it so the settings page can render it.
+      responses:
+        '200':
+          description: The policy in force.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Policy'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: The single settings row.
+      responses:
+        '200':
+          description: Current settings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+        default:
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Replace the settings row.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SettingsUpdate'
+      responses:
+        '200':
+          description: Settings after the update.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/plex:
+    get:
+      operationId: getPlex
+      tags: [plex]
+      summary: The single Plex server configuration.
+      responses:
+        '200':
+          description: Plex configuration, token masked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlexConfig'
+        default:
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: updatePlex
+      tags: [plex]
+      summary: Replace the Plex configuration and its path mappings.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlexConfigUpdate'
+      responses:
+        '200':
+          description: Plex configuration after the update, token masked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlexConfig'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/plex/test:
+    post:
+      operationId: testPlex
+      tags: [plex]
+      summary: Test the stored Plex credentials against the server.
+      responses:
+        '200':
+          description: |
+            The test ran. `ok` reports whether Plex answered; a reachable-but-
+            rejecting server is a 200 with `ok: false`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestResult'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/plex/libraries:
+    get:
+      operationId: listPlexLibraries
+      tags: [plex]
+      summary: Live library sections from the Plex server.
+      responses:
+        '200':
+          description: The sections Plex reports, with their Plex-side locations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlexLibrary'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/plex/resolve-path:
+    post:
+      operationId: resolvePlexPath
+      tags: [plex]
+      summary: Show how a local path translates through the Plex path mappings.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolvePathRequest'
+      responses:
+        '200':
+          description: The mapping result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolvePathResult'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/plex/auth/start:
+    post:
+      operationId: startPlexAuth
+      tags: [plex]
+      summary: Start the plex.tv PIN flow.
+      description: |
+        Creates a strong PIN at plex.tv (plan.md 16.1) and returns the id, the
+        code and the URL to open. Poll `GET /api/plex/auth/poll/{pin_id}` until
+        it reports authorised.
+      responses:
+        '200':
+          description: The PIN to complete in a browser.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlexAuthStart'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/plex/auth/poll/{pin_id}:
+    get:
+      operationId: pollPlexAuth
+      tags: [plex]
+      summary: Poll a plex.tv PIN for completion.
+      parameters:
+        - $ref: '#/components/parameters/PinID'
+      responses:
+        '200':
+          description: |
+            Poll result. The token itself is never returned; when the PIN is
+            claimed the token is persisted server-side and `token_stored` is true.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlexAuthPoll'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/arr:
+    get:
+      operationId: listArrInstances
+      tags: [arr]
+      summary: Every configured Radarr and Sonarr instance.
+      responses:
+        '200':
+          description: All instances, API keys masked.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ArrInstance'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createArrInstance
+      tags: [arr]
+      summary: Create an instance.
+      description: The `webhook_id` is generated server-side and is unguessable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArrInstanceCreate'
+      responses:
+        '201':
+          description: The created instance, API key masked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArrInstance'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/arr/{id}:
+    get:
+      operationId: getArrInstance
+      tags: [arr]
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: The instance, API key masked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArrInstance'
+        default:
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: updateArrInstance
+      tags: [arr]
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArrInstanceUpdate'
+      responses:
+        '200':
+          description: The instance after the update, API key masked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArrInstance'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteArrInstance
+      tags: [arr]
+      description: |
+        Roots owned by the instance survive with a null owner: their files keep
+        being processed, nothing is notified afterwards.
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '204':
+          description: Deleted.
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/arr/{id}/test:
+    post:
+      operationId: testArrInstance
+      tags: [arr]
+      summary: Test the instance's URL and API key.
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: The test ran; `ok` reports the outcome.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestResult'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/arr/{id}/rootfolders:
+    get:
+      operationId: listArrRootFolders
+      tags: [arr]
+      summary: Live query of the instance's root folders.
+      description: Proxies `GET /api/v3/rootfolder` on that instance.
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Root folders as the instance reports them, remote paths.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ArrRootFolder'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/arr/{id}/import-roots:
+    post:
+      operationId: importArrRoots
+      tags: [arr]
+      summary: Create roots from the instance's root folders.
+      description: |
+        Remote paths are rewritten through that instance's mappings. A path an
+        enabled instance already claims is reported as a conflict and skipped
+        rather than reassigned (plan.md 16.2).
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: What was imported and what conflicted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportRootsResult'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/roots:
+    get:
+      operationId: listRoots
+      tags: [roots]
+      summary: Every watch root.
+      responses:
+        '200':
+          description: All roots with their owning instance.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Root'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createRoot
+      tags: [roots]
+      summary: Add a root manually.
+      description: A root without an instance is processed but nothing is notified.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RootCreate'
+      responses:
+        '201':
+          description: The created root.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Root'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/roots/{id}:
+    delete:
+      operationId: deleteRoot
+      tags: [roots]
+      description: Media rows under the root survive with a null root.
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '204':
+          description: Deleted.
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/roots/{id}/scan:
+    post:
+      operationId: scanRoot
+      tags: [roots]
+      summary: Walk one root now.
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '202':
+          description: The scan was started in the background.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanStarted'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/media:
+    get:
+      operationId: listMedia
+      tags: [media]
+      summary: The library table, filtered, sorted and paginated server-side.
+      parameters:
+        - name: q
+          in: query
+          description: Substring match on the path.
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/MediaStatus'
+        - name: plan_kind
+          in: query
+          schema:
+            $ref: '#/components/schemas/PlanKind'
+        - name: video_codec
+          in: query
+          description: ffprobe codec name, matched exactly.
+          schema:
+            type: string
+        - name: arr_instance_id
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: provenance
+          in: query
+          schema:
+            $ref: '#/components/schemas/Provenance'
+        - name: sort
+          in: query
+          description: A `-` prefix reverses the order.
+          schema:
+            $ref: '#/components/schemas/MediaSort'
+        - name: page
+          in: query
+          description: One-based.
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 50
+      responses:
+        '200':
+          description: One page of the library, with the total for the filter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaPage'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/media/{id}:
+    get:
+      operationId: getMediaFile
+      tags: [media]
+      summary: One media file, with its plan and probe output.
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: The file.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaDetail'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/media/{id}/analyze:
+    post:
+      operationId: analyzeMediaFile
+      tags: [media]
+      summary: Re-probe and re-plan one file now.
+      description: Recomputes the fingerprint, the plan and the provenance.
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: The file after analysis.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaDetail'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/media/{id}/queue:
+    post:
+      operationId: queueMediaFile
+      tags: [media]
+      summary: Enqueue one file.
+      description: |
+        Idempotent. A file that already has an active job, or whose plan is
+        `skip`, is a no-op reported with `enqueued: false` and a reason.
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: What the enqueue did.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnqueueResult'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/media/{id}/ignore:
+    post:
+      operationId: ignoreMediaFile
+      tags: [media]
+      summary: Add the file to the ignore list.
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: The file after the change.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaDetail'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: unignoreMediaFile
+      tags: [media]
+      summary: Remove the file from the ignore list.
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: The file after the change.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaDetail'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/media/recheck-all:
+    post:
+      operationId: recheckAllMedia
+      tags: [media]
+      summary: Re-check every done file against the current policy.
+      description: |
+        Dry run unless `confirm` is true. The dry run re-probes and re-plans but
+        queues nothing, so the confirmation can state exactly how many jobs it is
+        about to create and of which kinds (plan.md section 19).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecheckAllRequest'
+      responses:
+        '200':
+          description: What would be queued, or what was queued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecheckResult'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/media/recheck-selected:
+    post:
+      operationId: recheckSelectedMedia
+      tags: [media]
+      summary: Re-check a selection against the current policy.
+      description: |
+        Dry run unless `confirm` is true. Re-probes first and skips anything
+        already correct, so selecting everything is safe.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecheckSelectedRequest'
+      responses:
+        '200':
+          description: What would be queued, or what was queued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecheckResult'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/media/{id}/verify-integrity:
+    post:
+      operationId: verifyMediaIntegrity
+      tags: [media]
+      summary: Recompute the fingerprint of one file and compare it.
+      description: |
+        Recomputes the sparse fingerprint, and the whole-file hash when one was
+        recorded, compares both against the values stored at promotion and
+        updates the provenance (plan.md 12.2).
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: The comparison.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrityResult'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/media/verify-integrity:
+    post:
+      operationId: verifyMediaIntegrityBulk
+      tags: [media]
+      summary: Recompute fingerprints for a selection.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyIntegrityRequest'
+      responses:
+        '200':
+          description: One comparison per requested file.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrityBulkResult'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/space-sweep/preview:
+    post:
+      operationId: previewSpaceSweep
+      tags: [spaceSweep]
+      summary: Dry run of the space reclaim sweep.
+      description: |
+        Finds H.264 files above the policy bitrate threshold, runs the sample
+        probe and keeps the ones whose projected saving clears the policy
+        minimum (plan.md section 11). Queues nothing.
+      responses:
+        '200':
+          description: The candidates and the projected saving.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpaceSweepPreview'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/space-sweep/run:
+    post:
+      operationId: runSpaceSweep
+      tags: [spaceSweep]
+      summary: Queue the space reclaim sweep.
+      description: |
+        `confirm` must be true; false is rejected. The operation is irreversible:
+        every queued job replaces its source file in place and there is no undo
+        (plan.md 15.5).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SpaceSweepRunRequest'
+      responses:
+        '200':
+          description: What was queued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpaceSweepRunResult'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/jobs:
+    get:
+      operationId: listJobs
+      tags: [jobs]
+      summary: Job history, newest first.
+      parameters:
+        - name: state
+          in: query
+          schema:
+            $ref: '#/components/schemas/JobState'
+        - name: media_file_id
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: page
+          in: query
+          description: One-based.
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 50
+      responses:
+        '200':
+          description: One page of jobs, with the total for the filter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobPage'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/jobs/{id}:
+    get:
+      operationId: getJob
+      tags: [jobs]
+      summary: One job, including its transform record.
+      description: |
+        The transform record is the before/after history the detail modal renders
+        for queued, running and completed jobs alike (plan.md 17.2). For a job
+        that has not finished, `after` holds the plan; for a finished one it holds
+        what an ffprobe of the real output measured.
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: The job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/jobs/{id}/cancel:
+    post:
+      operationId: cancelJob
+      tags: [jobs]
+      summary: Cancel a queued or running job.
+      description: |
+        A running job gets SIGTERM, a grace period, then SIGKILL. The staging
+        file is deleted. The job stays visible in `cancelled`.
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: The job after cancellation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/jobs/{id}/restart:
+    post:
+      operationId: restartJob
+      tags: [jobs]
+      summary: Re-queue a cancelled or failed job at the front.
+      description: |
+        Priority becomes `min(queued) - 1` and the automatic-interruption attempt
+        counter resets (plan.md 19.2).
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: The re-queued job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/queue:
+    get:
+      operationId: getQueue
+      tags: [queue]
+      summary: The queue as the worker sees it.
+      responses:
+        '200':
+          description: Queue state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueState'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/queue/pause:
+    post:
+      operationId: pauseQueue
+      tags: [queue]
+      summary: Stop starting new jobs.
+      description: A running job continues to completion.
+      responses:
+        '200':
+          description: Queue state after pausing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueState'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/queue/resume:
+    post:
+      operationId: resumeQueue
+      tags: [queue]
+      summary: Start consuming the queue again.
+      responses:
+        '200':
+          description: Queue state after resuming.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueState'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/hardware:
+    get:
+      operationId: getHardware
+      tags: [hardware]
+      summary: Cached hardware probe results.
+      responses:
+        '200':
+          description: What the last probe found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hardware'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/hardware/probe:
+    post:
+      operationId: probeHardware
+      tags: [hardware]
+      summary: Re-run the encoder probe now.
+      description: |
+        Runs a real one-second encode per backend and profile (plan.md 10.1).
+        Compiled-in support is not working support, so this is the only thing
+        that decides which encoder gets used.
+      responses:
+        '200':
+          description: The fresh probe results.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hardware'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/webhook/{webhook_id}:
+    post:
+      operationId: receiveArrWebhook
+      tags: [webhook]
+      summary: Receiver for one *arr instance's Connect webhook.
+      description: |
+        One unguessable id per instance, so there is no guessing about which
+        instance sent an event.
+
+        Handles `Download`, `Rename` and `Test`; `MovieFileDelete` and
+        `EpisodeFileDelete` mark the file missing. `Test` always answers 200 with
+        a body so the *arr's Test button reports success.
+      parameters:
+        - name: webhook_id
+          in: path
+          required: true
+          description: The instance's `webhook_id`.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArrWebhookPayload'
+      responses:
+        '200':
+          description: The payload was accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookAck'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/stats:
+    get:
+      operationId: getStats
+      tags: [dashboard]
+      summary: Library and throughput totals.
+      responses:
+        '200':
+          description: The totals.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Stats'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/events:
+    get:
+      operationId: listEvents
+      tags: [dashboard]
+      summary: The log view, cursor-paginated.
+      description: |
+        Ascending by id. Poll with `since_id` set to the last id seen; the
+        response carries the cursor to use next.
+      parameters:
+        - name: level
+          in: query
+          description: Minimum level, inclusive.
+          schema:
+            $ref: '#/components/schemas/EventLevel'
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: since_id
+          in: query
+          description: Return events with a strictly greater id.
+          schema:
+            type: integer
+            format: int64
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 200
+      responses:
+        '200':
+          description: One page of events plus the next cursor.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventPage'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Everything the dashboard polls, in one call.
+      description: |
+        The dashboard polls this every 10 seconds and nothing else (plan.md
+        18.6), so it carries the current job, the queue, what is waiting on a
+        Plex stream to end, recent completions, failures needing attention, the
+        totals and the compatibility summary.
+      responses:
+        '200':
+          description: The whole dashboard payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+        default:
+          $ref: '#/components/responses/Error'
+
+components:
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    PinID:
+      name: pin_id
+      in: path
+      required: true
+      description: The plex.tv PIN id returned by `POST /api/plex/auth/start`.
+      schema:
+        type: integer
+        format: int64
+
+  responses:
+    Error:
+      description: |
+        Any failure. 400 for a malformed request or an unconfirmed destructive
+        operation, 404 for an unknown id, 409 for a conflicting state, 502 when
+        a downstream Plex or *arr call fails, 500 otherwise.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: Stable machine-readable code, snake_case.
+          example: not_found
+        message:
+          type: string
+          description: Human-readable detail, specific enough to act on.
+        details:
+          type: object
+          additionalProperties: true
+
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+
+    Readiness:
+      type: object
+      required: [ready, checks]
+      properties:
+        ready:
+          type: boolean
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReadinessCheck'
+
+    ReadinessCheck:
+      type: object
+      required: [name, ok]
+      properties:
+        name:
+          type: string
+          example: database
+        ok:
+          type: boolean
+        message:
+          type: string
+
+    Version:
+      type: object
+      required: [version, commit, built_at, go_version]
+      properties:
+        version:
+          type: string
+        commit:
+          type: string
+        built_at:
+          type: string
+          format: date-time
+        go_version:
+          type: string
+        ffmpeg_version:
+          type: string
+        policy_hash:
+          type: string
+          description: Hash of the compiled-in policy; changing it makes tagged files eligible again.
+
+    PlanKind:
+      type: string
+      description: The shape of the work a file needs.
+      enum: [skip, remux, audio_only, full]
+
+    MediaStatus:
+      type: string
+      enum: [new, analyzed, queued, processing, done, failed, ignored, skipped, missing]
+
+    Provenance:
+      type: string
+      description: |
+        Derived on every analysis, never set by a user. `modified_since_transcode`
+        means something rewrote a file Codarr produced.
+      enum: [untouched, codarr_output, modified_since_transcode]
+
+    Decision:
+      type: string
+      description: What happens to one stream. `convert` is subtitles only.
+      enum: [copy, encode, convert, drop]
+
+    StreamType:
+      type: string
+      enum: [video, audio, subtitle]
+
+    ContainerFamily:
+      type: string
+      description: The output muxer family. Codarr only ever writes these two.
+      enum: [matroska, mp4]
+
+    ScanType:
+      type: string
+      description: Unknown or absent field_order counts as progressive.
+      enum: [progressive, interlaced]
+
+    BitrateSource:
+      type: string
+      description: Which rung of the resolution chain in plan.md 8.4 produced the video bitrate.
+      enum: [stream, bps_tag, computed, format, unresolved]
+
+    DecodePath:
+      type: string
+      enum: [hardware, software]
+
+    Encoder:
+      type: string
+      enum: [hevc_qsv, hevc_vaapi, libx265]
+
+    JobState:
+      type: string
+      enum: [queued, running, verifying, awaiting_stream_end, promoting, done, cancelled, failed]
+
+    JobOrigin:
+      type: string
+      enum: [ingest, manual, recheck, space_sweep]
+
+    FailureCode:
+      type: string
+      description: A failed job without one is a bug (plan.md 19.1).
+      enum:
+        - interrupted
+        - preflight_failed
+        - probe_failed
+        - ffmpeg_failed
+        - verification_failed
+        - promote_failed
+        - internal_error
+
+    Flavour:
+      type: string
+      enum: [radarr, sonarr]
+
+    EventLevel:
+      type: string
+      enum: [debug, info, warn, error]
+
+    MediaSort:
+      type: string
+      enum:
+        - path
+        - -path
+        - size_bytes
+        - -size_bytes
+        - video_bitrate
+        - -video_bitrate
+        - plan_kind
+        - -plan_kind
+        - status
+        - -status
+        - provenance
+        - -provenance
+        - updated_at
+        - -updated_at
+
+    Settings:
+      type: object
+      required:
+        - temp_dir
+        - qsv_device
+        - scan_enabled
+        - scan_cron
+        - scan_rate_limit_fps
+        - queue_paused
+        - prioritise_quick_jobs
+        - full_hash_enabled
+        - updated_at
+      properties:
+        temp_dir:
+          type: string
+          description: Staging fallback when the destination filesystem cannot hold the output.
+        qsv_device:
+          type: string
+          example: /dev/dri/renderD128
+        scan_enabled:
+          type: boolean
+        scan_cron:
+          type: string
+          example: 0 4 * * *
+        scan_rate_limit_fps:
+          type: integer
+          description: Files per second the scheduled walk is allowed to stat.
+        queue_paused:
+          type: boolean
+        prioritise_quick_jobs:
+          type: boolean
+          description: Give remux and audio_only a better default priority than full.
+        full_hash_enabled:
+          type: boolean
+          description: Compute a whole-file hash at promotion as well (plan.md 12.2).
+        updated_at:
+          type: string
+          format: date-time
+
+    SettingsUpdate:
+      type: object
+      required:
+        - temp_dir
+        - qsv_device
+        - scan_enabled
+        - scan_cron
+        - scan_rate_limit_fps
+        - prioritise_quick_jobs
+        - full_hash_enabled
+      properties:
+        temp_dir:
+          type: string
+        qsv_device:
+          type: string
+        scan_enabled:
+          type: boolean
+        scan_cron:
+          type: string
+        scan_rate_limit_fps:
+          type: integer
+          minimum: 1
+        prioritise_quick_jobs:
+          type: boolean
+        full_hash_enabled:
+          type: boolean
+
+    PathMapping:
+      type: object
+      required: [local, remote, sort]
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Absent when creating.
+        local:
+          type: string
+          description: Codarr's view of the path.
+        remote:
+          type: string
+          description: The other service's view of the same path.
+        sort:
+          type: integer
+          description: Lower is tried first.
+
+    PlexConfig:
+      type: object
+      required:
+        - base_url
+        - token
+        - client_identifier
+        - refresh_after
+        - analyze_after
+        - guard_active_streams
+        - path_mappings
+        - updated_at
+      properties:
+        base_url:
+          type: string
+        token:
+          type: string
+          description: |
+            Always the masked placeholder `********` on read. The real token is
+            never returned and never logged. On PUT, this exact value leaves the
+            stored token untouched; anything else overwrites it.
+          example: '********'
+        client_identifier:
+          type: string
+          description: Stable X-Plex-Client-Identifier, generated once and persisted.
+        refresh_after:
+          type: boolean
+          description: Partial scan of the containing directory after a replacement.
+        analyze_after:
+          type: boolean
+          description: PUT /library/metadata/{ratingKey}/analyze after a replacement.
+        guard_active_streams:
+          type: boolean
+          description: |
+            Never replace a file Plex is streaming right now. This defers a job,
+            it never skips it, and it is unrelated to resource contention.
+        last_tested_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_test_result:
+          type: string
+        path_mappings:
+          type: array
+          items:
+            $ref: '#/components/schemas/PathMapping'
+        updated_at:
+          type: string
+          format: date-time
+
+    PlexConfigUpdate:
+      type: object
+      required:
+        - base_url
+        - token
+        - refresh_after
+        - analyze_after
+        - guard_active_streams
+        - path_mappings
+      properties:
+        base_url:
+          type: string
+        token:
+          type: string
+          description: |
+            Send the masked placeholder `********` to keep the stored token.
+            Any other value replaces it.
+        refresh_after:
+          type: boolean
+        analyze_after:
+          type: boolean
+        guard_active_streams:
+          type: boolean
+        path_mappings:
+          type: array
+          description: Replaces the whole mapping list.
+          items:
+            $ref: '#/components/schemas/PathMapping'
+
+    TestResult:
+      type: object
+      required: [ok, message, tested_at]
+      properties:
+        ok:
+          type: boolean
+        message:
+          type: string
+        tested_at:
+          type: string
+          format: date-time
+        server_name:
+          type: string
+        server_version:
+          type: string
+
+    PlexLibrary:
+      type: object
+      required: [key, title, type, locations]
+      properties:
+        key:
+          type: string
+          description: The section key used in /library/sections/{key}/refresh.
+        title:
+          type: string
+        type:
+          type: string
+          example: movie
+        locations:
+          type: array
+          description: Plex-side directories for the section.
+          items:
+            type: string
+
+    ResolvePathRequest:
+      type: object
+      required: [path]
+      properties:
+        path:
+          type: string
+          description: A local path as Codarr sees it.
+
+    ResolvePathResult:
+      type: object
+      required: [local_path, remote_path, matched]
+      properties:
+        local_path:
+          type: string
+        remote_path:
+          type: string
+          description: Equal to local_path when no mapping matched.
+        matched:
+          type: boolean
+        mapping_id:
+          type: integer
+          format: int64
+          nullable: true
+
+    PlexAuthStart:
+      type: object
+      required: [pin_id, code, auth_url, client_identifier]
+      properties:
+        pin_id:
+          type: integer
+          format: int64
+        code:
+          type: string
+        auth_url:
+          type: string
+          description: Open this in a browser to claim the PIN.
+        client_identifier:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    PlexAuthPoll:
+      type: object
+      required: [authorized, token_stored]
+      properties:
+        authorized:
+          type: boolean
+        token_stored:
+          type: boolean
+          description: |
+            True once the claimed token has been persisted. The token itself is
+            never returned by this API.
+        message:
+          type: string
+
+    ArrInstance:
+      type: object
+      required:
+        - id
+        - name
+        - flavour
+        - base_url
+        - api_key
+        - webhook_id
+        - rescan_after
+        - unmonitor_after
+        - enabled
+        - path_mappings
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        flavour:
+          $ref: '#/components/schemas/Flavour'
+        base_url:
+          type: string
+        api_key:
+          type: string
+          description: |
+            Always the masked placeholder `********` on read. The real key is
+            never returned and never logged.
+          example: '********'
+        webhook_id:
+          type: string
+          description: |
+            Unguessable, generated server-side. The instance's webhook URL is
+            this server's external base plus `/api/webhook/{webhook_id}`.
+        rescan_after:
+          type: boolean
+          description: RescanMovie or RescanSeries after a replacement.
+        unmonitor_after:
+          type: boolean
+          description: Unmonitor the item after a successful full job. Off by default.
+        enabled:
+          type: boolean
+        last_tested_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_test_result:
+          type: string
+        path_mappings:
+          type: array
+          items:
+            $ref: '#/components/schemas/PathMapping'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ArrInstanceCreate:
+      type: object
+      required: [name, flavour, base_url, api_key]
+      properties:
+        name:
+          type: string
+        flavour:
+          $ref: '#/components/schemas/Flavour'
+        base_url:
+          type: string
+        api_key:
+          type: string
+        rescan_after:
+          type: boolean
+          default: true
+        unmonitor_after:
+          type: boolean
+          default: false
+        enabled:
+          type: boolean
+          default: true
+        path_mappings:
+          type: array
+          items:
+            $ref: '#/components/schemas/PathMapping'
+
+    ArrInstanceUpdate:
+      type: object
+      required: [name, flavour, base_url, api_key, rescan_after, unmonitor_after, enabled, path_mappings]
+      properties:
+        name:
+          type: string
+        flavour:
+          $ref: '#/components/schemas/Flavour'
+        base_url:
+          type: string
+        api_key:
+          type: string
+          description: |
+            Send the masked placeholder `********` to keep the stored key. Any
+            other value replaces it.
+        rescan_after:
+          type: boolean
+        unmonitor_after:
+          type: boolean
+        enabled:
+          type: boolean
+        path_mappings:
+          type: array
+          description: Replaces the whole mapping list.
+          items:
+            $ref: '#/components/schemas/PathMapping'
+
+    ArrRootFolder:
+      type: object
+      required: [id, path, local_path, accessible]
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: The id on the *arr instance.
+        path:
+          type: string
+          description: The instance's view of the path.
+        local_path:
+          type: string
+          description: The same path through that instance's mappings.
+        accessible:
+          type: boolean
+        free_space:
+          type: integer
+          format: int64
+          nullable: true
+        already_imported:
+          type: boolean
+
+    ImportRootsResult:
+      type: object
+      required: [imported, skipped, roots, conflicts]
+      properties:
+        imported:
+          type: integer
+        skipped:
+          type: integer
+          description: Already present and owned by this instance.
+        roots:
+          type: array
+          items:
+            $ref: '#/components/schemas/Root'
+        conflicts:
+          type: array
+          description: |
+            Paths another enabled instance already claims. Codarr never guesses
+            an owner, so these are skipped and surfaced (plan.md 16.2).
+          items:
+            $ref: '#/components/schemas/RootConflict'
+
+    RootConflict:
+      type: object
+      required: [path, owning_arr_instance_id, owning_arr_instance_name]
+      properties:
+        path:
+          type: string
+        owning_arr_instance_id:
+          type: integer
+          format: int64
+        owning_arr_instance_name:
+          type: string
+
+    Root:
+      type: object
+      required: [id, path, imported, enabled, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        path:
+          type: string
+        arr_instance_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: Null means files here are processed but nothing is notified.
+        arr_instance_name:
+          type: string
+          nullable: true
+        imported:
+          type: boolean
+          description: Created by import-roots rather than by hand.
+        enabled:
+          type: boolean
+        media_file_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    RootCreate:
+      type: object
+      required: [path]
+      properties:
+        path:
+          type: string
+        arr_instance_id:
+          type: integer
+          format: int64
+          nullable: true
+        enabled:
+          type: boolean
+          default: true
+
+    ScanStarted:
+      type: object
+      required: [root_id, started_at]
+      properties:
+        root_id:
+          type: integer
+          format: int64
+        started_at:
+          type: string
+          format: date-time
+
+    AudioSummary:
+      type: object
+      required: [codec, channels, layout, language]
+      properties:
+        codec:
+          type: string
+        channels:
+          type: integer
+        layout:
+          type: string
+          example: '5.1'
+        language:
+          type: string
+          example: eng
+
+    SubtitleSummary:
+      type: object
+      required: [codec, language, forced]
+      properties:
+        codec:
+          type: string
+        language:
+          type: string
+        forced:
+          type: boolean
+
+    MediaListItem:
+      type: object
+      required:
+        - id
+        - path
+        - filename
+        - size_bytes
+        - is_hdr
+        - audio
+        - subtitles
+        - status
+        - provenance
+        - ignored
+        - codarr_tagged
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        path:
+          type: string
+        filename:
+          type: string
+        root_id:
+          type: integer
+          format: int64
+          nullable: true
+        arr_instance_id:
+          type: integer
+          format: int64
+          nullable: true
+        arr_instance_name:
+          type: string
+          nullable: true
+        size_bytes:
+          type: integer
+          format: int64
+        container:
+          type: string
+        video_codec:
+          type: string
+        video_profile:
+          type: string
+        video_level:
+          type: string
+        width:
+          type: integer
+        height:
+          type: integer
+        video_bitrate_kbps:
+          type: integer
+          nullable: true
+        video_bitrate_source:
+          $ref: '#/components/schemas/BitrateSource'
+        is_hdr:
+          type: boolean
+        audio:
+          type: array
+          items:
+            $ref: '#/components/schemas/AudioSummary'
+        subtitles:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubtitleSummary'
+        plan_kind:
+          $ref: '#/components/schemas/PlanKind'
+        status:
+          $ref: '#/components/schemas/MediaStatus'
+        provenance:
+          $ref: '#/components/schemas/Provenance'
+        ignored:
+          type: boolean
+        codarr_tagged:
+          type: boolean
+        analyzed_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+
+    MediaPage:
+      type: object
+      required: [items, total, page, page_size]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaListItem'
+        total:
+          type: integer
+          description: Rows matching the filter, ignoring pagination.
+        page:
+          type: integer
+        page_size:
+          type: integer
+
+    MediaDetail:
+      type: object
+      required:
+        - id
+        - path
+        - filename
+        - size_bytes
+        - mtime
+        - is_hdr
+        - audio
+        - subtitles
+        - status
+        - provenance
+        - ignored
+        - codarr_tagged
+        - plan_reasons
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        path:
+          type: string
+        filename:
+          type: string
+        root_id:
+          type: integer
+          format: int64
+          nullable: true
+        arr_instance_id:
+          type: integer
+          format: int64
+          nullable: true
+        arr_instance_name:
+          type: string
+          nullable: true
+        arr_entity_id:
+          type: integer
+          format: int64
+          nullable: true
+        size_bytes:
+          type: integer
+          format: int64
+        mtime:
+          type: integer
+          format: int64
+        nlink:
+          type: integer
+          description: Greater than one fails preflight; a hardlinked file is never replaced.
+        fingerprint:
+          type: string
+        fingerprint_algo:
+          type: string
+          example: xxh3-128
+        container:
+          type: string
+        video_codec:
+          type: string
+        video_profile:
+          type: string
+        video_level:
+          type: string
+        width:
+          type: integer
+        height:
+          type: integer
+        video_bitrate_kbps:
+          type: integer
+          nullable: true
+        video_bitrate_source:
+          $ref: '#/components/schemas/BitrateSource'
+        is_hdr:
+          type: boolean
+        audio:
+          type: array
+          items:
+            $ref: '#/components/schemas/AudioSummary'
+        subtitles:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubtitleSummary'
+        media_info:
+          $ref: '#/components/schemas/MediaInfo'
+        probe_json:
+          type: string
+          nullable: true
+          description: Raw ffprobe output, for the collapsed technical section of the modal.
+        plan:
+          $ref: '#/components/schemas/Plan'
+        plan_kind:
+          $ref: '#/components/schemas/PlanKind'
+        plan_reasons:
+          type: array
+          items:
+            type: string
+        codarr_policy_hash:
+          type: string
+        codarr_job_id:
+          type: integer
+          format: int64
+          nullable: true
+        codarr_processed_at:
+          type: string
+          format: date-time
+          nullable: true
+        codarr_output_fingerprint:
+          type: string
+          description: Empty means Codarr has never written this file.
+        codarr_output_size:
+          type: integer
+          format: int64
+        codarr_output_mtime:
+          type: integer
+          format: int64
+        codarr_output_full_hash:
+          type: string
+        integrity_checked_at:
+          type: string
+          format: date-time
+          nullable: true
+        provenance:
+          $ref: '#/components/schemas/Provenance'
+        status:
+          $ref: '#/components/schemas/MediaStatus'
+        ignored:
+          type: boolean
+        codarr_tagged:
+          type: boolean
+        last_error:
+          type: string
+        latest_job_id:
+          type: integer
+          format: int64
+          nullable: true
+        analyzed_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    MediaInfo:
+      type: object
+      description: |
+        The parsed summary the detail modal renders. Deliberately not a full
+        probe dump; `probe_json` carries that.
+      required: [container, audio, subtitles, attachments, chapters]
+      properties:
+        container:
+          type: string
+        duration_seconds:
+          type: number
+          format: double
+        video:
+          $ref: '#/components/schemas/VideoState'
+        audio:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaInfoAudio'
+        subtitles:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaInfoSubtitle'
+        attachments:
+          type: integer
+        chapters:
+          type: integer
+
+    MediaInfoAudio:
+      type: object
+      required: [index, codec, channels, layout, language, default, forced, comment, visual_impaired]
+      properties:
+        index:
+          type: integer
+          description: Source stream index.
+        codec:
+          type: string
+        profile:
+          type: string
+        channels:
+          type: integer
+        layout:
+          type: string
+        language:
+          type: string
+        title:
+          type: string
+          nullable: true
+        bitrate_kbps:
+          type: integer
+          nullable: true
+        default:
+          type: boolean
+        forced:
+          type: boolean
+        comment:
+          type: boolean
+        visual_impaired:
+          type: boolean
+
+    MediaInfoSubtitle:
+      type: object
+      required: [index, codec, language, default, forced]
+      properties:
+        index:
+          type: integer
+        codec:
+          type: string
+        language:
+          type: string
+        title:
+          type: string
+          nullable: true
+        default:
+          type: boolean
+        forced:
+          type: boolean
+
+    StreamPlan:
+      type: object
+      description: |
+        The decision for one source stream plus where it lands in the output.
+        Both indices are carried on purpose: ffmpeg's -c:a:N, -b:a:N,
+        -disposition:a:N and -bsf:v:N all address the OUTPUT position
+        (plan.md 14.2).
+      required: [type, source_index, output_index, decision, reason, default, forced, comment, visual_impaired]
+      properties:
+        type:
+          $ref: '#/components/schemas/StreamType'
+        source_index:
+          type: integer
+        output_index:
+          type: integer
+          nullable: true
+          description: Null for a dropped stream.
+        decision:
+          $ref: '#/components/schemas/Decision'
+        reason:
+          type: string
+        language:
+          type: string
+        title:
+          type: string
+        target_codec:
+          type: string
+        target_bitrate_bps:
+          type: integer
+        target_channels:
+          type: integer
+        default:
+          type: boolean
+        forced:
+          type: boolean
+        comment:
+          type: boolean
+        visual_impaired:
+          type: boolean
+
+    Plan:
+      type: object
+      description: |
+        Derived purely from an ffprobe result plus the hard-coded policy, so it
+        is deterministic (plan.md section 7).
+      required: [kind, source_container, output_container, streams, level_rewrite, deinterlace, hdr, dolby_vision, reasons, policy_hash]
+      properties:
+        kind:
+          $ref: '#/components/schemas/PlanKind'
+        source_container:
+          type: string
+        output_container:
+          $ref: '#/components/schemas/ContainerFamily'
+        streams:
+          type: array
+          items:
+            $ref: '#/components/schemas/StreamPlan'
+        level_rewrite:
+          type: boolean
+          description: |
+            The stream is still copied; only the H.264 level flag is rewritten
+            to 4.2 by a bitstream filter (plan.md 6.2).
+        deinterlace:
+          type: boolean
+        hdr:
+          type: boolean
+        dolby_vision:
+          type: boolean
+        dolby_vision_profile:
+          type: integer
+        target_video_bitrate_bps:
+          type: integer
+          description: |
+            Zero until the sample probe has run, which is the first phase of a
+            full job rather than something that happens at enqueue.
+        reasons:
+          type: array
+          items:
+            type: string
+        policy_hash:
+          type: string
+
+    BeforeAfterString:
+      type: object
+      required: [before, after]
+      properties:
+        before:
+          type: string
+        after:
+          type: string
+
+    BeforeAfterInt:
+      type: object
+      required: [before, after]
+      properties:
+        before:
+          type: integer
+        after:
+          type: integer
+
+    SizeTransform:
+      type: object
+      required: [before_bytes, after_bytes]
+      properties:
+        before_bytes:
+          type: integer
+          format: int64
+        after_bytes:
+          type: integer
+          format: int64
+
+    DurationTransform:
+      type: object
+      required: [estimated, actual]
+      properties:
+        estimated:
+          type: integer
+        actual:
+          type: integer
+          nullable: true
+          description: Null until the job finishes.
+
+    VideoState:
+      type: object
+      x-omitempty: false
+      required: [codec, profile, level, width, height, fps, bitrate_kbps, pix_fmt, hdr, scan]
+      properties:
+        codec:
+          type: string
+        profile:
+          type: string
+        level:
+          type: string
+        width:
+          type: integer
+        height:
+          type: integer
+        fps:
+          type: number
+          format: double
+        bitrate_kbps:
+          type: integer
+          nullable: true
+          description: |
+            Null on the predicted side of a full job until the sample probe has
+            run; the UI shows "calculating" (plan.md 17.2).
+        pix_fmt:
+          type: string
+        hdr:
+          type: boolean
+        scan:
+          $ref: '#/components/schemas/ScanType'
+
+    VideoTransform:
+      type: object
+      required: [action, reason]
+      properties:
+        action:
+          $ref: '#/components/schemas/Decision'
+        reason:
+          type: string
+        before:
+          $ref: '#/components/schemas/VideoState'
+        after:
+          $ref: '#/components/schemas/VideoState'
+
+    AudioState:
+      type: object
+      x-omitempty: false
+      required: [codec, channels, layout, bitrate_kbps]
+      properties:
+        codec:
+          type: string
+        profile:
+          type: string
+        channels:
+          type: integer
+        layout:
+          type: string
+        bitrate_kbps:
+          type: integer
+          nullable: true
+
+    AudioTransform:
+      type: object
+      required: [source_index, output_index, language, title, action]
+      properties:
+        source_index:
+          type: integer
+        output_index:
+          type: integer
+          nullable: true
+          description: Null for a dropped stream.
+        language:
+          type: string
+        title:
+          type: string
+          nullable: true
+        action:
+          $ref: '#/components/schemas/Decision'
+        reason:
+          type: string
+        before:
+          $ref: '#/components/schemas/AudioState'
+        after:
+          $ref: '#/components/schemas/AudioState'
+
+    SubtitleState:
+      type: object
+      x-omitempty: false
+      required: [codec, forced]
+      properties:
+        codec:
+          type: string
+        forced:
+          type: boolean
+
+    SubtitleTransform:
+      type: object
+      required: [source_index, output_index, language, action]
+      properties:
+        source_index:
+          type: integer
+        output_index:
+          type: integer
+          nullable: true
+          description: Null for a dropped stream.
+        language:
+          type: string
+        action:
+          $ref: '#/components/schemas/Decision'
+        reason:
+          type: string
+        before:
+          $ref: '#/components/schemas/SubtitleState'
+        after:
+          $ref: '#/components/schemas/SubtitleState'
+
+    OutputIdentity:
+      type: object
+      x-omitempty: false
+      description: |
+        Written at promotion, after the mtime restore. The immutable record of
+        what Codarr actually produced; the media row's copy is the mutable
+        current-state view, and the two diverging is the signal that something
+        rewrote the file.
+      required: [fingerprint, full_hash, size_bytes, mtime, policy_hash, recorded_at]
+      properties:
+        fingerprint:
+          type: string
+          example: xxh3-128:9f2c
+        full_hash:
+          type: string
+          nullable: true
+          description: Only when full_hash_enabled was on.
+        size_bytes:
+          type: integer
+          format: int64
+        mtime:
+          type: integer
+          format: int64
+        policy_hash:
+          type: string
+        recorded_at:
+          type: string
+          format: date-time
+
+    TransformRecord:
+      type: object
+      description: |
+        The before/after history for one job (plan.md 17.2). Written at enqueue
+        with `after` holding the plan, updated at completion with `after` holding
+        what an ffprobe of the real output measured. One schema serves both,
+        which is what lets the UI render queued and completed items with the same
+        component. Never deleted.
+      required: [container, video, audio, subtitles, attachments, chapters, size, duration_seconds]
+      properties:
+        container:
+          $ref: '#/components/schemas/BeforeAfterString'
+        video:
+          $ref: '#/components/schemas/VideoTransform'
+        audio:
+          type: array
+          items:
+            $ref: '#/components/schemas/AudioTransform'
+        subtitles:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubtitleTransform'
+        attachments:
+          $ref: '#/components/schemas/BeforeAfterInt'
+        chapters:
+          $ref: '#/components/schemas/BeforeAfterInt'
+        size:
+          $ref: '#/components/schemas/SizeTransform'
+        duration_seconds:
+          $ref: '#/components/schemas/DurationTransform'
+        output_identity:
+          $ref: '#/components/schemas/OutputIdentity'
+
+    JobSummary:
+      type: object
+      required:
+        - id
+        - media_file_id
+        - media_path
+        - media_filename
+        - kind
+        - origin
+        - priority
+        - state
+        - attempt
+        - fell_back
+        - queued_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        media_file_id:
+          type: integer
+          format: int64
+        media_path:
+          type: string
+        media_filename:
+          type: string
+        kind:
+          $ref: '#/components/schemas/PlanKind'
+        origin:
+          $ref: '#/components/schemas/JobOrigin'
+        priority:
+          type: integer
+          description: Lower runs first.
+        state:
+          $ref: '#/components/schemas/JobState'
+        attempt:
+          type: integer
+          description: Automatic re-queues after an interruption; caps at 3.
+        progress_pct:
+          type: number
+          format: double
+        progress_speed:
+          type: number
+          format: double
+          description: ffmpeg's speed multiplier relative to realtime.
+        estimated_seconds:
+          type: integer
+        actual_seconds:
+          type: integer
+        encoder_used:
+          $ref: '#/components/schemas/Encoder'
+        decode_path:
+          $ref: '#/components/schemas/DecodePath'
+        fell_back:
+          type: boolean
+          description: A software-encoder fallback turns a 20-minute job into a 4-hour one; the UI shouts about it.
+        fallback_reason:
+          type: string
+        source_size:
+          type: integer
+          format: int64
+        output_size:
+          type: integer
+          format: int64
+        blocked_by:
+          type: string
+          description: What is holding the job in awaiting_stream_end.
+        failure_code:
+          $ref: '#/components/schemas/FailureCode'
+        failure_message:
+          type: string
+          description: Always populated on failure, and specific enough to act on.
+        queued_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    Job:
+      type: object
+      required:
+        - id
+        - media_file_id
+        - media_path
+        - media_filename
+        - kind
+        - origin
+        - priority
+        - state
+        - attempt
+        - fell_back
+        - used_temp_dir
+        - transform
+        - queued_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        media_file_id:
+          type: integer
+          format: int64
+        media_path:
+          type: string
+        media_filename:
+          type: string
+        arr_instance_id:
+          type: integer
+          format: int64
+          nullable: true
+        arr_instance_name:
+          type: string
+          nullable: true
+        kind:
+          $ref: '#/components/schemas/PlanKind'
+        origin:
+          $ref: '#/components/schemas/JobOrigin'
+        priority:
+          type: integer
+        state:
+          $ref: '#/components/schemas/JobState'
+        attempt:
+          type: integer
+        transform:
+          $ref: '#/components/schemas/TransformRecord'
+        staging_path:
+          type: string
+        used_temp_dir:
+          type: boolean
+        ffmpeg_argv:
+          type: array
+          items:
+            type: string
+        probe_result:
+          type: string
+          nullable: true
+          description: Raw ffprobe output of the staged result, when one was taken.
+        progress_pct:
+          type: number
+          format: double
+        progress_speed:
+          type: number
+          format: double
+        estimated_seconds:
+          type: integer
+        actual_seconds:
+          type: integer
+        encoder_used:
+          $ref: '#/components/schemas/Encoder'
+        decode_path:
+          $ref: '#/components/schemas/DecodePath'
+        fell_back:
+          type: boolean
+        fallback_reason:
+          type: string
+        source_size:
+          type: integer
+          format: int64
+        output_size:
+          type: integer
+          format: int64
+        output_fingerprint:
+          type: string
+        output_full_hash:
+          type: string
+        blocked_by:
+          type: string
+        failure_code:
+          $ref: '#/components/schemas/FailureCode'
+        failure_message:
+          type: string
+        stderr_tail:
+          type: string
+          description: Included on ffmpeg_failed.
+        queued_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    JobPage:
+      type: object
+      required: [items, total, page, page_size]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobSummary'
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+
+    EnqueueResult:
+      type: object
+      required: [media_file_id, enqueued, reason]
+      properties:
+        media_file_id:
+          type: integer
+          format: int64
+        enqueued:
+          type: boolean
+        job_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: The existing job when the enqueue was a no-op.
+        plan_kind:
+          $ref: '#/components/schemas/PlanKind'
+        reason:
+          type: string
+
+    PlanKindBreakdown:
+      type: object
+      required: [skip, remux, audio_only, full]
+      properties:
+        skip:
+          type: integer
+        remux:
+          type: integer
+        audio_only:
+          type: integer
+        full:
+          type: integer
+
+    RecheckAllRequest:
+      type: object
+      required: [confirm]
+      properties:
+        confirm:
+          type: boolean
+          description: False re-probes and re-plans but queues nothing.
+
+    MediaFilter:
+      description: >
+        The same filter the library table applies, so "select all matching
+        filter" (plan.md 18.2) does not mean shipping every matching id over the
+        wire. A 40k-file selection is one filter object, not 40k integers.
+      type: object
+      properties:
+        q:
+          type: string
+        status:
+          $ref: '#/components/schemas/MediaStatus'
+        plan_kind:
+          $ref: '#/components/schemas/PlanKind'
+        video_codec:
+          type: string
+        arr_instance_id:
+          type: integer
+          format: int64
+        provenance:
+          $ref: '#/components/schemas/Provenance'
+
+    RecheckSelectedRequest:
+      description: >
+        Supply either ids or filter, never both. An empty body selects nothing
+        rather than everything, so a mis-sent request cannot queue the library.
+      type: object
+      required: [confirm]
+      properties:
+        ids:
+          type: array
+          minItems: 1
+          items:
+            type: integer
+            format: int64
+        filter:
+          $ref: '#/components/schemas/MediaFilter'
+        confirm:
+          type: boolean
+
+    RecheckResult:
+      type: object
+      required: [dry_run, examined, count, by_plan_kind, queued_job_ids]
+      properties:
+        dry_run:
+          type: boolean
+          description: True when confirm was false; nothing was queued.
+        examined:
+          type: integer
+          description: Files re-probed and re-planned.
+        count:
+          type: integer
+          description: Files that no longer match the current policy, so would be queued.
+        by_plan_kind:
+          $ref: '#/components/schemas/PlanKindBreakdown'
+        queued_job_ids:
+          type: array
+          description: Empty on a dry run.
+          items:
+            type: integer
+            format: int64
+        media_file_ids:
+          type: array
+          description: The files behind `count`, so the confirmation can name them.
+          items:
+            type: integer
+            format: int64
+
+    VerifyIntegrityRequest:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          minItems: 1
+          items:
+            type: integer
+            format: int64
+
+    IntegrityResult:
+      type: object
+      required: [media_file_id, path, ok, provenance, full_hash_checked, checked_at]
+      properties:
+        media_file_id:
+          type: integer
+          format: int64
+        path:
+          type: string
+        ok:
+          type: boolean
+          description: |
+            The file still matches what was recorded at promotion. A file Codarr
+            never wrote reports ok with provenance `untouched`.
+        provenance:
+          $ref: '#/components/schemas/Provenance'
+        recorded_fingerprint:
+          type: string
+        current_fingerprint:
+          type: string
+        recorded_full_hash:
+          type: string
+        current_full_hash:
+          type: string
+        full_hash_checked:
+          type: boolean
+          description: Only true when a whole-file hash was recorded at promotion.
+        recorded_size_bytes:
+          type: integer
+          format: int64
+        current_size_bytes:
+          type: integer
+          format: int64
+        message:
+          type: string
+        checked_at:
+          type: string
+          format: date-time
+
+    IntegrityBulkResult:
+      type: object
+      required: [checked, mismatched, results]
+      properties:
+        checked:
+          type: integer
+        mismatched:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/IntegrityResult'
+
+    SpaceSweepCandidate:
+      type: object
+      required: [media_file_id, path, filename, current_bytes, projected_bytes, projected_saving_bytes, projected_saving_pct]
+      properties:
+        media_file_id:
+          type: integer
+          format: int64
+        path:
+          type: string
+        filename:
+          type: string
+        video_codec:
+          type: string
+        current_video_bitrate_kbps:
+          type: integer
+        target_video_bitrate_kbps:
+          type: integer
+        current_bytes:
+          type: integer
+          format: int64
+        projected_bytes:
+          type: integer
+          format: int64
+        projected_saving_bytes:
+          type: integer
+          format: int64
+        projected_saving_pct:
+          type: number
+          format: double
+
+    SpaceSweepPreview:
+      type: object
+      required:
+        - count
+        - examined
+        - by_plan_kind
+        - current_bytes
+        - projected_bytes
+        - projected_saving_bytes
+        - projected_saving_pct
+        - irreversible
+        - candidates
+      properties:
+        count:
+          type: integer
+          description: Files that clear the policy saving threshold.
+        examined:
+          type: integer
+          description: Files that matched the bitrate filter and were sample-probed.
+        by_plan_kind:
+          $ref: '#/components/schemas/PlanKindBreakdown'
+        current_bytes:
+          type: integer
+          format: int64
+        projected_bytes:
+          type: integer
+          format: int64
+        projected_saving_bytes:
+          type: integer
+          format: int64
+        projected_saving_pct:
+          type: number
+          format: double
+        irreversible:
+          type: boolean
+          description: Always true. The confirmation must say so plainly.
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/SpaceSweepCandidate'
+
+    SpaceSweepRunRequest:
+      type: object
+      required: [confirm]
+      properties:
+        confirm:
+          type: boolean
+          description: Must be true. False is rejected with 400.
+        media_file_ids:
+          type: array
+          description: |
+            Restricts the run to these files, which is how the UI runs exactly
+            what the preview showed. Omitted means every current candidate.
+          items:
+            type: integer
+            format: int64
+
+    SpaceSweepRunResult:
+      type: object
+      required: [count, by_plan_kind, projected_saving_bytes, queued_job_ids]
+      properties:
+        count:
+          type: integer
+        by_plan_kind:
+          $ref: '#/components/schemas/PlanKindBreakdown'
+        projected_saving_bytes:
+          type: integer
+          format: int64
+        queued_job_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+
+    AwaitingStreamEnd:
+      type: object
+      required: [job_id, media_file_id, path, filename, waiting_since, waiting_seconds]
+      properties:
+        job_id:
+          type: integer
+          format: int64
+        media_file_id:
+          type: integer
+          format: int64
+        path:
+          type: string
+        filename:
+          type: string
+        session_user:
+          type: string
+        session_player:
+          type: string
+        session_key:
+          type: string
+        waiting_since:
+          type: string
+          format: date-time
+        waiting_seconds:
+          type: integer
+
+    QueueState:
+      type: object
+      required: [paused, depth, queued, awaiting_stream_end]
+      properties:
+        paused:
+          type: boolean
+        depth:
+          type: integer
+          description: Jobs in queued.
+        running:
+          $ref: '#/components/schemas/JobSummary'
+        queued:
+          type: array
+          description: In execution order.
+          items:
+            $ref: '#/components/schemas/JobSummary'
+        awaiting_stream_end:
+          type: array
+          items:
+            $ref: '#/components/schemas/AwaitingStreamEnd'
+
+    HWCapability:
+      type: object
+      required: [backend, codec, profile, direction, works, probed_at]
+      properties:
+        backend:
+          type: string
+          example: qsv
+        codec:
+          type: string
+          example: hevc
+        profile:
+          type: string
+          example: main10
+        direction:
+          type: string
+          enum: [encode, decode]
+        works:
+          type: boolean
+        error:
+          type: string
+        ffmpeg_version:
+          type: string
+        probed_at:
+          type: string
+          format: date-time
+
+    Hardware:
+      type: object
+      required: [qsv_device, capabilities, hardware_decode_codecs]
+      properties:
+        qsv_device:
+          type: string
+        ffmpeg_version:
+          type: string
+        selected_encoder:
+          $ref: '#/components/schemas/Encoder'
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/HWCapability'
+        hardware_decode_codecs:
+          type: array
+          description: The hard-coded Gen 9.5 decode set. Anything else decodes in software.
+          items:
+            type: string
+        remediation:
+          type: string
+          description: What to do when a probe failed; a Main10 failure is almost always the driver stack.
+        probed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ArrWebhookMovie:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        folderPath:
+          type: string
+
+    ArrWebhookMovieFile:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: integer
+          format: int64
+        relativePath:
+          type: string
+        path:
+          type: string
+
+    ArrWebhookSeries:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        path:
+          type: string
+
+    ArrWebhookEpisode:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: integer
+          format: int64
+        seasonNumber:
+          type: integer
+        episodeNumber:
+          type: integer
+        title:
+          type: string
+
+    ArrWebhookEpisodeFile:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: integer
+          format: int64
+        relativePath:
+          type: string
+        path:
+          type: string
+
+    ArrWebhookPayload:
+      type: object
+      description: |
+        Modelled loosely on purpose. Radarr and Sonarr payloads vary by event
+        type and by *arr version, so only the fields Codarr actually reads are
+        declared and `additionalProperties: true` lets everything else through
+        untouched. Mirroring the *arr schemas exactly creates breakage on every
+        *arr release (plan.md 2.1 and 13.1).
+
+        `path` is the sending instance's view of the filesystem and is remapped
+        through that instance's own path mappings.
+      additionalProperties: true
+      required: [eventType]
+      properties:
+        eventType:
+          type: string
+          description: |
+            Handled: Download, Rename, Test, MovieFileDelete, EpisodeFileDelete.
+            Anything else is acknowledged and ignored.
+          example: Download
+        isUpgrade:
+          type: boolean
+        movie:
+          $ref: '#/components/schemas/ArrWebhookMovie'
+        movieFile:
+          $ref: '#/components/schemas/ArrWebhookMovieFile'
+        series:
+          $ref: '#/components/schemas/ArrWebhookSeries'
+        episodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArrWebhookEpisode'
+        episodeFile:
+          $ref: '#/components/schemas/ArrWebhookEpisodeFile'
+
+    WebhookAck:
+      type: object
+      required: [received, message]
+      properties:
+        received:
+          type: boolean
+        message:
+          type: string
+        media_file_id:
+          type: integer
+          format: int64
+          nullable: true
+        job_id:
+          type: integer
+          format: int64
+          nullable: true
+
+    Stats:
+      type: object
+      required:
+        - files_total
+        - files_done
+        - files_pending
+        - files_failed
+        - files_skipped
+        - files_ignored
+        - files_missing
+        - jobs_done
+        - jobs_failed
+        - bytes_in
+        - bytes_out
+        - bytes_saved
+        - encode_seconds
+      properties:
+        files_total:
+          type: integer
+        files_done:
+          type: integer
+        files_pending:
+          type: integer
+        files_failed:
+          type: integer
+        files_skipped:
+          type: integer
+        files_ignored:
+          type: integer
+        files_missing:
+          type: integer
+        jobs_done:
+          type: integer
+        jobs_failed:
+          type: integer
+        bytes_in:
+          type: integer
+          format: int64
+        bytes_out:
+          type: integer
+          format: int64
+        bytes_saved:
+          type: integer
+          format: int64
+          description: Can be negative; an AV1 source re-encoded to HEVC usually grows.
+        encode_seconds:
+          type: integer
+          format: int64
+        avg_saving_pct:
+          type: number
+          format: double
+
+    CompatibilityReasons:
+      type: object
+      description: A file can need work for more than one reason, so these overlap.
+      required: [audio, subtitles, video, container]
+      properties:
+        audio:
+          type: integer
+        subtitles:
+          type: integer
+        video:
+          type: integer
+        container:
+          type: integer
+
+    CompatibilitySummary:
+      type: object
+      description: |
+        How many files still force playback transcoding, and why. This is the
+        number that tracks progress toward the primary goal.
+      required: [files_analyzed, files_compatible, files_needing_work, files_unanalyzed, by_reason, by_plan_kind]
+      properties:
+        files_analyzed:
+          type: integer
+        files_compatible:
+          type: integer
+        files_needing_work:
+          type: integer
+        files_unanalyzed:
+          type: integer
+        by_reason:
+          $ref: '#/components/schemas/CompatibilityReasons'
+        by_plan_kind:
+          $ref: '#/components/schemas/PlanKindBreakdown'
+
+    Dashboard:
+      type: object
+      required:
+        - generated_at
+        - queue_paused
+        - queue_depth
+        - queue
+        - awaiting_stream_end
+        - recent_completions
+        - failures
+        - stats
+        - compatibility
+      properties:
+        generated_at:
+          type: string
+          format: date-time
+        queue_paused:
+          type: boolean
+        current_job:
+          $ref: '#/components/schemas/JobSummary'
+        queue_depth:
+          type: integer
+        queue:
+          type: array
+          description: In execution order.
+          items:
+            $ref: '#/components/schemas/JobSummary'
+        awaiting_stream_end:
+          type: array
+          items:
+            $ref: '#/components/schemas/AwaitingStreamEnd'
+        recent_completions:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobSummary'
+        failures:
+          type: array
+          description: Failed jobs needing attention, newest first.
+          items:
+            $ref: '#/components/schemas/JobSummary'
+        stats:
+          $ref: '#/components/schemas/Stats'
+        compatibility:
+          $ref: '#/components/schemas/CompatibilitySummary'
+
+    Event:
+      type: object
+      required: [id, level, category, message, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        level:
+          $ref: '#/components/schemas/EventLevel'
+        category:
+          type: string
+        message:
+          type: string
+        media_file_id:
+          type: integer
+          format: int64
+          nullable: true
+        job_id:
+          type: integer
+          format: int64
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    EventPage:
+      type: object
+      required: [items, next_since_id, has_more]
+      properties:
+        items:
+          type: array
+          description: Ascending by id.
+          items:
+            $ref: '#/components/schemas/Event'
+        next_since_id:
+          type: integer
+          format: int64
+          description: Pass as `since_id` on the next poll.
+        has_more:
+          type: boolean
+          description: More events matched than the limit allowed.
+
+    PolicyContainer:
+      type: object
+      required: [preserve_extensions, legacy_extensions, mp4_movflags]
+      properties:
+        preserve_extensions:
+          type: array
+          description: Containers kept as they are, so the path never changes.
+          items:
+            type: string
+        legacy_extensions:
+          type: array
+          description: Containers always rewritten to Matroska, even when every stream copies.
+          items:
+            type: string
+        mp4_movflags:
+          type: array
+          description: faststart moves the moov atom to the front; use_metadata_tags carries the loop-prevention tag.
+          items:
+            type: string
+
+    PolicyVideoCopyRule:
+      type: object
+      required: [codecs, h264_profiles, hevc_profiles, h264_max_level, chroma_subsampling, progressive_only, unknown_scan_is_progressive]
+      properties:
+        codecs:
+          type: array
+          items:
+            type: string
+        h264_profiles:
+          type: array
+          description: ffprobe's exact strings. Constrained Baseline is distinct from Baseline.
+          items:
+            type: string
+        hevc_profiles:
+          type: array
+          items:
+            type: string
+        h264_max_level:
+          type: string
+          example: '4.2'
+        chroma_subsampling:
+          type: string
+          description: A subsampling test, not a pix_fmt string compare. Any bit depth passes.
+          example: 4:2:0
+        progressive_only:
+          type: boolean
+        unknown_scan_is_progressive:
+          type: boolean
+
+    PolicyLevelRewrite:
+      type: object
+      description: |
+        A stream failing only the level test is still copied; the flag is
+        rewritten in-stream during the container rebuild. The refs guard is
+        load-bearing, not a safety margin.
+      required: [target_level, max_width, max_height, max_fps, max_refs, bitstream_filter]
+      properties:
+        target_level:
+          type: string
+        max_width:
+          type: integer
+        max_height:
+          type: integer
+        max_fps:
+          type: number
+          format: double
+        max_refs:
+          type: integer
+        bitstream_filter:
+          type: string
+          example: h264_metadata=level=4.2
+
+    PolicyEncodeTarget:
+      type: object
+      required: [source, codec, profile, bit_depth]
+      properties:
+        source:
+          type: string
+          example: SDR
+        codec:
+          type: string
+        profile:
+          type: string
+        bit_depth:
+          type: integer
+        mp4_tag:
+          type: string
+          description: hvc1 rather than ffmpeg's default hev1, which Apple-derived players refuse.
+
+    PolicyVideo:
+      type: object
+      required: [copy_rule, level_rewrite, encode_targets, hardware_decode_codecs, drop_attached_pictures]
+      properties:
+        copy_rule:
+          $ref: '#/components/schemas/PolicyVideoCopyRule'
+        level_rewrite:
+          $ref: '#/components/schemas/PolicyLevelRewrite'
+        encode_targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyEncodeTarget'
+        hardware_decode_codecs:
+          type: array
+          items:
+            type: string
+        drop_attached_pictures:
+          type: boolean
+
+    PolicyAudioCopyRule:
+      type: object
+      required: [min_channels, max_channels, codecs]
+      properties:
+        min_channels:
+          type: integer
+        max_channels:
+          type: integer
+          description: Zero means unbounded.
+        codecs:
+          type: array
+          items:
+            type: string
+
+    PolicyAudioEncodeTarget:
+      type: object
+      required: [min_channels, max_channels, codec, bitrate_kbps]
+      properties:
+        min_channels:
+          type: integer
+        max_channels:
+          type: integer
+          description: Zero means unbounded.
+        codec:
+          type: string
+        bitrate_kbps:
+          type: integer
+        downmix_channels:
+          type: integer
+          description: Set for 7 or more channels, which downmix to 5.1.
+
+    PolicyAudio:
+      type: object
+      required: [copy_list, encode_targets, mp4_multichannel_codec, mp4_kbps_per_channel, keep_all_languages, never_zero_audio_streams]
+      properties:
+        copy_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyAudioCopyRule'
+        encode_targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyAudioEncodeTarget'
+        mp4_multichannel_codec:
+          type: string
+          description: AC3 in MP4 is legal but patchily supported, so multichannel MP4 audio goes to AAC.
+        mp4_kbps_per_channel:
+          type: integer
+        keep_all_languages:
+          type: boolean
+        never_zero_audio_streams:
+          type: boolean
+          description: A mapping that would produce no audio fails the job instead.
+
+    PolicySubtitleTarget:
+      type: object
+      required: [container, codec]
+      properties:
+        container:
+          $ref: '#/components/schemas/ContainerFamily'
+        codec:
+          type: string
+
+    PolicySubtitles:
+      type: object
+      required: [drop_image_codecs, drop_broadcast_codecs, text_codecs, targets, drop_attachments, keep_all_languages, drop_forced_image_subtitles]
+      properties:
+        drop_image_codecs:
+          type: array
+          description: Bitmaps. A client that cannot render them makes the server burn them in, forcing a full playback transcode.
+          items:
+            type: string
+        drop_broadcast_codecs:
+          type: array
+          items:
+            type: string
+        text_codecs:
+          type: array
+          description: Never dropped for format reasons; converted to the container's target.
+          items:
+            type: string
+        targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicySubtitleTarget'
+        drop_attachments:
+          type: boolean
+          description: Converting ASS to SRT removes the dependency on embedded fonts.
+        keep_all_languages:
+          type: boolean
+        drop_forced_image_subtitles:
+          type: boolean
+          description: Keeping forced PGS would reintroduce the burn-in transcode this policy exists to remove.
+
+    PolicySampleProbe:
+      type: object
+      required: [segments, segment_seconds, skip_head_pct, skip_tail_pct, encoder, crf, preset, hardware_correction, source_clamp]
+      properties:
+        segments:
+          type: integer
+        segment_seconds:
+          type: integer
+        skip_head_pct:
+          type: number
+          format: double
+        skip_tail_pct:
+          type: number
+          format: double
+        encoder:
+          type: string
+        crf:
+          type: integer
+        preset:
+          type: string
+        hardware_correction:
+          type: number
+          format: double
+          description: The fixed-function encoder is less efficient than x265 at equal bitrate.
+        source_clamp:
+          type: number
+          format: double
+          description: Target is capped at this fraction of the resolved source bitrate.
+
+    PolicyBitrateRow:
+      type: object
+      required: [resolution, bpp, floor_kbps, ceiling_kbps]
+      properties:
+        resolution:
+          type: string
+          example: 1080p
+        bpp:
+          type: number
+          format: double
+          description: Bits per pixel for the fallback formula when the sample probe fails.
+        floor_kbps:
+          type: integer
+        ceiling_kbps:
+          type: integer
+
+    PolicyBitrate:
+      type: object
+      required: [applies_to, sample_probe, table, hdr_uplift_pct, fps_scale_cap, maxrate_factor, bufsize_factor]
+      properties:
+        applies_to:
+          type: string
+          description: Only full jobs and the manual space sweep compute a bitrate.
+        sample_probe:
+          $ref: '#/components/schemas/PolicySampleProbe'
+        table:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyBitrateRow'
+        hdr_uplift_pct:
+          type: number
+          format: double
+        fps_scale_cap:
+          type: number
+          format: double
+        maxrate_factor:
+          type: number
+          format: double
+        bufsize_factor:
+          type: number
+          format: double
+
+    PolicySpaceSweep:
+      type: object
+      required: [manual_only, source_codec, min_video_bitrate_kbps, min_projected_saving_pct]
+      properties:
+        manual_only:
+          type: boolean
+          description: Never runs automatically and is never triggered by ingest.
+        source_codec:
+          type: string
+        min_video_bitrate_kbps:
+          type: integer
+        min_projected_saving_pct:
+          type: number
+          format: double
+
+    PolicyExclusions:
+      type: object
+      required: [extras_directories, filename_patterns, min_size_bytes, stability_guard_seconds, partial_extensions]
+      properties:
+        extras_directories:
+          type: array
+          items:
+            type: string
+        filename_patterns:
+          type: array
+          items:
+            type: string
+        min_size_bytes:
+          type: integer
+          format: int64
+        stability_guard_seconds:
+          type: integer
+          description: Files whose mtime is newer than this are left for the next scan.
+        partial_extensions:
+          type: array
+          items:
+            type: string
+
+    Policy:
+      type: object
+      description: |
+        Compiled into the binary and displayed read-only. Nothing in this API
+        changes what gets transcoded or to what (plan.md section 6). Changing the
+        policy and rebuilding changes `policy_hash`, which is what makes
+        previously-tagged files eligible for a re-check again.
+      required: [policy_hash, container, video, audio, subtitles, bitrate, space_sweep, exclusions, tag_keys]
+      properties:
+        policy_hash:
+          type: string
+        container:
+          $ref: '#/components/schemas/PolicyContainer'
+        video:
+          $ref: '#/components/schemas/PolicyVideo'
+        audio:
+          $ref: '#/components/schemas/PolicyAudio'
+        subtitles:
+          $ref: '#/components/schemas/PolicySubtitles'
+        bitrate:
+          $ref: '#/components/schemas/PolicyBitrate'
+        space_sweep:
+          $ref: '#/components/schemas/PolicySpaceSweep'
+        exclusions:
+          $ref: '#/components/schemas/PolicyExclusions'
+        tag_keys:
+          type: array
+          description: |
+            Written into every output. The tag alone is never sufficient to skip
+            a file; the skip rule is a conjunction with the policy hash and the
+            recorded output fingerprint (plan.md section 12).
+          items:
+            type: string

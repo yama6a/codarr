@@ -1,0 +1,166 @@
+# Codarr
+
+Single-user media transcoding service. Watches what Radarr and Sonarr produce,
+works out whether each file will direct-play on Plex without server-side
+transcoding, and rewrites only what needs rewriting.
+
+One owner, one Plex server, one machine. The encoding policy is hard-coded and
+not configurable. Deployment wiring lives in SQLite and is edited through the UI.
+
+Full specification: [`plan.md`](plan.md). Judgement calls made while building it:
+[`decisions.md`](decisions.md). Live-system checks: [`VERIFY.md`](VERIFY.md).
+
+## What it does
+
+Two goals, in order:
+
+1. **Direct play.** Nothing in the library should force Plex to transcode video
+   at playback time.
+2. **Disk space.** Real, but subordinate. Where the two conflict, compatibility
+   wins.
+
+Most of the library needs no video work at all. Valid H.264 and HEVC are copied,
+never upgraded, because re-encoding already-compatible video is generation loss
+for no gain. The dominant job is `audio_only`: fix the DTS track, drop the PGS
+subtitles, copy the video through untouched.
+
+## There is no undo
+
+Promotion replaces the original file with a single atomic `rename()`. Once that
+completes the source is gone. There is no trash directory, no retention window
+and no restore path.
+
+Three things carry that weight instead:
+
+- **Verification runs before promotion, always.** With no undo, it is the only
+  thing standing between a bad encode and a destroyed source.
+- **Anything touching more than one file dry-runs first**, shows the exact count
+  and plan breakdown, and says plainly that it cannot be undone.
+- **The *arrs are the recovery mechanism.** If a transcode ruins a file, Radarr
+  or Sonarr can fetch it again. That is why trash is expendable here in a way it
+  would not be for irreplaceable data: the library is reproducible.
+
+## Running it
+
+```
+--db          / CODARR_DB          /data/codarr.db
+--listen      / CODARR_LISTEN      :8080
+--log-level   / CODARR_LOG_LEVEL   info
+--ffmpeg      / CODARR_FFMPEG      ffmpeg
+--ffprobe     / CODARR_FFPROBE     ffprobe
+```
+
+Everything else lives in the database and is edited in the UI. On first run with
+an empty database it starts with no Plex, no *arr instances and no roots; ingest
+does nothing until at least one root exists.
+
+**There is no authentication.** Access is secured externally. There is no login,
+no API key check and no session handling, deliberately.
+
+## Development
+
+```bash
+make ci        # fumpt, generate, lint, vet, govulncheck, go test ./...
+make build     # frontend, then the binary with it embedded
+make run       # against ./data/codarr.db
+make web-dev   # Vite dev server, proxies /api to the Go server
+make image     # amd64 image
+```
+
+## Deployment
+
+The image is `ghcr.io/yama6a/codarr:<N>`, integer-tagged, one release per merge
+to `main`, amd64 only.
+
+This repo ships no Kubernetes manifests. The wiring for the target cluster is
+documented below; paste it into `offgrid-private` following that repo's own
+conventions.
+
+### It belongs in the media chart, not a new one
+
+`argo_apps/workloads/charts/media/templates/codarr.yaml`, with a `codarr:` block
+in that chart's `values.yaml`. Not a standalone chart: a PVC cannot be mounted
+across namespaces, and both `media-library` and the config volumes live in
+`media`.
+
+### The GPU request is the placement
+
+```yaml
+resources:
+  limits:
+    gpu.intel.com/i915: "1"
+```
+
+Nothing else. No `nodeSelector`, no `/dev/dri` hostPath, no
+`supplementalGroups`. The Intel device plugin advertises the resource only on
+the node carrying `extensions.talos.dev/i915`, so requesting it is what pins the
+pod to `tc-w1`. See that repo's `docs/14_igpu.md`.
+
+`sharedDevNum` is 2 and Plex already holds one slot, so Codarr takes the last
+one. A third claimant would sit `Pending`.
+
+### Volumes
+
+| Volume | Claim | Mount | Notes |
+|---|---|---|---|
+| library | `media-library` | `/media` | **No `subPath`.** Codarr needs both owners' trees |
+| config | `codarr-config` | `/data` | `longhorn-r2-retained-with-backups`, RWO |
+
+`media-downloads` is not mounted. Codarr never touches the staging area.
+
+`replicas: 1` and `strategy: Recreate`, because two processes on one SQLite
+directory corrupt it. Size the config PVC against `tc-w1`'s remaining Longhorn
+headroom, which is tight.
+
+### Security context
+
+```yaml
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 568
+  runAsGroup: 568
+  fsGroup: 568
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile: {type: RuntimeDefault}
+```
+
+uid 568 is what owns the NAS dataset. `fsGroup` does not apply to the NFS mount
+at all; it is there for the RWO config volume.
+
+### The three-place ingress edit
+
+Adding a host means all three, or the SecurityPolicy attaches to nothing and the
+app is served unauthenticated:
+
+1. `media/values.yaml`, under `ingress.ingresses[].hosts`
+2. `04_google_sso/values.yaml`, as `codarr.media` under `yama.casa`
+3. `05_blackbox_exporter/values.yaml`, under `probes.workloads-sso.targets`
+
+Plus a `CiliumNetworkPolicy` entry in `media/templates/networkpolicy.yaml`.
+
+### Other
+
+- Image pin with `# renovate: datasource=docker depName=ghcr.io/yama6a/codarr`
+  on the preceding line. Tags stay pinned: a floating tag would deploy on its
+  own schedule.
+- Add `ghcr.io/yama6a/codarr` to `SKIP_IMAGES` in
+  `lib/shell/check_multiarch.sh`, after the amd64 pin is in the chart.
+- Pod labels: `app: codarr`, `alert-criticality: warning`,
+  `longhorn-replica-affinity/enabled: "true"`.
+
+### Two changes outside Codarr
+
+**A Plex client profile for HEVC in browsers.** Without it, Plex Media Server
+transcodes HEVC to browser clients regardless of what the browser can decode,
+because it decides from its own client profile rather than browser capability.
+The profile is in `plan.md` section 23.1; drop it at
+`{plex data dir}/Profiles/Chrome.xml` and restart the Plex pod.
+
+**Upgrades must stay disabled on every Radarr and Sonarr instance.** That is
+what makes `full` jobs safe: with upgrades off, a rescan cannot trigger an
+upgrade search regardless of what the refreshed mediainfo says. *arr renaming
+must also stay off, or its naming format must use no `{MediaInfo ...}` tokens.
+
+Also worth fixing while in that repo: `docs/30_media.md:335` still says hardware
+transcoding is not wired up. The device plugin is installed and Plex holds a
+slot, so that paragraph is stale.

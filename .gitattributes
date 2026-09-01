@@ -1,0 +1,5 @@
+/go.sum linguist-generated=true
+/go.mod linguist-generated=true
+/api/models.gen.go linguist-generated=true
+/api/server.gen.go linguist-generated=true
+/web/src/api/schema.d.ts linguist-generated=true

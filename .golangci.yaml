@@ -1,0 +1,158 @@
+version: "2"
+linters:
+  # See available linter here. https://golangci-lint.run/usage/linters/
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - canonicalheader
+    - containedctx
+    - contextcheck
+    - copyloopvar
+    - cyclop
+    - decorder
+    - dogsled
+    - dupl
+    - dupword
+    - durationcheck
+    - errcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - exptostd
+    - fatcontext
+    - forcetypeassert
+    - ginkgolinter
+    - gocheckcompilerdirectives
+    - gochecknoglobals
+    - gochecknoinits
+    - gochecksumtype
+    - gocognit
+    - gocritic
+    - gocyclo
+    - godot
+    - goheader
+    - gomoddirectives
+    - gomodguard_v2
+    - goprintffuncname
+    - gosec
+    - gosmopolitan
+    - grouper
+    - iface
+    - importas
+    - inamedparam
+    - ineffassign
+    - interfacebloat
+    - intrange
+    - ireturn
+    - loggercheck
+    - maintidx
+    - makezero
+    - mirror
+    - misspell
+    - musttag
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnesserr
+    - nilnil
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - paralleltest
+    - prealloc
+    - predeclared
+    - promlinter
+    - protogetter
+    - reassign
+    - recvcheck
+    - revive
+    - rowserrcheck
+    - sloglint
+    - spancheck
+    - sqlclosecheck
+    - staticcheck
+    - tagalign
+    - tagliatelle
+    - testableexamples
+    - testifylint
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - usetesting
+    - wastedassign
+    - whitespace
+    - wrapcheck
+    - zerologlint
+  settings:
+    tagliatelle:
+      case:
+        rules:
+          # plan.md 17.2 pins the transform record's JSON shape, and the ffprobe
+          # and *arr payloads are snake_case upstream.
+          json: snake
+    interfacebloat:
+      # fsx.FS is deliberately wide: promotion rests on stat, statfs, rename,
+      # fsync and the metadata restore all going through one mockable seam.
+      max: 15
+    ireturn:
+      allow:
+        - anon
+        - error
+        - empty
+        - stdlib
+        - io.ReadSeekCloser
+    gosec:
+      excludes:
+        - G115  # integer overflow conversion int<->uint
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # Generated oapi-codegen output uses names like Id and Url.
+      - path: api/
+        linters:
+          - revive
+          - tagliatelle
+        text: var-naming
+      # A constructor returning its own package's interface is the boundary
+      # pattern plan.md 2.2 asks for, not an accident.
+      - path: internal/pkg/(clock|fsx)/
+        linters:
+          - ireturn
+      # Table-driven decision tests are long by construction; that is the point.
+      - path: _test\.go
+        linters:
+          - dupl
+          - funlen
+          - gocognit
+          - maintidx
+          - gochecknoglobals
+      # The policy constants in section 6 of plan.md are deliberately package-level.
+      - path: internal/decide/policy\.go
+        linters:
+          - gochecknoglobals
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

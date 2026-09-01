@@ -1,0 +1,8 @@
+/.build/.artifacts
+/.git
+/.github
+/codarr
+/data/*.db
+/web/node_modules
+/internal/web/dist
+/plan.md

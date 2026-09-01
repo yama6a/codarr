@@ -1,0 +1,11 @@
+/codarr
+/vendor
+/.env
+/data/*.db
+/data/*.db-shm
+/data/*.db-wal
+/internal/web/dist/*
+!/internal/web/dist/.gitkeep
+/web/node_modules
+/web/dist
+.DS_Store

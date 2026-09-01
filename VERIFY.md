@@ -117,6 +117,55 @@ record can survive `-c:v copy` into MKV on this build. That is a necessary
 condition for the profile 5 gate, not a sufficient one; it still needs a real
 file to prove.
 
+### The runtime image builds, and carries every codec the plan needs (2026-09-01)
+
+Built the runtime stage standalone for linux/amd64 under emulation.
+
+```
+ffmpeg version 7.1.4-Jellyfin / ffprobe version 7.1.4-Jellyfin
+hwaccels: cuda vaapi qsv drm opencl vulkan
+encoders: hevc_qsv, hevc_vaapi, libx265
+decoders: libdav1d (AV1 software decode), h264_qsv, hevc_qsv
+bsfs:     h264_metadata
+uid=568 gid=568
+```
+
+So the four things the encode path depends on are all compiled in: `hevc_qsv`
+and its `hevc_vaapi` fallback (10.2), `libx265` for the software fallback and
+the 8.1 sample probe, `libdav1d` for the AV1 software-decode path (6.2), and the
+`h264_metadata` bitstream filter for the level rewrite (6.2).
+
+Compiled-in is not working, per 10.1. Whether QSV actually encodes Main and
+Main10 on this silicon still needs the verification pod.
+
+### Bazarr does not depend on *arr video analysis (2026-09-01)
+
+Relevant to whether "Analyse video files" can be turned off on the *arrs.
+
+```
+embedded_subtitles_parser: ffprobe      # Bazarr runs its OWN ffprobe
+parse_embedded_audio_track: false       # audio language comes from the *arr
+language_equals: []                     # nothing branches on audio language
+default_und_audio_lang: ''
+single_language / use_original_language / force_audio: false
+ignore_pgs_subs: false
+```
+
+Embedded subtitle detection is Bazarr's own ffprobe, independent of the *arr.
+Audio language is the only field it takes from the *arr, and no setting acts on
+it. Setting `parse_embedded_audio_track: true` removes even that, at no extra
+I/O, since Bazarr already reads those files.
+
+`ignore_pgs_subs: false` is worth noting for a different reason: Bazarr counts
+an embedded PGS track as "subtitles present" for that language. Codarr drops
+every PGS track (6.4), so Bazarr will then see the language as missing and fetch
+a real text subtitle. That is the desired outcome, and it means a burst of
+Bazarr downloads the first time Codarr sweeps a populated library.
+
+Bazarr also runs its own per-instance path mapping (`/media/` to `/media/tv/`),
+which is the same remapping Codarr needs and independently confirms the root
+folder finding above.
+
 ## Section 27 checklist
 
 | # | Claim | Status |
@@ -127,7 +176,7 @@ file to prove.
 | 4 | Chrome client profile produces Direct Stream for 8-bit and 10-bit HEVC | TODO, needs a browser and a real file |
 | 5 | *arr renaming is off on all four instances | **FAILED**, see above. Renaming is on and the formats use MediaInfo tokens |
 | 6 | Current jellyfin-ffmpeg Debian package name and repo path | **CONFIRMED**, see below |
-| 7 | `vainfo` inside the container, and which driver loaded | TODO, verification pod |
+| 7 | `vainfo` inside the container, and which driver loaded | PARTIAL: vainfo present and the image builds; which driver loads needs the pod |
 | 8 | 7.1 to 5.1 downmix produces a sensible channel layout | TODO, verification pod |
 | 9 | ASS to SRT conversion is readable on a real sample | TODO, verification pod |
 | 10 | `rename()` atomicity and same device number on the NFS mount | TODO, verification pod |

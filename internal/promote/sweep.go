@@ -11,14 +11,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/fsx"
 )
 
-// Sweep removes staging files and writability probes no live job claims, plus
-// whatever the temp directory still holds. plan.md 15.2: it runs at startup,
-// after the job-state sweep of 19.2 has claimed what it can, so anything left
-// unclaimed is debris from a crash.
-//
-// It returns everything it removed. A failure on one entry is logged and the
-// sweep continues; the returned error joins them, so a caller can log it and
-// carry on.
+// Sweep removes staging files and write probes no live job claims; it runs after
+// the job-state sweep of 19.2, so anything left unclaimed is debris from a crash.
 func (p *Promoter) Sweep(ctx context.Context, roots, claimed []string) ([]string, error) {
 	held := map[string]bool{}
 

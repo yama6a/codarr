@@ -7,10 +7,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
-// currentPolicyHash pins the hash of the policy as it stands. It changes only
-// when a constant in policy.go deliberately changes, which is exactly what
-// makes every already-processed file eligible again (plan.md 12). The
-// CODARR_POLICY tag in testdata/tagged_mp4.json carries the same value.
+// currentPolicyHash pins the policy hash: changing it makes every processed file
+// eligible again (plan.md 12). testdata/tagged_mp4.json carries the same value.
 const currentPolicyHash = "914f0f87"
 
 func TestPolicyHash_IsStable(t *testing.T) {

@@ -39,9 +39,8 @@ func TestService_EnqueueEstimateForAFullJobIsEncodeBound(t *testing.T) {
 	require.Equal(t, int(mediaDur/job.SeedSpeedHardware), h.jobRow(*res.JobID).Transform.Duration.Estimated)
 }
 
-// plan.md 14.3: the enqueue estimate for a full job is rough because neither
-// the sample probe nor the encoder choice has happened. Starting the job
-// refines it against the encoder actually selected.
+// plan.md 14.3: the enqueue estimate for a full job is rough, and starting the
+// job refines it against the encoder actually selected.
 func TestService_TheEstimateIsRefinedWhenTheJobStarts(t *testing.T) {
 	t.Parallel()
 

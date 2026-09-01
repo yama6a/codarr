@@ -1,9 +1,6 @@
-// Package metrics is the Prometheus surface of plan.md 24, served at /metrics
-// outside /api.
+// Package metrics is the Prometheus surface of plan.md 24, served at /metrics outside /api.
 //
-// Nothing here is a package-level variable. The registry is built and handed to
-// New, so a test gets its own and the wiring stays in cmd/codarr like every
-// other dependency.
+// The registry is built and handed to New rather than kept package-level, so a test gets its own.
 package metrics
 
 import (
@@ -42,8 +39,7 @@ type Metrics struct {
 	arrUp              *prometheus.GaugeVec
 }
 
-// New builds every series and registers it, alongside the Go and process
-// collectors.
+// New builds every series and registers it, alongside the Go and process collectors.
 func New() *Metrics {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
@@ -119,10 +115,8 @@ func New() *Metrics {
 			Help:      "Analysed library files by the plan kind they currently need.",
 		}, []string{"kind"}),
 
-		// plan.md 24 pins these three names. bytes_in and bytes_out only ever
-		// grow, but all three are read back out of SQLite rather than
-		// accumulated in process, so a restart must not reset them: a gauge set
-		// from the stored totals is the only representation that survives one.
+		// Gauges, not counters: all three are read back out of SQLite rather than
+		// accumulated in process, so a restart must not reset them.
 		bytesIn: prometheus.NewGauge(prometheus.GaugeOpts{ //nolint:promlinter // name pinned by plan.md 24
 			Namespace: Namespace,
 			Name:      "bytes_in_total",
@@ -232,9 +226,8 @@ func (m *Metrics) SetQueueDepth(n int) { m.queueDepth.Set(float64(n)) }
 // SetAwaitingStreamEnd sets the number of deferred jobs.
 func (m *Metrics) SetAwaitingStreamEnd(n int) { m.awaitingStreamEnd.Set(float64(n)) }
 
-// SetFilesByPlanKind replaces the library breakdown. Every kind is written on
-// every refresh, including the zeroes, so a kind that empties reports zero
-// rather than freezing at its last non-zero value.
+// SetFilesByPlanKind replaces the library breakdown, writing the zeroes too so a kind
+// that empties reports zero rather than freezing at its last value.
 func (m *Metrics) SetFilesByPlanKind(counts map[domain.Kind]int) {
 	for _, k := range []domain.Kind{domain.KindSkip, domain.KindRemux, domain.KindAudioOnly, domain.KindFull} {
 		m.filesByPlanKind.WithLabelValues(string(k)).Set(float64(counts[k]))

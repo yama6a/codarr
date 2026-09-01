@@ -14,15 +14,12 @@ var ErrBadCron = errors.New("ingest: invalid cron expression")
 // DefaultCron is the settings default of plan.md 17.1: 04:00 daily.
 const DefaultCron = "0 4 * * *"
 
-// searchYears caps the forward search. A schedule that matches nothing inside
-// four years (29 February on a weekday that never lines up) returns no time
-// rather than looping.
+// searchYears caps the forward search, so a schedule matching nothing inside four years
+// returns no time rather than looping.
 const searchYears = 4
 
-// Schedule is a parsed five-field cron expression, in the usual order: minute,
-// hour, day of month, month and finally day of week. Numeric only, plus *,
-// ranges, lists and steps; no names and no @-shorthands, because
-// settings.scan_cron is a single daily time and a bigger dialect buys nothing.
+// Schedule is a parsed five-field cron expression. Numeric only, plus *, ranges, lists
+// and steps: settings.scan_cron is a single daily time and a bigger dialect buys nothing.
 type Schedule struct {
 	minute uint64
 	hour   uint64

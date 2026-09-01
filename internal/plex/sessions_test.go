@@ -76,9 +76,8 @@ func TestSessions_IsEmptyOnAnIdleServer(t *testing.T) {
 	require.Empty(t, got)
 }
 
-// The sessions listing is never cached: promote asks again immediately before
-// the rename, and a cached answer there would reopen the race the guard exists
-// to close (plan.md 15.6).
+// The sessions listing is never cached: promote asks again immediately before the
+// rename, and a cached answer reopens the race the guard closes (plan.md 15.6).
 func TestSessions_IsNeverServedFromCache(t *testing.T) {
 	t.Parallel()
 
@@ -184,9 +183,8 @@ func TestIsStreaming_LetsAnUnrelatedFileThrough(t *testing.T) {
 	require.Empty(t, who)
 }
 
-// VERIFY.md: the mapping is a no-op on this cluster, but the reverse step still
-// has to run or a mapped deployment would compare a Plex path to a local one
-// and never find a match.
+// The mapping is a no-op on this cluster (VERIFY.md), but the reverse step still has to
+// run or a mapped deployment compares a Plex path to a local one and never matches.
 func TestIsStreaming_ReversesThePathMappingBeforeComparing(t *testing.T) {
 	t.Parallel()
 

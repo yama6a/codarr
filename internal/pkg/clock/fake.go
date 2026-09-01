@@ -5,8 +5,7 @@ import (
 	"time"
 )
 
-// Fake is a hand-written Clock for tests that need to advance time rather than
-// stub individual calls. Prefer the generated mock when a single Now() will do.
+// Fake is a Clock for tests that advance time rather than stub individual calls; prefer the generated mock for a single Now().
 type Fake struct {
 	mu  sync.Mutex
 	now time.Time

@@ -1,9 +1,4 @@
-// Command codarr is the whole application: the API, the SPA, the queue worker
-// and the scan schedule in one process.
-//
-// There is no business logic here. Everything is constructed and handed its
-// dependencies, following bolan's cmd pattern, so the only thing this file
-// decides is what talks to what.
+// Command codarr runs the API, the SPA, the queue worker and the scan schedule in one process.
 package main
 
 import (
@@ -17,8 +12,7 @@ import (
 	"syscall"
 )
 
-// Bootstrap configuration is flags and environment only (plan.md 21).
-// Everything else lives in SQLite and is edited in the UI.
+// Bootstrap config is flags and environment only; everything else lives in SQLite (plan.md 21).
 const (
 	defaultDB       = "/data/codarr.db"
 	defaultListen   = ":8080"
@@ -69,8 +63,7 @@ func run() error {
 	return nil
 }
 
-// parseFlags reads the five bootstrap values of plan.md 21. stdlib flag plus
-// os.Getenv, no config library: this is the whole of the file-level config.
+// parseFlags reads the five bootstrap values of plan.md 21, stdlib flag only.
 func parseFlags() config {
 	cfg := config{}
 

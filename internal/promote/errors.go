@@ -6,10 +6,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
-// Error carries both halves of plan.md 19.1: a machine-readable failure code
-// for the jobs row and a message specific enough to act on without reading the
-// logs. "verification failed" is not a message; naming the duration that
-// differed is.
+// Error carries both halves of plan.md 19.1: a failure code for the jobs row and
+// a message naming the value that was wrong, never just "verification failed".
 type Error struct {
 	Code    domain.FailureCode
 	Message string

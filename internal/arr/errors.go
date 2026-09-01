@@ -32,13 +32,8 @@ var (
 	// ErrNoItem is a rescan or unmonitor with no item id to act on.
 	ErrNoItem = errors.New("arr: no item id")
 
-	// ErrNoPathMapping is a root folder that came back unchanged from the
-	// instance's mappings.
-	//
-	// VERIFY.md: all four live instances report the literal path "/media",
-	// because each mounts only its own slice via a subPath. Importing that path
-	// verbatim gives four identical roots, and the longest-prefix attribution of
-	// plan.md 16.2 then has four equally good candidates for every file.
+	// ErrNoPathMapping is a root folder unchanged by the instance's mappings, which on
+	// this cluster means four identical roots and no attribution (VERIFY.md, 16.2).
 	ErrNoPathMapping = errors.New("arr: instance has no path mapping for its root folder")
 )
 

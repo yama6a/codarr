@@ -146,9 +146,8 @@ func (s *Server) ListEvents(ctx context.Context, req gen.ListEventsRequestObject
 	return gen.ListEvents200JSONResponse{HasMore: hasMore, Items: items, NextSinceId: next}, nil
 }
 
-// atLeast expands the "minimum level, inclusive" parameter into the explicit
-// list the store filters on, because levels are stored as text and text has no
-// ordering that means anything.
+// atLeast expands "minimum level, inclusive" into an explicit list, because levels are
+// stored as text and text has no ordering that means anything.
 func atLeast(level gen.EventLevel) []string {
 	order := []gen.EventLevel{gen.EventLevelDebug, gen.EventLevelInfo, gen.EventLevelWarn, gen.EventLevelError}
 

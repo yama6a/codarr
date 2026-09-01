@@ -45,9 +45,8 @@ type Server struct {
 	build    Build
 	ffmpeg   string
 
-	// compat caches the compatibility breakdown of plan.md 18.1. Deriving the
-	// per-reason counts means reading every non-skip plan, and the dashboard
-	// polls every 10 seconds (18.6), so the answer is shared across polls.
+	// The per-reason counts read every non-skip plan and the dashboard polls every
+	// 10 seconds (plan.md 18.1, 18.6), so the answer is shared across polls.
 	compat compatCache
 }
 
@@ -84,9 +83,8 @@ func New(d Deps) *Server {
 	}
 }
 
-// Router mounts the generated routes plus the served spec on r. There is no
-// authentication middleware and there must not be one: plan.md 21 secures
-// access outside the process.
+// Router mounts the generated routes and the served spec. There is no authentication
+// middleware and there must not be one: plan.md 21 secures access outside the process.
 func (s *Server) Router(r chi.Router) http.Handler {
 	r.Get("/api/openapi.json", s.serveSpec)
 
@@ -116,7 +114,6 @@ func (s *Server) serveSpec(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(body)
 }
 
-// compatCache is the memoised compatibility summary.
 type compatCache struct {
 	mu       sync.Mutex
 	value    gen.CompatibilitySummary

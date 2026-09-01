@@ -8,10 +8,7 @@ const reasonMeta = [
   { key: 'container', label: 'Container', bar: 'bg-emerald-500' },
 ] as const;
 
-/**
- * CompatibilityPanel is the headline number: how many files still force playback transcoding, and
- * why (plan.md 18.1). Everything else on the dashboard is throughput; this is the goal.
- */
+// plan.md 18.1's headline number. Everything else on the dashboard is throughput; this is the goal.
 export function CompatibilityPanel({ summary }: { summary: CompatibilitySummary }) {
   const denominator = Math.max(1, summary.files_analyzed);
   const compatiblePct = (summary.files_compatible / denominator) * 100;

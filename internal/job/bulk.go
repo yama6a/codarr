@@ -23,15 +23,13 @@ const (
 	// all, in bits per second, resolved per 8.4.
 	SweepMinBitrate = 8_000_000
 
-	// SweepMinSavingPct is the projected saving a file has to beat to be
-	// queued. Evaluated against the probe result rather than a fixed table, so
-	// it spares files that are large because the content is complex.
+	// SweepMinSavingPct is measured per file rather than read off a table, so it
+	// spares files that are large because the content is complex.
 	SweepMinSavingPct = 35.0
 )
 
-// mediaPageSize is how many rows a bulk operation pulls at a time. The library
-// is tens of thousands of files and none of these operations needs it in memory
-// all at once.
+// mediaPageSize keeps a library of tens of thousands of files out of memory all
+// at once.
 const mediaPageSize = 500
 
 // PlanKindBreakdown is the count per plan kind every bulk preview reports, so
@@ -56,9 +54,8 @@ func (b *PlanKindBreakdown) add(kind domain.Kind) {
 	}
 }
 
-// Recheck is one re-check request: a selection, a filter, or neither. An empty
-// request selects nothing rather than everything, so a mis-sent body cannot
-// queue the library.
+// Recheck is one re-check request; an empty one selects nothing rather than
+// everything, so a mis-sent body cannot queue the library.
 type Recheck struct {
 	IDs     []int64
 	Filter  *store.MediaFilter
@@ -79,9 +76,8 @@ type RecheckResult struct {
 	Irreversible bool
 }
 
-// RecheckAll re-probes every done file, re-plans it against the current policy
-// and queues whatever no longer matches (19). Nothing is queued unless confirm
-// is set.
+// RecheckAll re-probes every done file and queues whatever no longer matches the
+// current policy (19), queueing nothing unless confirm is set.
 func (s *Service) RecheckAll(ctx context.Context, confirm bool) (RecheckResult, error) {
 	return s.Recheck(ctx, Recheck{
 		Filter:  &store.MediaFilter{Status: []domain.MediaStatus{domain.MediaDone}},
@@ -89,9 +85,8 @@ func (s *Service) RecheckAll(ctx context.Context, confirm bool) (RecheckResult, 
 	})
 }
 
-// Recheck is the same operation restricted to a selection or a filter. It
-// re-probes first and skips anything already correct, so selecting everything
-// is safe.
+// Recheck is the same operation restricted to a selection or a filter, re-probing
+// first and skipping anything already correct.
 func (s *Service) Recheck(ctx context.Context, req Recheck) (RecheckResult, error) {
 	files, err := s.selectMedia(ctx, req.IDs, req.Filter)
 	if err != nil {
@@ -177,17 +172,14 @@ type SpaceSweepPreview struct {
 	QueuedJobIDs         []int64
 }
 
-// SpaceSweepPreview finds H.264 files above the bitrate floor, sample-probes
-// each one and keeps only those whose projected saving clears the threshold.
-// It queues nothing.
+// SpaceSweepPreview sample-probes the H.264 files above the bitrate floor and
+// keeps those whose projected saving clears the threshold, queueing nothing.
 func (s *Service) SpaceSweepPreview(ctx context.Context) (SpaceSweepPreview, error) {
 	return s.spaceSweep(ctx, nil, false)
 }
 
-// SpaceSweepRun queues the sweep. confirm must be set: the operation replaces
-// every file it touches and there is no undo (15.5). Passing ids runs exactly
-// what a preview showed, and each one is re-evaluated rather than trusted, so a
-// stale preview cannot queue a file that no longer clears the threshold.
+// SpaceSweepRun queues the sweep, which needs confirm because it replaces every
+// file it touches (15.5); ids are re-evaluated, never trusted from the preview.
 func (s *Service) SpaceSweepRun(ctx context.Context, ids []int64, confirm bool) (SpaceSweepPreview, error) {
 	if !confirm {
 		return SpaceSweepPreview{}, ErrConfirmationRequired
@@ -257,9 +249,8 @@ func (s *Service) queueSweep(ctx context.Context, m domain.MediaFile, queue bool
 	return nil
 }
 
-// evaluate is the per-file half of plan.md 11: sample-probe the content, work
-// out what HEVC would cost for it, and keep the file only if the projected
-// saving beats the threshold. A file it cannot measure is not a candidate.
+// The per-file half of plan.md 11: measure what HEVC would cost for this content.
+// A file that cannot be measured is not a candidate.
 func (s *Service) evaluate(ctx context.Context, settings domain.Settings, m domain.MediaFile) (SpaceSweepCandidate, bool) {
 	probe, err := storedProbe(m)
 	if err != nil {
@@ -289,10 +280,8 @@ func (s *Service) evaluate(ctx context.Context, settings domain.Settings, m doma
 	return projection(m, in, ffmpeg.TargetFromSamples([]int{base}, in), duration)
 }
 
-// projection turns a measured target into the file-level numbers the
-// confirmation shows. The threshold is applied to the projected file size
-// rather than to the video bitrate alone, because what the sweep reclaims is
-// disk space and the audio it leaves alone still occupies some.
+// The threshold applies to the projected file size, not the video bitrate alone,
+// because the audio the sweep leaves alone still occupies disk.
 func projection(m domain.MediaFile, in ffmpeg.BitrateInput, target int, duration float64) (SpaceSweepCandidate, bool) {
 	if target <= 0 || target >= in.SourceBitrate {
 		return SpaceSweepCandidate{}, false
@@ -324,8 +313,8 @@ func projection(m domain.MediaFile, in ffmpeg.BitrateInput, target int, duration
 	}, true
 }
 
-// sweepCandidates is the cheap filter that runs before any sample probe:
-// H.264 video above the bitrate floor, resolved per 8.4.
+// The cheap filter before any sample probe: H.264 video above the bitrate floor,
+// resolved per 8.4.
 func (s *Service) sweepCandidates(ctx context.Context, ids []int64) ([]domain.MediaFile, error) {
 	files, err := s.selectMedia(ctx, ids, &store.MediaFilter{VideoCodec: []string{SweepVideoCodec}})
 	if err != nil {

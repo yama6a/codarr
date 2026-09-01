@@ -10,14 +10,12 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/store"
 )
 
-// RefreshInterval is how often the state-derived series are re-read. The UI
-// polls every 10 seconds (plan.md 18.6) and Prometheus scrapes far less often,
-// so this only has to be cheaper than the scrape.
+// RefreshInterval is how often the state-derived series are re-read; it only has to
+// beat the scrape, which is far less frequent than the UI's 10s poll (plan.md 18.6).
 const RefreshInterval = 15 * time.Second
 
-// Source is the state the gauges are read back out of. The counters are
-// incremented at the seams that cause them; only the gauges come from here,
-// because a restart must not reset a total that SQLite already knows.
+// Source is the state the gauges are read back out of, because a restart must not
+// reset a total SQLite already knows. Counters are incremented at their own seams.
 type Source interface {
 	CountJobsByState(ctx context.Context) (map[domain.JobState]int, error)
 	CountMediaByPlanKind(ctx context.Context) (map[domain.Kind]int, error)

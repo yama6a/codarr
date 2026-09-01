@@ -1,6 +1,5 @@
-// Package decide turns an ffprobe result into a plan. The policy it applies is
-// hard-coded (plan.md 3, rule 3): nothing here is configurable, and the hash of
-// these constants is what makes an already-processed file identifiable.
+// Package decide turns an ffprobe result into a plan against a hard-coded
+// policy (plan.md 3, rule 3) whose hash identifies an already-processed file.
 package decide
 
 import (
@@ -29,9 +28,8 @@ var (
 // equivalent problem at 4K because 4K hardware decoders were built around it.
 const h264MaxLevel = 4.2
 
-// Level rewrite carve-out, plan.md 6.2. maxRefs is load-bearing rather than a
-// margin: level 4.2 allows MaxDpbMbs 34816 and a 1080p frame is 8160
-// macroblocks, so the DPB holds exactly 4 reference frames.
+// Level rewrite carve-out, plan.md 6.2. maxRefs is load-bearing, not a margin:
+// level 4.2's MaxDpbMbs 34816 over an 8160-macroblock 1080p frame is exactly 4.
 const (
 	levelRewriteTarget    = 4.2
 	levelRewriteMaxWidth  = 1920
@@ -97,14 +95,12 @@ var containerByExt = map[string]domain.Container{
 
 const containerFallback = domain.ContainerMatroska
 
-// hardwareDecodeCodecs is the Gen 9.5 decode set from plan.md 10.1. It is not
-// part of the policy hash: it selects a decode path, not what the output
-// contains.
+// hardwareDecodeCodecs is the Gen 9.5 decode set of plan.md 10.1, outside the
+// policy hash because it selects a decode path, not what the output contains.
 var hardwareDecodeCodecs = []string{"h264", "hevc", "mpeg2video", "vc1", "vp9"}
 
-// HardwareDecodable reports whether the iGPU can decode a source codec. Passing
-// -hwaccel for anything else fails on exactly the sources the encode path
-// exists for.
+// HardwareDecodable reports whether the iGPU can decode a source codec; passing
+// -hwaccel for anything else fails on exactly the sources the encode path exists for.
 func HardwareDecodable(codec string) bool {
 	return slices.Contains(hardwareDecodeCodecs, codec)
 }
@@ -118,15 +114,14 @@ func ContainerFor(path string) domain.Container {
 	return containerFallback
 }
 
-// IsLegacyContainer reports a source container that is neither Matroska nor
-// MP4. Those get -fflags +genpts on input (plan.md 14.1) and always change
-// extension.
+// IsLegacyContainer reports a source container that is neither Matroska nor MP4,
+// which gets -fflags +genpts on input (plan.md 14.1) and always changes extension.
 func IsLegacyContainer(sourceContainer string) bool {
 	return sourceContainer != string(domain.ContainerMatroska) && sourceContainer != string(domain.ContainerMP4)
 }
 
 // SubtitleTargetForContainer is the text subtitle codec an output container
-// takes, as ffprobe names it.
+// takes, spelled as ffprobe names it.
 func SubtitleTargetForContainer(c domain.Container) string {
 	if c == domain.ContainerMP4 {
 		return subtitleTargetMP4
@@ -135,8 +130,8 @@ func SubtitleTargetForContainer(c domain.Container) string {
 	return subtitleTargetMKV
 }
 
-// SubtitleEncoder maps a target subtitle codec to the ffmpeg encoder name.
-// ffmpeg writes subrip with the "srt" encoder, so the two differ.
+// SubtitleEncoder maps a target subtitle codec to the ffmpeg encoder name,
+// which differ: ffmpeg writes subrip with the "srt" encoder.
 func SubtitleEncoder(codec string) string {
 	if codec == subtitleTargetMKV {
 		return "srt"
@@ -145,8 +140,8 @@ func SubtitleEncoder(codec string) string {
 	return codec
 }
 
-// VideoEncodeProfile is the HEVC profile for an encode: Main 10 for HDR
-// sources, which are never tonemapped, Main otherwise.
+// VideoEncodeProfile is the HEVC profile for an encode: Main 10 for HDR sources,
+// which are never tonemapped, Main otherwise.
 func VideoEncodeProfile(hdr bool) string {
 	if hdr {
 		return videoEncodeProfileHDR
@@ -190,8 +185,8 @@ func audioCopyList(channels int) []string {
 	return audioCopy3PlusChannels
 }
 
-// policySnapshot is every constant the hash covers, in one value, so the hash
-// is computed from the same place the engine reads.
+// policySnapshot is every constant the hash covers, so the hash is computed from
+// the same place the engine reads.
 type policySnapshot struct {
 	VideoCopyCodecs  []string
 	H264CopyProfiles []string
@@ -266,15 +261,14 @@ func currentPolicy() policySnapshot {
 	}
 }
 
-// policyHashLength keeps the tag short enough to read in a log line. It is a
-// prefix of a SHA-256, so collisions are not a concern at this scale.
+// policyHashLength keeps the tag readable in a log line; it is a SHA-256 prefix,
+// so collisions are not a concern at this scale.
 const policyHashLength = 8
 
 var policyHash = sync.OnceValue(func() string { return hashPolicy(currentPolicy()) })
 
-// PolicyHash identifies the policy that produced a file. Changing any constant
-// above changes it, which is what makes previously-tagged files eligible again
-// after a rebuild (plan.md 12).
+// PolicyHash identifies the policy that produced a file, so changing any constant
+// above makes previously-tagged files eligible again (plan.md 12).
 func PolicyHash() string { return policyHash() }
 
 func hashPolicy(p policySnapshot) string {

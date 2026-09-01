@@ -60,11 +60,13 @@ definition that the store, the analyzer and the UI all call.
 ### Tailwind v4 as a Vite plugin, not the CDN script bolan-admin-fe uses
 
 bolan-admin-fe loads `cdn.tailwindcss.com` from a script tag and inlines its
-config in `index.html`. Three reasons that does not transfer: the CDN build
-compiles CSS in the browser at runtime and ships roughly 400KB of JS, it is
-deprecated in Tailwind v4, and it makes a self-hosted tool depend on a third
-party being up. The whole point of `go:embed` is that the binary is the
-deployment.
+config in `index.html`. That does not transfer:
+
+- the CDN build compiles CSS in the browser at runtime and ships roughly 400KB
+  of JS
+- it is deprecated in Tailwind v4
+- it makes a self-hosted tool depend on a third party being up, and the whole
+  point of `go:embed` is that the binary is the deployment
 
 Confirmed with the user before adopting.
 
@@ -98,9 +100,11 @@ AI Studio export rather than a decision.
 
 ### Not adopted from bolan-admin-fe
 
-The duplicate `constants.ts` / `constants/api.ts` pair with contradictory values,
-the `@` path alias nothing imports, the leftover `process.env.GEMINI_API_KEY`
-define, and the `lint:raw-colors` script that is defined but never run.
+- the duplicate `constants.ts` / `constants/api.ts` pair with contradictory
+  values
+- the `@` path alias nothing imports
+- the leftover `process.env.GEMINI_API_KEY` define
+- the `lint:raw-colors` script that is defined but never run
 
 Kept, because it is load-bearing there: the singleton `ToastManager` the API
 client fires directly on failure, so components only handle the success path.
@@ -223,7 +227,7 @@ since NULLs never compare equal in a unique index.
 ### `Store` is one wide interface, but consumers define narrow ones
 
 `plan.md` 2.2's table lists `Store | all DB access` as a single boundary, and
-that is what `internal/pkg/store` exposes: 74 methods. The same section also
+that is what `internal/pkg/store` exposes: 60 methods. The same section also
 says interfaces should be small and defined by the consumer. Both hold, at
 different layers: the store package publishes the wide interface, and each
 consumer declares the three or four methods it actually uses, satisfied by the
@@ -233,7 +237,7 @@ same concrete value. Tests mock the narrow one.
 
 The first cut pulled `material-symbols`, whose woff2 is 3.8 MB. `go:embed` puts
 the whole `dist` inside the binary, so a handful of icons cost 3.8 MB of
-executable. `lucide-react` tree-shakes to the ~20 icons actually imported.
+executable. `lucide-react` tree-shakes to the 49 icons actually imported.
 `internal/web/dist` went from 4.4 MB to 360 KB.
 
 Inter is pinned to the latin subset by a hand-written `@font-face` for the same
@@ -264,12 +268,10 @@ the audio on an `audio_only` one. All four instances originally failed both
 limbs.
 
 The user rewrote the four formats to title, year and id only, which satisfies
-the second limb. Renaming stays on. See `VERIFY.md` for the verified formats.
-
-This is a better outcome than turning renaming off would have been: nothing left
-in a filename derives from the file's contents, so the name an *arr would compute
-is now invariant under everything Codarr does, and a rename pass is a guaranteed
-no-op rather than merely an unlikely one.
+the second limb, so renaming stays on. Nothing left in a filename derives from
+the file's contents, so the name an *arr would compute is invariant under
+everything Codarr does and a rename pass is a guaranteed no-op. See `VERIFY.md`
+for the verified formats.
 
 Codarr still never renames, and still keeps the path stable so a rescan is a
 no-op rather than a delete-plus-add. Only the extension changes, and only when a
@@ -280,7 +282,7 @@ already confirmed.
 
 ## Post-verification changes
 
-Two things changed on the strength of the second cluster run. Both are in
+Three things changed on the strength of the second cluster run. All three are in
 `VERIFY.md` with their evidence.
 
 ### Dolby Vision in MP4 is tagged `dvh1`, not `hvc1`

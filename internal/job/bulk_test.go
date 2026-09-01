@@ -14,9 +14,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/store"
 )
 
-// sweepSampleSize is 10 MB per 60-second sample: 1.33 Mbps measured, which the
-// 1080p floor of 8.3 lifts to 2.5 Mbps. Against an 8.42 Mbps source that is a
-// 54% projected saving, comfortably over the threshold.
+// 10 MB per 60-second sample is 1.33 Mbps, lifted to the 2.5 Mbps 1080p floor;
+// against an 8.42 Mbps source that clears the threshold comfortably.
 const sweepSampleSize = int64(10_000_000)
 
 // samplesOfSize answers every sample probe with a file of the given size and

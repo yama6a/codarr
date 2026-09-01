@@ -10,12 +10,10 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/pathmap"
 )
 
-// Path validation is input validation, not authorisation. plan.md 21 is
-// explicit that there is no auth layer and that none may be added; what these
-// checks stop is a malformed request naming a file outside the library.
+// Path validation is input validation, not authorisation: plan.md 21 forbids an auth
+// layer, and these checks only stop a request naming a file outside the library.
 
-// cleanPath normalises an absolute path and refuses anything that is not one.
-// A relative path or a traversal segment is rejected before it is cleaned, so
+// A relative path or a traversal segment is rejected before cleaning, so
 // "/media/../etc/passwd" cannot arrive as an innocent-looking "/etc/passwd".
 func cleanPath(raw string) (string, error) {
 	p := strings.TrimSpace(raw)
@@ -45,8 +43,7 @@ func cleanPath(raw string) (string, error) {
 	return cleaned, nil
 }
 
-// underRoots rejects a path that lies under no configured root. Every path a
-// request supplies is checked, because the roots are the whole of the
+// Every path a request supplies is checked, because the roots are the whole of the
 // filesystem this process has any business touching.
 func (s *Server) underRoots(ctx context.Context, raw string) (string, error) {
 	cleaned, err := cleanPath(raw)
@@ -70,10 +67,8 @@ func (s *Server) underRoots(ctx context.Context, raw string) (string, error) {
 	return cleaned, nil
 }
 
-// rootPath validates a path being registered as a root. It cannot be checked
-// against the roots, since it is about to become one, so only the shape is
-// enforced, plus a refusal to nest inside a root that already exists: two roots
-// covering the same file make attribution ambiguous (plan.md 16.2).
+// A root cannot be checked against the roots, so only its shape is enforced plus a
+// refusal to nest: two roots over one file make attribution ambiguous (plan.md 16.2).
 func (s *Server) rootPath(ctx context.Context, raw string) (string, error) {
 	cleaned, err := cleanPath(raw)
 	if err != nil {
@@ -103,9 +98,8 @@ func contains(parent, child string) bool {
 	return parent != "" && strings.HasPrefix(child, parent+"/")
 }
 
-// mappingPath validates one side of a path mapping. The remote side belongs to
-// another service's filesystem, so it is not checked against the roots; it only
-// has to be an absolute path.
+// The remote side of a mapping belongs to another service's filesystem, so it is not
+// checked against the roots and only has to be absolute.
 func mappingPath(raw, side string) (string, error) {
 	cleaned, err := cleanPath(raw)
 	if err != nil {

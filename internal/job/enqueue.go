@@ -19,9 +19,8 @@ type EnqueueResult struct {
 	Reason      string
 }
 
-// Enqueue queues one file. A file that is ignored, unanalysed, already queued
-// or planned as skip is a no-op with a reason, never an error: the partial
-// unique index makes a racing webhook and a manual trigger produce one job.
+// Enqueue queues one file, where nothing to do is a no-op with a reason rather
+// than an error; the partial unique index collapses a race into one job (17.1).
 func (s *Service) Enqueue(ctx context.Context, mediaFileID int64, origin domain.JobOrigin) (EnqueueResult, error) {
 	media, err := s.store.GetMediaFile(ctx, mediaFileID)
 	if err != nil {
@@ -82,9 +81,8 @@ func (s *Service) insert(
 		return EnqueueResult{}, fmt.Errorf("reading the stored probe of media file %d: %w", media.ID, err)
 	}
 
-	// plan.md 14.3: estimate at enqueue. For a full job this is necessarily
-	// rough, because neither the sample probe nor the encoder choice has
-	// happened yet; the worker refines it when the job starts.
+	// plan.md 14.3: rough for a full job, because neither the sample probe nor the
+	// encoder choice has happened; the worker refines it when the job starts.
 	estimate := s.est.Estimate(ctx, work{
 		kind:         plan.Kind,
 		sourceBytes:  media.SizeBytes,
@@ -148,9 +146,8 @@ func skipReason(m domain.MediaFile) string {
 // sweepReason is what the space sweep records against the stream it forces.
 const sweepReason = "space reclaim sweep: re-encoded to HEVC at the measured target"
 
-// planFor applies the one thing origin changes about a plan: the space sweep of
-// plan.md 11 re-encodes video the policy would otherwise copy. What that encode
-// targets is decide's to say, not the queue's.
+// The one thing origin changes about a plan: the space sweep of plan.md 11
+// re-encodes video the policy would otherwise copy.
 func planFor(origin domain.JobOrigin, plan domain.Plan) (domain.Plan, bool) {
 	if origin != domain.OriginSpaceSweep {
 		return plan, true

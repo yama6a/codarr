@@ -46,11 +46,8 @@ const (
 
 // OutputExt is the extension the output must carry for a given source path.
 //
-// It takes the source path rather than returning a constant because plan.md 6.1
-// requires the filename never to change for an MKV or MP4 source: an .m4v file
-// stays .m4v, and returning ".mp4" for it would rename the file, which makes an
-// *arr rescan a delete-plus-add instead of a no-op. Only a legacy container,
-// which is becoming MKV anyway, gets a new extension.
+// plan.md 6.1 requires the filename never to change for an MKV or MP4 source: renaming
+// .m4v to .mp4 turns an *arr rescan into a delete-plus-add instead of a no-op.
 func (c Container) OutputExt(sourcePath string) string {
 	srcExt := filepath.Ext(sourcePath)
 	lower := strings.ToLower(srcExt)
@@ -90,9 +87,8 @@ const (
 	EncoderSoftware Encoder = "libx265"
 )
 
-// Scan is the interlacing state of a video stream. Unknown counts as
-// progressive: ffprobe omits field_order for a large share of progressive
-// files, and treating that as interlaced full-encodes much of a normal library.
+// Scan is the interlacing state of a video stream, where unknown counts as progressive:
+// ffprobe omits field_order for most progressive files.
 type Scan string
 
 const (

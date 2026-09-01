@@ -31,10 +31,8 @@ func TestMediaStore_UpsertIsKeyedOnPath(t *testing.T) {
 	require.Equal(t, "xxh3-128:changed", second.Fingerprint)
 }
 
-// TestMediaStore_UpsertDerivesProvenance: plan.md 12 makes provenance a
-// function of the recorded output fingerprint and the current one. A caller
-// cannot set it, and an untouched file is exactly one whose
-// codarr_output_fingerprint is NULL.
+// plan.md 12 makes provenance a function of the recorded and current fingerprints;
+// a caller cannot set it, and untouched means codarr_output_fingerprint IS NULL.
 func TestMediaStore_UpsertDerivesProvenance(t *testing.T) {
 	t.Parallel()
 
@@ -54,10 +52,8 @@ func TestMediaStore_UpsertDerivesProvenance(t *testing.T) {
 	require.Equal(t, domain.ProvenanceUntouched, m.Provenance)
 }
 
-// TestMediaStore_RecordPromotionLeavesTheNextScanNothingToDo is loop
-// prevention (plan.md 12 and step 9 of 15.2): the current size, mtime and
-// fingerprint become the output's own, so a rescan sees an unchanged file
-// rather than re-probing Codarr's own work.
+// Loop prevention (plan.md 12 and step 9 of 15.2): size, mtime and fingerprint become
+// the output's own, so a rescan sees an unchanged file.
 func TestMediaStore_RecordPromotionLeavesTheNextScanNothingToDo(t *testing.T) {
 	t.Parallel()
 
@@ -110,9 +106,8 @@ func TestMediaStore_RecordPromotionLeavesTheNextScanNothingToDo(t *testing.T) {
 	require.NotNil(t, done.FinishedAt)
 }
 
-// TestMediaStore_ProvenanceGoesModifiedWhenSomethingRewritesTheFile is the
-// Bazarr subtitle embed of plan.md 12: the CODARR tag survives, the
-// fingerprint does not.
+// The Bazarr subtitle embed of plan.md 12: the CODARR tag survives, the fingerprint
+// does not.
 func TestMediaStore_ProvenanceGoesModifiedWhenSomethingRewritesTheFile(t *testing.T) {
 	t.Parallel()
 
@@ -435,10 +430,8 @@ func TestMediaStore_CountsForTheDashboard(t *testing.T) {
 	require.Equal(t, map[domain.Kind]int{domain.KindFull: 2}, byKind)
 }
 
-// TestMediaStore_SortsByProvenanceInBothDirections covers the column plan.md
-// 18.2 makes first-class alongside the plan kind. Before it was in the
-// whitelist the store silently fell back to path, so "show me everything that
-// changed after Codarr wrote it" sorted by filename instead.
+// plan.md 18.2 makes provenance a first-class sort column. Outside the whitelist the
+// store silently falls back to path, which is a wrong answer rather than an error.
 func TestMediaStore_SortsByProvenanceInBothDirections(t *testing.T) {
 	t.Parallel()
 

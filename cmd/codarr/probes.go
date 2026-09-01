@@ -7,9 +7,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/store"
 )
 
-// The two series in plan.md 24 that need a live dependency rather than the
-// database. They run on the metrics refresh tick, never on a scrape, so a Plex
-// that has gone away slows nothing down but the refresh itself.
+// The two series of plan.md 24 that need a live dependency. They run on the
+// refresh tick, never on a scrape, so an unreachable Plex slows only the refresh.
 
 func plexProbe(plexes *plexProvider) metrics.Probe {
 	return func(ctx context.Context, m *metrics.Metrics) {
@@ -40,8 +39,7 @@ func arrProbe(st store.Store, arrs *arrProvider) metrics.Probe {
 
 		for _, in := range instances {
 			if !in.Enabled {
-				// A disabled instance stops reporting rather than reporting
-				// down, which would page someone for a deliberate change.
+				// A disabled instance stops reporting rather than reporting down and paging someone.
 				m.ForgetArr(in.Name)
 
 				continue

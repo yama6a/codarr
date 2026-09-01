@@ -27,9 +27,8 @@ import (
 	"github.com/yama6a/codarr/internal/promote"
 )
 
-// Defaults for the settings row on first run. plan.md 21: the schema ships no
-// row, and internal/pkg/store deliberately holds no policy, so the defaults are
-// stated here, once, where everything else is wired.
+// The schema ships no settings row and store holds no policy, so first-run
+// defaults are stated here, once (plan.md 21).
 var defaultSettings = domain.Settings{ //nolint:gochecknoglobals // first-run defaults, stated once
 	TempDir:             "/tmp",
 	QSVDevice:           "/dev/dri/renderD128",
@@ -70,9 +69,8 @@ func (a *app) close() {
 func build(ctx context.Context, cfg config) (*app, error) {
 	level := events.ParseLevel(cfg.logLevel)
 
-	// The store needs a logger and the logger needs the store, so the store is
-	// built twice over the same pools: once to open the events sink, once with
-	// the real logger behind it.
+	// The store needs a logger and the logger needs the store, so it is built
+	// twice over the same pools.
 	bootstrap := events.New(events.Options{Level: level})
 
 	db, err := store.OpenAndMigrate(ctx, cfg.db, bootstrap)
@@ -112,9 +110,8 @@ func build(ctx context.Context, cfg config) (*app, error) {
 		info   = buildInfo()
 	)
 
-	// One notifier, passed to both promote and job: promotion notifies on the
-	// normal path, and the worker notifies for a promotion that completed during
-	// a crash and never got to (plan.md 19.2).
+	// Both promote and job hold it: the worker notifies for a promotion that
+	// completed during a crash (plan.md 19.2).
 	notifier := arr.NewNotifier(plexes, arrs, logger)
 
 	promoter := promote.New(promote.Deps{
@@ -186,17 +183,15 @@ func build(ctx context.Context, cfg config) (*app, error) {
 	}, nil
 }
 
-// newEncoder builds one runner per invocation. The runner turns ffmpeg's
-// out_time into a percentage against the probed duration (plan.md 14.3), which
-// is per file, so it cannot be a singleton.
+// newEncoder builds one runner per invocation because progress is a percentage
+// against the probed duration of that file (plan.md 14.3).
 func newEncoder(bin string) job.NewEncoder {
 	return func(duration time.Duration) job.Encoder {
 		return ffmpeg.NewRunner(bin, ffmpeg.DefaultGrace, duration)
 	}
 }
 
-// ffmpegVersion is read once: the binary cannot change under a running process,
-// and reporting it costs one invocation rather than one per request.
+// ffmpegVersion is read once because the binary cannot change under a running process.
 func ffmpegVersion(ctx context.Context, hw *hardware.Prober, logger *slog.Logger) string {
 	version, err := hw.Version(ctx)
 	if err != nil {
@@ -209,8 +204,7 @@ func ffmpegVersion(ctx context.Context, hw *hardware.Prober, logger *slog.Logger
 	return version
 }
 
-// mustPlexAuth builds the plex.tv PIN client. Its only failure mode is an
-// unusable base URL, and that URL is a constant.
+// mustPlexAuth cannot fail: its only error is an unusable base URL, and that URL is a constant.
 func mustPlexAuth() *plex.Auth {
 	auth, err := plex.NewAuth(plex.AuthConfig{})
 	if err != nil {

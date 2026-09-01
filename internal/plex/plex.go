@@ -1,12 +1,8 @@
-// Package plex talks to the one Plex Media Server (plan.md 16.1): the partial
-// scan and analyze that follow a promotion, the active-stream guard that
-// decides whether a promotion may happen at all, and the plex.tv PIN flow.
+// Package plex talks to the one Plex Media Server (plan.md 16.1): the post-promotion
+// scan and analyze, the active-stream guard, and the plex.tv PIN flow.
 //
-// Two things here are load-bearing rather than defensive. Codarr never deletes
-// and rescans, because that destroys watch state, ratings, playlists and
-// collections; it refreshes the containing directory and analyzes the item.
-// And it never replaces a file Plex is streaming, because on NFS that gives the
-// reader ESTALE rather than a graceful cut (plan.md 15.6).
+// Codarr never deletes and rescans, which would destroy watch state, ratings and
+// collections, and never replaces a streaming file, which gives the reader ESTALE (15.6).
 package plex
 
 import (
@@ -26,10 +22,8 @@ import (
 // verbs return as soon as the work is queued, so nothing here is long-running.
 const DefaultTimeout = 15 * time.Second
 
-// DefaultPartTTL is how long a rating key's file paths are reused. plan.md 16.1
-// says to cache the metadata lookup briefly; the sessions list itself is never
-// cached, because the guard's final check runs immediately before the rename
-// and a cached answer there would reopen the race it exists to close.
+// DefaultPartTTL is how long a rating key's file paths are reused (plan.md 16.1). The
+// sessions list itself is never cached, or the guard's last check reopens its own race.
 const DefaultPartTTL = 30 * time.Second
 
 // DefaultSectionTTL is how long GET /library/sections is reused. Sections
@@ -46,9 +40,8 @@ type Config struct {
 	Token            string
 	ClientIdentifier string
 
-	// Mapper rewrites between Codarr's paths and the server's. VERIFY.md records
-	// that Plex mounts the export whole on this cluster, so today it is a no-op;
-	// the mechanism stays because that is one mount change away from mattering.
+	// A no-op today, since Plex mounts the export whole on this cluster (VERIFY.md),
+	// but one mount change away from mattering.
 	Mapper *pathmap.Mapper
 
 	// RefreshAfter and AnalyzeAfter mirror the stored settings and gate the two

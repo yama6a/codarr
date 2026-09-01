@@ -51,10 +51,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-// Named rather than passing components around, so call sites stay
-// `<Icon name="folder" />` and every icon the binary embeds is visible in one
-// place. lucide tree-shakes on the named imports above; a font would have put
-// its whole glyph set into the Go binary via go:embed.
+// Named, so every icon the binary embeds is visible in one place. lucide tree-shakes on the named
+// imports above; an icon font would have put its whole glyph set into the Go binary via go:embed.
 const icons = {
   alert: AlertTriangle,
   audio: AudioLines,

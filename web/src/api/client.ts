@@ -42,10 +42,8 @@ interface Result<T> {
   error?: unknown;
 }
 
-/**
- * unwrap turns openapi-fetch's `{ data, error }` into a promise that rejects, so `usePolling` can
- * hold an error state. The middleware above has already toasted the detail.
- */
+// Rejects rather than returning `{ data, error }`, so `usePolling` can hold an error state. The
+// middleware above has already toasted the detail.
 export async function unwrap<T>(promise: Promise<Result<T>>): Promise<T> {
   const { data, error } = await promise;
   if (data === undefined) {

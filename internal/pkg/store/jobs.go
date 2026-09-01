@@ -16,10 +16,8 @@ const jobColumns = `id, media_file_id, kind, origin, priority, state, attempt, t
 	output_size, output_fingerprint, output_full_hash, blocked_by, failure_code,
 	failure_message, stderr_tail, queued_at, started_at, finished_at`
 
-// EnqueueJob is idempotent. idx_jobs_one_active_per_file is a partial unique
-// index over the active states, so a webhook and a manual trigger racing on the
-// same file produce one job; the loser is a no-op reporting created=false, not
-// an error (plan.md 17.1).
+// EnqueueJob is idempotent through the partial unique index idx_jobs_one_active_per_file:
+// the racing loser reports created=false rather than an error (plan.md 17.1).
 func (s *store) EnqueueJob(ctx context.Context, j domain.Job) (domain.Job, bool, error) {
 	transform, err := marshalJSON(j.Transform)
 	if err != nil {
@@ -290,9 +288,8 @@ func (s *store) CancelJob(ctx context.Context, id int64) error {
 		string(domain.JobDone), string(domain.JobCancelled), string(domain.JobFailed))
 }
 
-// RestartJob re-queues a cancelled or failed job ahead of everything queued and
-// resets the attempt counter, since plan.md 19.2 makes a manual retry a fresh
-// start rather than a continuation of the interruption streak.
+// RestartJob re-queues a cancelled or failed job at the front and resets the attempt
+// counter, since plan.md 19.2 makes a manual retry a fresh start.
 func (s *store) RestartJob(ctx context.Context, id int64) (domain.Job, error) {
 	var out domain.Job
 
@@ -340,15 +337,11 @@ func (s *store) RestartJob(ctx context.Context, id int64) (domain.Job, error) {
 	return out, nil
 }
 
-// SweepInterruptedJobs is the startup sweep of plan.md 19.2. There is one
-// worker process, so anything still in an in-flight state was interrupted.
+// SweepInterruptedJobs is the startup sweep of plan.md 19.2: with one worker process,
+// anything still in an in-flight state was interrupted.
 //
-// running and verifying are re-queued at the front with attempt+1, or failed
-// once attempt has reached domain.MaxAutoAttempts. promoting and
-// awaiting_stream_end are reported as SweepNeedsCheck and left exactly as
-// found: deciding those needs the destination file and the staging file, which
-// is the job package's business, not the store's. The caller finishes them with
-// RecordPromotion, RequeueInterruptedJob or FailJob.
+// promoting and awaiting_stream_end come back as SweepNeedsCheck and are left as found,
+// because deciding them needs the files, which is the job package's business.
 func (s *store) SweepInterruptedJobs(ctx context.Context) ([]SweepResult, error) {
 	var out []SweepResult
 
@@ -378,9 +371,8 @@ func (s *store) SweepInterruptedJobs(ctx context.Context) ([]SweepResult, error)
 	return out, nil
 }
 
-// RequeueInterruptedJob applies the same cap and front-of-queue rule to a
-// single job, for a caller that has finished the consistency check a
-// SweepNeedsCheck result asked for.
+// RequeueInterruptedJob applies the same cap and front-of-queue rule to one job, for a
+// caller that has finished the consistency check SweepNeedsCheck asked for.
 func (s *store) RequeueInterruptedJob(ctx context.Context, id int64) (SweepResult, error) {
 	var out SweepResult
 
@@ -479,9 +471,8 @@ func selectInterrupted(ctx context.Context, tx *sql.Tx) ([]interruptedJob, error
 	return found, nil
 }
 
-// sweepOne leaves promoting and awaiting_stream_end exactly as found: both need
-// the destination file or the staging file to decide, which is the job
-// package's business (plan.md 19.2).
+// promoting and awaiting_stream_end are left as found: deciding them needs the
+// destination or staging file, which is the job package's business (plan.md 19.2).
 func sweepOne(ctx context.Context, tx *sql.Tx, j interruptedJob) (SweepResult, error) {
 	if j.state == domain.JobPromoting || j.state == domain.JobAwaitingStreamEnd {
 		return SweepResult{
@@ -578,9 +569,8 @@ func requeueOrFail(ctx context.Context, tx *sql.Tx, j interruptedJob) (SweepResu
 	return out, nil
 }
 
-// frontPriority is plan.md 19: min(queued priorities) - 1, so a re-queued job
-// runs next. With nothing queued it steps ahead of the job's own priority, which
-// keeps repeated interruptions monotonic instead of pinning them at 99.
+// frontPriority is min(queued priorities) - 1 so a re-queued job runs next (plan.md 19);
+// with nothing queued it steps ahead of its own, keeping repeated interruptions monotonic.
 func frontPriority(ctx context.Context, tx *sql.Tx, jobID int64) (int, error) {
 	const query = `
 		SELECT MIN(COALESCE(
@@ -629,7 +619,7 @@ func failJobTx(ctx context.Context, tx *sql.Tx, id int64, code domain.FailureCod
 	return nil
 }
 
-//nolint:funlen // 30 columns; the length is the schema's
+//nolint:funlen // one column per jobColumns entry; the length is the schema's
 func scanJob(row rowScanner) (domain.Job, error) {
 	var (
 		j              domain.Job

@@ -7,9 +7,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
-// Mapping between the domain types and the generated wire types. It is all in
-// one file so a spec change lands in one place, and it is all pure functions so
-// the secret rule (18.4) is enforced in exactly one place per secret.
+// Domain to wire mapping, in one file so a spec change lands in one place and the secret
+// rule of 18.4 is enforced in exactly one place per secret.
 
 func ptrOf[T any](v T) *T { return &v }
 

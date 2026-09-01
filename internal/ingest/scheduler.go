@@ -9,14 +9,12 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/clock"
 )
 
-// RecheckInterval is how long the scheduler waits before re-reading the
-// settings when the schedule is off or unreadable. It bounds how long a
-// settings change takes to be noticed.
+// RecheckInterval bounds how long a settings change takes to be noticed when the
+// schedule is off or unreadable.
 const RecheckInterval = time.Minute
 
-// Scheduler fires the daily scan of plan.md 13.2. It re-reads settings.scan_cron
-// on every tick, so changing the time in the UI takes effect at the next wake
-// rather than at the next restart.
+// Scheduler fires the daily scan of plan.md 13.2, re-reading settings.scan_cron every
+// tick so a change in the UI takes effect at the next wake, not the next restart.
 type Scheduler struct {
 	store   ScanStore
 	scanner *Scanner
@@ -37,9 +35,8 @@ func NewScheduler(st ScanStore, scanner *Scanner, clk clock.Clock, logger *slog.
 // Run blocks until ctx is cancelled.
 func (s *Scheduler) Run(ctx context.Context) error {
 	for {
-		// A cancelled context is a clean shutdown, not a failure, and checking
-		// here rather than only in the select keeps the loop deterministic when
-		// the scan itself was what got cancelled.
+		// Checked here rather than only in the select, so the loop stays deterministic
+		// when the scan itself was what got cancelled.
 		if ctx.Err() != nil {
 			return nil //nolint:nilerr // cancellation is how Run is meant to end
 		}
@@ -66,9 +63,8 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	}
 }
 
-// nextWait reports how long to sleep and whether waking up means running a
-// scan. A disabled or unparseable schedule sleeps a short interval instead, so
-// fixing it in the UI does not need a restart.
+// A disabled or unparseable schedule sleeps a short interval instead, so fixing it in
+// the UI does not need a restart.
 func (s *Scheduler) nextWait(ctx context.Context) (time.Duration, bool) {
 	settings, err := s.store.GetSettings(ctx)
 	if err != nil {

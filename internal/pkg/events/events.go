@@ -1,10 +1,8 @@
-// Package events is Codarr's logging. plan.md 24: log/slog with a JSON handler
-// writing to stdout, wrapped so records at info and above are also written to
-// the events table for the UI's log view.
+// Package events is Codarr's logging: slog JSON to stdout, wrapped so info and above
+// also reach the events table (plan.md 24).
 //
-// Stdout is the source of truth. A failure writing the row must never stop the
-// stdout line being emitted, which is why the wrapper calls the inner handler
-// first and never propagates the table's error.
+// Stdout is the source of truth, so the wrapper calls the inner handler first and never
+// propagates the table's error.
 package events
 
 import (
@@ -20,9 +18,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
-// SinkTimeout bounds one events-table insert. The write pool holds a single
-// connection, so an insert that cannot get it has to give up rather than block
-// the goroutine that was only trying to log.
+// SinkTimeout bounds one events-table insert, so a goroutine that was only trying to
+// log does not block waiting for the single write connection.
 const SinkTimeout = 5 * time.Second
 
 // DefaultCategory is used for a record carrying no component or category attr.
@@ -63,8 +60,7 @@ func New(o Options) *slog.Logger {
 	return slog.New(NewHandler(o))
 }
 
-// NewHandler returns the JSON handler with the events-table sink wrapped around
-// it.
+// NewHandler returns the JSON handler with the events-table sink wrapped around it.
 func NewHandler(o Options) slog.Handler {
 	if o.Out == nil {
 		o.Out = os.Stdout
@@ -227,8 +223,7 @@ func (h *handler) event(r slog.Record) domain.Event {
 	return ev
 }
 
-// harvest lifts the three attributes the log view filters and links on into
-// their own columns. Everything else stays in the JSON line on stdout.
+// The three attributes the log view filters and links on get their own columns.
 func harvest(ev *domain.Event, a slog.Attr) {
 	switch a.Key {
 	case "category", "component":
@@ -259,9 +254,8 @@ func levelName(l slog.Level) string {
 	}
 }
 
-// ParseLevel maps the --log-level flag onto a slog level. An unknown value is
-// info rather than an error: refusing to start over a typo in a log level is a
-// worse outcome than logging slightly more than asked.
+// ParseLevel maps the --log-level flag onto a slog level, falling back to info rather
+// than refusing to start over a typo.
 func ParseLevel(s string) slog.Level {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "debug":
@@ -275,9 +269,8 @@ func ParseLevel(s string) slog.Level {
 	}
 }
 
-// redact keeps the Plex token and the *arr API keys out of stdout and out of
-// the events table (plan.md 24). It runs on every attribute, nested ones
-// included, because the value is a secret wherever it is spelled.
+// redact keeps the Plex token and *arr API keys out of both sinks (plan.md 24), on
+// every attribute including nested ones, because a secret is a secret wherever it appears.
 func redact(_ []string, a slog.Attr) slog.Attr {
 	if !secretKey(a.Key) {
 		return a

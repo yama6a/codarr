@@ -8,10 +8,8 @@ import (
 	"github.com/yama6a/codarr/internal/hardware"
 )
 
-// GetHardware serves the cached probe. plan.md 10.1 says "at startup and on
-// demand", but re-probing on every read burns six ffmpeg invocations for an
-// answer already in SQLite, so the read is cache-first and only the button
-// forces a fresh run.
+// GetHardware is cache-first: re-probing on every read burns six ffmpeg invocations for
+// an answer already in SQLite, so only the button forces a fresh run (plan.md 10.1).
 func (s *Server) GetHardware(
 	ctx context.Context, _ gen.GetHardwareRequestObject,
 ) (gen.GetHardwareResponseObject, error) {

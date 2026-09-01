@@ -1,11 +1,8 @@
-// Package arr talks to Radarr and Sonarr. plan.md 16.2: there are several of
-// each, so everything here is per instance from the start - base URL, API key,
-// path mappings and root folders. There is no single-instance shortcut to
-// generalise later.
+// Package arr talks to Radarr and Sonarr, per instance from the start because there are
+// several of each and no single-instance shortcut generalises later (plan.md 16.2).
 //
-// The one shape both flavours share is behind Client; the two places they
-// differ, the rescan command and how an item is unmonitored, are switches
-// inside the one implementation rather than two parallel clients.
+// The two places the flavours differ, the rescan command and unmonitoring, are switches
+// inside one implementation rather than two parallel clients.
 package arr
 
 import (
@@ -34,9 +31,8 @@ type Identity struct {
 	Flavour domain.Flavour
 }
 
-// ItemRef is the item on the *arr side that a promoted file belongs to. Which
-// field matters depends on the flavour: Radarr rescans a movie, Sonarr a
-// series, and Sonarr unmonitors per episode.
+// ItemRef is the item a promoted file belongs to; which field matters is per flavour,
+// since Radarr rescans a movie, Sonarr a series, and Sonarr unmonitors per episode.
 type ItemRef struct {
 	MovieID    int64
 	SeriesID   int64
@@ -56,9 +52,8 @@ type Client interface {
 type Config struct {
 	Instance domain.ArrInstance
 
-	// Mapper rewrites between this instance's view of the filesystem and
-	// Codarr's. It is mandatory in practice: VERIFY.md records all four live
-	// instances reporting the same literal root, "/media".
+	// Mandatory in practice: VERIFY.md records all four live instances reporting
+	// the same literal root, "/media".
 	Mapper *pathmap.Mapper
 
 	HTTPClient *http.Client
@@ -132,9 +127,8 @@ func (c Config) withDefaults() Config {
 // Identity returns who this instance is.
 func (a *API) Identity() Identity { return a.identity }
 
-// Mapper is this instance's path mappings, for the webhook handler that has to
-// rewrite an incoming path with the mappings of the instance that sent it
-// (plan.md 13.1).
+// Mapper is this instance's path mappings, for the webhook handler, which rewrites an
+// incoming path with the mappings of the instance that sent it (plan.md 13.1).
 func (a *API) Mapper() *pathmap.Mapper { return a.mapper }
 
 // TestResult is what the UI's Test button shows. A reachable instance that

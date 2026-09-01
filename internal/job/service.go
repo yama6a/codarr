@@ -10,9 +10,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/clock"
 )
 
-// DefaultIdlePoll is how long the worker waits before looking for work again
-// when the queue is empty or paused. Every control that creates work also wakes
-// it, so this is only the backstop.
+// DefaultIdlePoll is the backstop wait when the queue is empty or paused; every
+// control that creates work also wakes the worker.
 const DefaultIdlePoll = 2 * time.Second
 
 // Deps is everything the queue needs. Nothing is instantiated internally; see
@@ -39,9 +38,8 @@ type Deps struct {
 	IdlePoll time.Duration
 }
 
-// Service is the queue: the single worker goroutine of plan.md 19 plus the
-// operations the API drives it with. There is exactly one, and it runs exactly
-// one transcode at a time.
+// Service is the queue: the single worker goroutine of plan.md 19, running exactly
+// one transcode at a time, plus the operations the API drives it with.
 type Service struct {
 	store    Store
 	prober   Prober
@@ -111,8 +109,8 @@ func New(d Deps) *Service {
 	}
 }
 
-// notify wakes the worker without blocking. The channel is a signal, not a
-// queue: one pending wake-up is all a poll loop can use.
+// notify wakes the worker without blocking; the channel is a signal, not a queue,
+// since one pending wake-up is all a poll loop can use.
 func (s *Service) notify() {
 	select {
 	case s.wake <- struct{}{}:

@@ -7,9 +7,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
-// Error categories for codarr_errors_total. Each one names a place the worker
-// swallows an error and carries on, which is exactly the set that is otherwise
-// invisible: a failed job already reports itself through jobs_failed_total.
+// Error categories for codarr_errors_total: every place the worker swallows an
+// error and carries on, which jobs_failed_total can never show.
 const (
 	errorWorker      = "worker"
 	errorRecovery    = "recovery"
@@ -22,12 +21,8 @@ const (
 	errorNotify      = "notify"
 )
 
-// Metrics is the part of the Prometheus surface of plan.md 24 the worker
-// produces. Every other series is either an API seam or a gauge the refresher
-// reads back out of SQLite.
-//
-// It is optional. Deps.Metrics may be nil, every call goes through recorder,
-// and nothing here may ever fail a job.
+// Metrics is the part of plan.md 24's surface the worker produces; Deps.Metrics
+// may be nil, and nothing here may ever fail a job.
 type Metrics interface {
 	JobObserved(state domain.JobState, kind domain.Kind, origin domain.JobOrigin)
 	JobFailed(code domain.FailureCode)
@@ -101,11 +96,8 @@ func (r recorder) queue(queued, awaiting int) {
 	}
 }
 
-// observe records one state transition the worker made and re-reads the two
-// queue gauges. internal/pkg/metrics refreshes the same two from the same query
-// every 15 seconds; doing it here as well means a transition is visible on the
-// next scrape instead of up to a refresh later, and the two writers can never
-// disagree because the number comes from the same count.
+// The queue gauges are re-read here as well as by the 15-second refresher, so a
+// transition is visible on the next scrape; both read the same count, so neither wins.
 func (s *Service) observe(ctx context.Context, state domain.JobState, kind domain.Kind, origin domain.JobOrigin) {
 	s.mx.jobObserved(state, kind, origin)
 	s.syncQueueGauges(ctx)
@@ -126,9 +118,8 @@ func (s *Service) syncQueueGauges(ctx context.Context) {
 	s.mx.queue(counts[domain.JobQueued], counts[domain.JobAwaitingStreamEnd])
 }
 
-// recordDuration is the completion half of plan.md 14.3: both the estimate and
-// the measurement are stored, and the delta between them is the series that
-// says whether the rolling averages are worth anything.
+// The completion half of plan.md 14.3: the delta between estimate and measurement
+// is the series that says whether the rolling averages are worth anything.
 func (s *Service) recordDuration(t *task, actual int) {
 	s.mx.transcodeDuration(t.plan.Kind, t.selection.Encoder, float64(actual))
 	s.mx.estimateError(float64(actual - t.estimate))

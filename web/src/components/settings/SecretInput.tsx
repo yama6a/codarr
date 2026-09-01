@@ -10,11 +10,8 @@ interface SecretInputProps {
   placeholder?: string;
 }
 
-/**
- * SecretInput never renders a stored secret. plan.md 18.4: GET returns the mask, and sending the
- * mask straight back leaves the stored value alone, so the field only holds real characters once
- * the user has typed them.
- */
+// plan.md 18.4: GET returns the mask, and sending the mask back leaves the stored value alone, so
+// the field only ever holds characters the user typed.
 export function SecretInput({ value, onChange, label, placeholder }: SecretInputProps) {
   const [editing, setEditing] = useState(value !== SECRET_MASK);
 

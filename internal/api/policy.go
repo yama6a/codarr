@@ -13,9 +13,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
-// The policy is hard-coded (plan.md 3, rule 3) and this endpoint only displays
-// it. Every value below is read from the package that owns it, so the page can
-// never show a rule the engine is not applying.
+// The policy is hard-coded (plan.md 3, rule 3) and only displayed here. Every value is
+// read from the package that owns it, so the page cannot show a rule the engine skips.
 
 func policy() gen.Policy {
 	p := decide.Describe()
@@ -82,9 +81,8 @@ func policyAudio(p decide.Snapshot) gen.PolicyAudio {
 	}
 }
 
-// audioEncodeTargets describes the Matroska ladder, which is the general case.
-// The MP4 divergence is carried by mp4_multichannel_codec and
-// mp4_kbps_per_channel rather than by a second ladder.
+// The Matroska ladder is the general case; the MP4 divergence rides on
+// mp4_multichannel_codec and mp4_kbps_per_channel rather than a second ladder.
 func audioEncodeTargets() []gen.PolicyAudioEncodeTarget {
 	mono := decide.AudioEncodeTarget(domain.ContainerMatroska, 1)
 	stereo := decide.AudioEncodeTarget(domain.ContainerMatroska, 2)

@@ -26,10 +26,8 @@ type rootFolderResource struct {
 	FreeSpace  *int64 `json:"freeSpace"`
 }
 
-// RootFolders lists the instance's root folders. The mapping runs here rather
-// than at the caller because the reported path alone is not usable: VERIFY.md
-// records all four live instances reporting the literal "/media", each meaning
-// a different directory on the NAS (plan.md 16.2).
+// RootFolders lists the instance's root folders, mapped here because the reported path
+// alone is unusable: all four instances report "/media" (VERIFY.md, plan.md 16.2).
 func (a *API) RootFolders(ctx context.Context) ([]RootFolder, error) {
 	var resources []rootFolderResource
 
@@ -59,10 +57,8 @@ func (a *API) RootFolders(ctx context.Context) ([]RootFolder, error) {
 	return out, nil
 }
 
-// ImportRoots is the "import root folders" action of plan.md 16.2. It refuses
-// the whole import when any reported path came back unmapped, because that is
-// the state where every instance claims the same root and attribution stops
-// working (VERIFY.md).
+// ImportRoots is the import action of plan.md 16.2, refusing the whole import when any
+// path came back unmapped, which is the state where attribution stops working.
 func ImportRoots(ctx context.Context, c Client) ([]pathmap.ImportedRoot, error) {
 	folders, err := c.RootFolders(ctx)
 	if err != nil {

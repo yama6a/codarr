@@ -126,9 +126,8 @@ func TestNotifyPromoted_RefreshesThenAnalyzesTheItemItFoundFirst(t *testing.T) {
 	}, paths)
 }
 
-// A full job can turn a legacy container into MKV, which changes the path, so
-// the item is not there before the scan. One retry after it is all that is
-// worth spending against an asynchronous scan.
+// A full job can turn a legacy container into MKV, changing the path, so the item is
+// not there before the scan. One retry is all an asynchronous scan is worth.
 func TestNotifyPromoted_LooksAgainAfterTheRefreshWhenTheItemWasNotThere(t *testing.T) {
 	t.Parallel()
 

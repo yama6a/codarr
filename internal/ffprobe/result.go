@@ -137,9 +137,8 @@ func (f Format) SizeBytes() int64 { return int64(parseFloat(f.Size)) }
 // BitRateBPS is the overall container bitrate, zero when absent.
 func (f Format) BitRateBPS() int { return int(parseFloat(f.BitRate)) }
 
-// Tag looks a container tag up case-insensitively. Muxers disagree on the case
-// of global tags, and the loop-prevention check in plan.md 12 has to find
-// CODARR whichever way it comes back.
+// Tag looks a container tag up case-insensitively, because muxers disagree on the
+// case of global tags and plan.md 12 has to find CODARR whichever way it comes back.
 func (f Format) Tag(name string) (string, bool) { return lookupTag(f.Tags, name) }
 
 // Tag looks a stream tag up case-insensitively.
@@ -222,9 +221,8 @@ func (s Stream) FrameRate() float64 {
 	return parseRational(s.RFrameRate)
 }
 
-// LevelValue normalises ffprobe's integer level to the number people write:
-// H.264 reports 41 for L4.1, HEVC reports general_level_idc, 30 times the
-// level. Codecs with no level concept report false.
+// LevelValue normalises ffprobe's integer level: H.264 reports 41 for L4.1, HEVC
+// reports general_level_idc, 30 times the level.
 func (s Stream) LevelValue() (float64, bool) {
 	if s.Level <= 0 {
 		return 0, false
@@ -240,8 +238,8 @@ func (s Stream) LevelValue() (float64, bool) {
 	}
 }
 
-// LevelString is the level for display and for the transform record, always
-// one decimal place ("4.0", "5.1"), empty when the codec has no level.
+// LevelString is the level for display and the transform record, always one
+// decimal place, empty when the codec has no level.
 func (s Stream) LevelString() string {
 	v, ok := s.LevelValue()
 	if !ok {
@@ -262,7 +260,7 @@ func (s Stream) Interlaced() bool {
 	}
 }
 
-// FieldOrderKnown reports whether ffprobe committed to a scan type at all. It
+// FieldOrderKnown reports whether ffprobe committed to a scan type at all, which
 // is what drives the idet sample for legacy codecs in plan.md 6.2.
 func (s Stream) FieldOrderKnown() bool {
 	switch s.FieldOrder {
@@ -302,8 +300,8 @@ func (s Stream) Chroma() Chroma { return ChromaOf(s.PixFmt) }
 // BitDepth is bits per luma sample, 8 when the pixel format is unknown.
 func (s Stream) BitDepth() int { return bitDepthOf(s.PixFmt) }
 
-// PrimaryVideo is the first video stream that is not an attached picture.
-// Blindly taking the first video stream is the bug plan.md 6.2 warns about.
+// PrimaryVideo is the first video stream that is not an attached picture; taking
+// the first video stream blindly is the bug plan.md 6.2 warns about.
 func (r *Result) PrimaryVideo() (Stream, bool) {
 	for _, s := range r.Streams {
 		if s.CodecType == TypeVideo && !s.IsAttachedPic() {
@@ -327,8 +325,8 @@ func (r *Result) StreamsOfType(codecType string) []Stream {
 	return out
 }
 
-// Duration prefers the container duration and falls back to the longest
-// stream, which is what legacy containers without a header duration give.
+// Duration prefers the container duration and falls back to the longest stream,
+// which is what a legacy container without a header duration needs.
 func (r *Result) Duration() float64 {
 	if d := r.Format.DurationSeconds(); d > 0 {
 		return d

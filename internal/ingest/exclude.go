@@ -37,9 +37,8 @@ func ExtrasDirs() []string {
 	}
 }
 
-// VideoExtensions is everything the scan will look inside. It is wider than the
-// two containers Codarr writes (6.1) because a legacy container is exactly the
-// thing that needs remuxing.
+// VideoExtensions is wider than the two containers Codarr writes (6.1), because a legacy
+// container is exactly the thing that needs remuxing.
 func VideoExtensions() []string {
 	return []string{
 		".mkv", ".mp4", ".m4v", ".avi", ".mov", ".wmv", ".asf", ".flv",
@@ -53,9 +52,8 @@ func PartialSuffixes() []string {
 	return []string{".part", ".!qb", ".partial", ".tmp"}
 }
 
-// ExcludeDir reports whether a directory is pruned from the walk. Comparison is
-// case-insensitive: Plex creates these names, but a hand-made library is not
-// always consistent about the capitals.
+// ExcludeDir compares case-insensitively: Plex creates these names, but a hand-made
+// library is not always consistent about the capitals.
 func ExcludeDir(name string) bool {
 	for _, d := range ExtrasDirs() {
 		if strings.EqualFold(name, d) {

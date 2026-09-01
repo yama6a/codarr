@@ -2,13 +2,11 @@ package hardware
 
 import "strconv"
 
-// TestSource is the synthetic input every probe encodes. One second at 30 fps
-// is long enough to exercise the whole pipeline and short enough to run at
-// startup (plan.md 10.1).
+// TestSource is the synthetic input every probe encodes: one second at 30 fps exercises
+// the whole pipeline and still runs at startup (plan.md 10.1).
 const TestSource = "testsrc=size=640x480:rate=30:duration=1"
 
-// VP9SampleBitrate keeps the synthesised VP9 clip small; it is decoded, never
-// watched.
+// vp9SampleBitrate keeps the synthesised clip small; it is decoded, never watched.
 const vp9SampleBitrate = 500_000
 
 // VersionArgs asks ffmpeg what build it is, which is the cache key for a probe
@@ -41,8 +39,8 @@ func VP9SampleArgs(out string) []string {
 	}
 }
 
-// VP9DecodeArgs decodes the sample on the iGPU. plan.md 10.1 wants this
-// separate from the encode matrix: the encode probe does not cover decode.
+// VP9DecodeArgs decodes the sample on the iGPU, separately from the encode matrix
+// because an encode probe says nothing about decode (plan.md 10.1).
 func VP9DecodeArgs(b Backend, device, src string) []string {
 	return []string{
 		"-hide_banner", "-loglevel", "error", "-nostdin",

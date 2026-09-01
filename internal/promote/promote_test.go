@@ -469,8 +469,7 @@ func TestPromote_TempStagingOnTheSameDeviceIsRenamedDirectly(t *testing.T) {
 }
 
 // plan.md 15.1 gated preflight on 1.2x the SOURCE size, but the copy back is of
-// the OUTPUT. Without this check the copy dies mid-write and leaves a partial
-// dotfile.
+// the OUTPUT; without this check it dies mid-write and leaves a partial dotfile.
 func TestPromote_CrossDeviceCopyChecksRoomForTheOutputFirst(t *testing.T) {
 	t.Parallel()
 

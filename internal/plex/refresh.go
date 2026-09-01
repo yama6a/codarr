@@ -11,9 +11,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/pathmap"
 )
 
-// Plex item type codes, used to filter a section listing. A show section's
-// /all returns series, not files, so finding a rating key by path there needs
-// the episode type explicitly.
+// Plex item type codes for filtering a section listing: a show section's /all returns
+// series, not files, so a rating key by path needs the episode type explicitly.
 const (
 	typeMovie   = "1"
 	typeEpisode = "4"
@@ -44,13 +43,10 @@ func (c *Client) RefreshDir(ctx context.Context, target Target) error {
 	return nil
 }
 
-// Analyze is plan.md 16.1 step 2. It updates the item's media info in place;
-// deleting and rescanning would do the same job and destroy watch state,
-// ratings, playlist membership and collections with it.
+// Analyze is plan.md 16.1 step 2, updating media info in place because a delete and
+// rescan would destroy watch state, ratings, playlists and collections.
 //
-// VERIFY.md item 2 is still open: the live library is empty, so there is no
-// rating key to send this against and the verb has not been confirmed on the
-// running PMS.
+// VERIFY.md item 2 is open: the verb is unconfirmed against the running PMS.
 func (c *Client) Analyze(ctx context.Context, ratingKey string) error {
 	if ratingKey == "" {
 		return fmt.Errorf("%w: no rating key", ErrNoRatingKey)
@@ -67,10 +63,8 @@ func (c *Client) Analyze(ctx context.Context, ratingKey string) error {
 	return nil
 }
 
-// RatingKeyFor finds the library item whose file is localPath. Plex is asked to
-// filter, but the answer is confirmed against the returned parts: an unknown
-// filter is accepted and silently ignored by the server, so the filter alone
-// proves nothing.
+// RatingKeyFor finds the library item whose file is localPath, confirming against the
+// returned parts because Plex accepts and silently ignores an unknown filter.
 func (c *Client) RatingKeyFor(ctx context.Context, localPath string) (string, error) {
 	target, err := c.Resolve(ctx, localPath)
 	if err != nil {
@@ -121,9 +115,8 @@ func itemType(sectionType string) (string, bool) {
 	}
 }
 
-// NotifyPromoted is the Plex half of the post-promotion notification. The
-// source file is already gone by the time it runs, so nothing it returns is a
-// job failure; promote turns the error into a warning (plan.md 15.2).
+// NotifyPromoted runs after the source file is gone, so nothing it returns is a job
+// failure; promote turns the error into a warning (plan.md 15.2).
 func (c *Client) NotifyPromoted(ctx context.Context, localPath string) error {
 	if !c.refreshAfter && !c.analyzeAfter {
 		return nil
@@ -134,9 +127,8 @@ func (c *Client) NotifyPromoted(ctx context.Context, localPath string) error {
 		return err
 	}
 
-	// The rating key is looked up first because Codarr keeps the path stable
-	// (plan.md 16.2), so the item already exists under it, and because the
-	// refresh is asynchronous: a lookup straight after it races the scan.
+	// Looked up first because the path stays stable (plan.md 16.2) and the refresh is
+	// asynchronous, so a lookup straight after it races the scan.
 	ratingKey, lookupErr := c.beforeRefreshRatingKey(ctx, target)
 
 	if c.refreshAfter {
@@ -150,10 +142,8 @@ func (c *Client) NotifyPromoted(ctx context.Context, localPath string) error {
 	}
 
 	if ratingKey == "" {
-		// A `full` job can change the extension when a legacy container becomes
-		// MKV (plan.md 6.1), so the pre-refresh lookup misses on a path Plex has
-		// not indexed yet. One retry after the scan was asked for is all that is
-		// worth spending here.
+		// A full job can change the extension (plan.md 6.1), so the pre-refresh lookup
+		// misses on a path Plex has not indexed yet. One retry is all this is worth.
 		if ratingKey, err = c.ratingKeyIn(ctx, target); err != nil {
 			return errors.Join(lookupErr, err)
 		}

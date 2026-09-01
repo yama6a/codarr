@@ -18,8 +18,8 @@ kubectl -n media exec deploy/plex -- find /media -type f \( -name '*.mkv' -o -na
 0
 ```
 
-All four Plex sections report 0 items. Nothing to analyze, nothing to transcode,
-nothing to regress. Two consequences:
+All four Plex sections report 0 items, so there is nothing to analyze and nothing
+to regress against. Two consequences:
 
 - The verification pod has to synthesise its own test media with
   `ffmpeg -f lavfi`. That covers the QSV probes, HDR10 round trip, the CODARR
@@ -229,9 +229,6 @@ A short-lived pod in the `media` namespace on `tc-w1`, requesting the free
 `media-library` mounted and an `emptyDir` for scratch. Sleep entrypoint,
 `kubectl exec` per check, deleted afterwards. Nothing existing is touched.
 
-
----
-
 ## Verification pod run, 2026-09-01
 
 One `codarr-verify` pod in `media` on `tc-w1`, holding the free `gpu.intel.com/i915`
@@ -241,7 +238,7 @@ installs), uid 568, library mounted, all test media synthesised with
 back to its original 12 pods and the i915 allocation back to Plex only. The one
 scratch directory on the NAS, `/media/.codarr-verify-tmp/`, was removed.
 
-### The hardware works, completely
+### The hardware works
 
 Driver is the jellyfin-bundled **Intel iHD 25.4.6**, libva 2.23 / VA-API 1.23.
 There is no distro driver in the image at all. `vainfo` reports HEVC Main and
@@ -319,7 +316,7 @@ reporting doing its job.
 
 ## Dolby Vision, settled with a real file
 
-The earlier synthetic test was wrong, and it was wrong in the way it suspected.
+The earlier synthetic test was wrong, in the way it suspected it might be.
 
 A genuine profile 5 file was built with `dovi_tool 2.3.3`: `generate` a profile 5
 RPU (240 frames, L5 and L6), `inject-rpu` into a 10-bit HEVC elementary stream,
@@ -366,7 +363,7 @@ MKV (`Tag dvh1 incompatible with output codec id '173'`, header write fails), an
 neither `-tag:v 0` nor `-tag:v ""` clears it. Container preservation (6.1) means
 Codarr never attempts that.
 
-## The hardware correction should be 1.25, not 1.35
+## Hardware correction, 1.35 to 1.25
 
 `plan.md` 8.1 proposes 1.35 and says to tune it after this check.
 
@@ -384,8 +381,8 @@ probe's own `libx265 -crf 21 -preset veryfast` on identical frames.
 | Sintel t=444 | 2706 | 75.06 | 3610 | 1.33 |
 | Sintel t=684 | 2761 | 87.11 | 3683 | 1.33 |
 
-Mean and median both **1.26**. Changed to **1.25**. 1.35 was not wrong, just
-about 8% conservative.
+Mean and median both **1.26**. Changed to **1.25**. 1.35 was about 8%
+conservative.
 
 The constant is only meaningful paired with the probe's `-preset veryfast`;
 change one and the other has to be re-measured. Source material was Xiph's test
@@ -422,7 +419,7 @@ Two caveats worth folding into 16.1:
   the filter does work, but the client's re-check of every returned `Part.file`
   is load-bearing. Keep it.
 
-## Smaller findings## Smaller findings
+## Smaller findings
 
 - **The native `eac3` encoder refuses 7.1** and downmixes to `5.1(side)` without
   being asked. Codarr never encodes to E-AC-3 (6.3's targets are AAC and AC-3),

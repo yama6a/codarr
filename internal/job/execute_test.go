@@ -15,9 +15,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
-// sampleSize is 30 MB per 60-second sample, which works out to exactly 4 Mbps
-// and makes the whole 8.1 chain assertable: 4 Mbps * 1.35 = 5.4 Mbps, inside
-// both the 1080p floor and its ceiling and under the 0.85 source clamp.
+// 30 MB per 60-second sample is exactly 4 Mbps, which after the hardware
+// correction still sits inside the 1080p clamps and under the 0.85 source clamp.
 const sampleSize = int64(30_000_000)
 
 // encoderWithSamples answers the sample probe with real files and the encode
@@ -416,9 +415,8 @@ func TestService_TheFinalOutTimeIsPersistedWhenTheEncodeEnds(t *testing.T) {
 	require.InDelta(t, mediaDur, promoteCalls[0].Req.FinalOutTimeSeconds, 0.001)
 }
 
-// sampledTarget is the bitrate the fake sample probe produces once the 8.1
-// hardware correction is applied. Derived so retuning the constant after a VMAF
-// pass does not fail tests that are about the plumbing, not the value.
+// Derived from the constant so retuning it does not fail tests that are about the
+// plumbing, not the value.
 func sampledTarget() string {
 	return strconv.Itoa(int(4_000_000 * ffmpeg.HardwareCorrection))
 }

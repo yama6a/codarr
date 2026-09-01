@@ -10,10 +10,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/store"
 )
 
-// Every bulk operation is dry-run first (plan.md 19). A preview reports the
-// count and the plan-kind breakdown so the confirmation can say exactly what it
-// is about to do, and promotion is irreversible (15.5), so nothing here queues
-// anything without confirm.
+// Every bulk operation is dry-run first (plan.md 19): promotion is irreversible (15.5),
+// so nothing here queues anything without confirm.
 
 // RecheckAllMedia re-probes every done file and re-plans it against the current
 // policy. confirm false examines everything and queues nothing.
@@ -30,9 +28,8 @@ func (s *Server) RecheckAllMedia(
 	return gen.RecheckAllMedia200JSONResponse(recheckResult(res)), nil
 }
 
-// RecheckSelectedMedia is the same operation restricted to a selection or a
-// filter. An empty body selects nothing rather than everything, so a mis-sent
-// request cannot queue the library.
+// RecheckSelectedMedia restricts the operation to a selection or filter; an empty body
+// selects nothing, so a mis-sent request cannot queue the library.
 func (s *Server) RecheckSelectedMedia(
 	ctx context.Context, req gen.RecheckSelectedMediaRequestObject,
 ) (gen.RecheckSelectedMediaResponseObject, error) {
@@ -55,9 +52,8 @@ func (s *Server) RecheckSelectedMedia(
 	return gen.RecheckSelectedMedia200JSONResponse(recheckResult(res)), nil
 }
 
-// recheckRequest turns the body into a selection. ids and filter are mutually
-// exclusive: accepting both would make it ambiguous whether the filter narrows
-// the ids or adds to them.
+// ids and filter are mutually exclusive: accepting both leaves it ambiguous whether the
+// filter narrows the ids or adds to them.
 func recheckRequest(in gen.RecheckSelectedRequest) (job.Recheck, error) {
 	out := job.Recheck{Confirm: in.Confirm}
 

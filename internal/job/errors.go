@@ -23,10 +23,8 @@ var ErrNotRunning = errors.New("job: not the running job")
 // is called without confirmation. plan.md 15.5 makes the confirmation mandatory.
 var ErrConfirmationRequired = errors.New("job: the operation is irreversible and was not confirmed")
 
-// Error is both halves of plan.md 19.1: the machine-readable code the jobs row
-// stores and a message specific enough to act on without reading the logs. A
-// failed job without both is a bug, so every path that fails a job goes through
-// this type and nothing constructs it with an empty message.
+// Error is both halves of plan.md 19.1, a code and a message; a failed job
+// without both is a bug, so every failing path goes through this type.
 type Error struct {
 	Code       domain.FailureCode
 	Message    string
@@ -54,10 +52,8 @@ func wrapf(code domain.FailureCode, err error, format string, args ...any) *Erro
 	return &Error{Code: code, Message: fmt.Sprintf(format, args...), Err: err}
 }
 
-// classify turns any error the pipeline produced into the code and message the
-// jobs row stores. A promote.Error already carries both, and an ffmpeg exit
-// carries the stderr tail 19.1 asks for; everything else lands on
-// internal_error with the Go error text rather than an empty message.
+// Everything the pipeline can produce lands on a code and a non-empty message;
+// an unrecognised error becomes internal_error with the Go error text (19.1).
 func classify(err error) *Error {
 	var (
 		own  *Error

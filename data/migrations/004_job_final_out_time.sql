@@ -1,12 +1,5 @@
 -- +migrate Up
 --
--- ffmpeg's own final out_time from the progress stream (14.3). 15.3 needs it for
--- the legacy-container fallback: VOB and AVI headers routinely lie about
--- duration, so when the 1% check against the probed source fails, the output is
--- compared against what ffmpeg says it actually wrote.
---
--- It has to be a column rather than in-memory state because 19.2 resumes
--- awaiting_stream_end across a restart. Without it a resumed job on a legacy
--- container has no fallback and fails verification on a duration its own source
--- misreported.
+-- ffmpeg's own final out_time (14.3), the 15.3 fallback for VOB and AVI headers that
+-- lie about duration. A column and not memory because 19.2 resumes across a restart.
 ALTER TABLE jobs ADD COLUMN final_out_time_us INTEGER;

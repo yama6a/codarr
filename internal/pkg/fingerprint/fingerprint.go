@@ -1,7 +1,5 @@
-// Package fingerprint answers "is this still the same file?" cheaply enough to
-// run on every scan. See plan.md 12.1: two 1 MiB reads regardless of file size,
-// because the library is tens of gigabytes on NFS and a nightly whole-library
-// read buys nothing over head, tail and size.
+// Package fingerprint answers "is this still the same file?" cheaply enough to run on
+// every scan: two 1 MiB reads regardless of file size, over NFS (plan.md 12.1).
 package fingerprint
 
 import (
@@ -75,9 +73,8 @@ func (f *Fingerprinter) Sparse(path string) (string, error) {
 	return format(h), nil
 }
 
-// Full is the on-demand whole-file hash of plan.md 12.2. It is computed at
-// promotion when full_hash_enabled and by the integrity endpoint, never during
-// a scan.
+// Full is the on-demand whole-file hash of plan.md 12.2, run at promotion and by the
+// integrity endpoint but never during a scan.
 func (f *Fingerprinter) Full(path string) (string, error) {
 	if path == "" {
 		return "", ErrEmptyPath

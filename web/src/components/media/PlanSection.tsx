@@ -21,10 +21,6 @@ function target(stream: StreamPlan): string {
   return parts.length > 0 ? parts.join(', ') : 'unchanged';
 }
 
-/**
- * PlanSection renders the decision engine's output for a file that has never had a job. The after
- * side is always the plan here, and the label says so.
- */
 export function PlanSection({ plan }: { plan: Plan }) {
   return (
     <div className="space-y-4">

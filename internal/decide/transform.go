@@ -20,9 +20,8 @@ const (
 	encodedProfileHDR = "Main 10"
 )
 
-// NewTransform builds the enqueue-time record of plan.md 17.2: "before" is
-// measured, "after" is the plan's prediction. Completion overwrites "after"
-// with what an ffprobe of the real output says.
+// NewTransform builds the enqueue-time record of plan.md 17.2, where "before" is
+// measured and "after" is the plan's prediction until MergeMeasured runs.
 func NewTransform(probe *ffprobe.Result, p domain.Plan, estimatedSeconds int) domain.TransformRecord {
 	rec := domain.TransformRecord{
 		Container: domain.BeforeAfterString{Before: p.SourceContainer, After: string(p.OutputContainer)},
@@ -199,7 +198,7 @@ func subtitleTransform(probe *ffprobe.Result, plan domain.StreamPlan, container 
 }
 
 // MergeMeasured replaces every prediction with what an ffprobe of the finished
-// output measured, per plan.md 17.2. The "before" half is never touched.
+// output measured (plan.md 17.2), never touching the "before" half.
 func MergeMeasured(rec domain.TransformRecord, out *ffprobe.Result, actualSeconds int) domain.TransformRecord {
 	rec.Duration.Actual = &actualSeconds
 

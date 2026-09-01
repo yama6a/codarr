@@ -16,9 +16,8 @@ import (
 // ErrNotFound is returned when a row a caller named does not exist.
 var ErrNotFound = errors.New("store: not found")
 
-// ErrInvalidFailure is returned when a job is failed without both halves of
-// plan.md 19.1. A failed job with an empty message is a bug, so the store
-// refuses to write one.
+// ErrInvalidFailure is returned when a job is failed without both halves of plan.md 19.1,
+// which the store refuses to write because it would be a bug.
 var ErrInvalidFailure = errors.New("store: failure code and message are both required")
 
 // timeLayout is fixed width on purpose; see the package comment.
@@ -70,9 +69,8 @@ type EventFilter struct {
 	Limit    int
 }
 
-// AnalysisUpdate carries everything one analysis pass learned about a file.
-// Provenance is absent on purpose: it is derived from the fingerprints, never
-// supplied (plan.md 12).
+// AnalysisUpdate carries everything one analysis pass learned about a file; provenance
+// is absent on purpose, being derived from the fingerprints (plan.md 12).
 type AnalysisUpdate struct {
 	MediaFileID int64
 
@@ -106,9 +104,8 @@ type AnalysisUpdate struct {
 	AnalyzedAt time.Time
 }
 
-// PromotionUpdate is step 9 of plan.md 15.2. The current size, mtime and
-// fingerprint are set to the output's own values so the next scan sees an
-// unchanged file rather than re-probing Codarr's own work.
+// PromotionUpdate is step 9 of plan.md 15.2, setting size, mtime and fingerprint to the
+// output's own values so the next scan does not re-probe Codarr's work.
 type PromotionUpdate struct {
 	JobID       int64
 	MediaFileID int64
@@ -137,15 +134,13 @@ type ExecutionUpdate struct {
 	SourceSize       int64
 	EstimatedSeconds int
 
-	// FinalOutTimeUS is ffmpeg's own last out_time, known only once the run
-	// ends. Verification needs it for a legacy container whose header lies
-	// about duration (plan.md 14.3, 15.3), including after a restart.
+	// ffmpeg's own last out_time, which verification needs for a legacy container
+	// whose header lies about duration (plan.md 14.3, 15.3), restart included.
 	FinalOutTimeUS int64
 }
 
-// MediaStat is the cheap projection the scheduled scan diffs against the
-// filesystem (plan.md 13.2); loading whole rows to compare size and mtime
-// would read the entire library into memory.
+// MediaStat is the cheap projection the scheduled scan diffs against the filesystem
+// (plan.md 13.2); whole rows would read the entire library into memory.
 type MediaStat struct {
 	ID        int64
 	Path      string
@@ -165,9 +160,8 @@ const (
 	// SweepFailed means the attempt cap was reached and the job is now
 	// failed with failure_code 'interrupted'.
 	SweepFailed SweepAction = "failed"
-	// SweepNeedsCheck means the store left the job in the state it found it.
-	// promoting and awaiting_stream_end both need the filesystem to decide
-	// what happened (plan.md 19.2), which is the job package's business.
+	// SweepNeedsCheck leaves the job as found: promoting and awaiting_stream_end
+	// need the filesystem to decide what happened (plan.md 19.2).
 	SweepNeedsCheck SweepAction = "needs_consistency_check"
 )
 
@@ -289,9 +283,8 @@ func New(db *DB, logger *slog.Logger) Store {
 	return &store{db: db, logger: logger.With(slog.String("component", "store"))}
 }
 
-// write runs fn in a single transaction on the write pool. Nothing inside fn
-// may touch the read pool's rows for a value it then writes; take everything
-// from tx so the transaction stays the consistent view.
+// write runs fn in a single transaction on the write pool. Nothing inside fn may read
+// through the read pool for a value it then writes, or the transaction is not the view.
 func (s *store) write(ctx context.Context, fn func(tx *sql.Tx) error) error {
 	tx, err := s.db.write.BeginTx(ctx, nil)
 	if err != nil {
@@ -320,8 +313,6 @@ func (s *store) exec(ctx context.Context, query string, args ...any) (sql.Result
 	return res, nil
 }
 
-// execOne runs a statement that must touch exactly one row, turning a miss into
-// ErrNotFound.
 func (s *store) execOne(ctx context.Context, query string, args ...any) error {
 	res, err := s.exec(ctx, query, args...)
 	if err != nil {
@@ -455,9 +446,8 @@ func marshalStrings(v []string) (any, error) {
 	return marshalJSON(v)
 }
 
-// conds accumulates a WHERE clause and its bound arguments. Every value
-// reaches the query as a placeholder; only column names, which are package
-// constants, are ever concatenated.
+// conds accumulates a WHERE clause and its bound arguments. Every value reaches the
+// query as a placeholder; only column names, which are constants, are concatenated.
 type conds struct {
 	clauses []string
 	args    []any

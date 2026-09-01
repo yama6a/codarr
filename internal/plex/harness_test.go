@@ -18,7 +18,6 @@ import (
 
 const testToken = "PLACEHOLDER-PLEX-TOKEN"
 
-// route is one canned answer, keyed by method and path.
 type route struct {
 	status  int
 	fixture string
@@ -152,9 +151,8 @@ func newClient(t *testing.T, s *server, mutate func(*plex.Config)) *plex.Client 
 	return c
 }
 
-// mappedMapper is the mapping this cluster does not need. VERIFY.md records
-// Plex seeing the same paths Codarr does, so the reverse step is a no-op here;
-// the tests still exercise it, because that is one mount change from mattering.
+// The mapping this cluster does not need: Plex sees the same paths Codarr does
+// (VERIFY.md), and the tests exercise it because that is one mount change from mattering.
 func mappedMapper() *pathmap.Mapper {
 	return pathmap.New([]domain.PathMapping{
 		{Local: "/mnt/pool/media", Remote: "/media"},

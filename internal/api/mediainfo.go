@@ -6,13 +6,9 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
-// The detail modal's media summary (plan.md 18.3) and the library table's
-// per-track columns (18.2) are both derived from the stored ffprobe output.
-// Nothing writes a pre-digested media_info_json today, so it is parsed here
-// rather than duplicated into a second column that could disagree with the
-// probe it came from.
+// The media summary of 18.3 and the per-track columns of 18.2 are derived from the stored
+// probe, never from media_info_json, which nothing writes and could only disagree with it.
 
-// probeSummary is everything the API renders out of one stored probe.
 type probeSummary struct {
 	Info      *gen.MediaInfo
 	Audio     []gen.AudioSummary

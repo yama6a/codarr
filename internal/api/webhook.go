@@ -41,11 +41,9 @@ func (s *Server) ReceiveArrWebhook(
 	return gen.ReceiveArrWebhook200JSONResponse(webhookAck(ack)), nil
 }
 
-// parseWebhook hands the payload back to internal/arr, which owns the Radarr and
-// Sonarr differences including the Rename shape that plan.md 13.1 gets wrong.
-// The strict server has already decoded the body, so it is re-marshalled: the
-// generated type keeps every unknown field in AdditionalProperties, so the round
-// trip is lossless and renamedMovieFiles survives it.
+// internal/arr owns the Radarr and Sonarr differences, including the Rename shape that
+// plan.md 13.1 gets wrong. The already-decoded body is re-marshalled, which is lossless
+// because the generated type keeps unknown fields in AdditionalProperties.
 func parseWebhook(flavour domain.Flavour, payload gen.ArrWebhookPayload) (ingest.Event, error) {
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -91,9 +89,8 @@ func entityID(e arr.Event) *int64 {
 	}
 }
 
-// folderPath is read off the payload rather than the parsed event: arr.Event
-// carries the folder only as a fallback for building file paths, and a Rename
-// with no per-file paths needs the folder itself so ingest can walk it.
+// Read off the payload, not the parsed event: arr.Event carries the folder only as a
+// path fallback, and a Rename with no per-file paths needs the folder itself.
 func folderPath(p gen.ArrWebhookPayload) string {
 	if p.Movie != nil && p.Movie.FolderPath != nil {
 		return *p.Movie.FolderPath

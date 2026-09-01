@@ -16,9 +16,8 @@ const (
 	eventMaxRows   = 100_000
 )
 
-// AppendEvent returns its error rather than swallowing it. Stdout is the source
-// of truth for logging (plan.md 24) and the caller must be free to emit the
-// line anyway, but it cannot decide that if the failure is hidden here.
+// AppendEvent returns its error rather than swallowing it, so the caller can still
+// emit the stdout line that plan.md 24 makes the source of truth.
 func (s *store) AppendEvent(ctx context.Context, e domain.Event) (int64, error) {
 	const query = `
 		INSERT INTO events (level, category, message, media_file_id, job_id, created_at)

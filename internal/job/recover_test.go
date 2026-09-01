@@ -12,9 +12,8 @@ import (
 	"github.com/yama6a/codarr/internal/promote"
 )
 
-// promoted makes the destination look like Codarr's finished output: a
-// fingerprint that no longer matches what analysis recorded, and the global
-// tags of plan.md 12 carrying the current policy hash.
+// promoted makes the destination look like Codarr's finished output: a changed
+// fingerprint plus the global tags of plan.md 12 with the current policy hash.
 func promoted(h *harness) {
 	h.fp.SparseFunc = func(string) (string, error) { return outputFP, nil }
 	h.prober.ProbeFunc = func(_ context.Context, _ string) (*ffprobe.Result, error) {
@@ -169,9 +168,8 @@ func TestService_RecoverFinishesAnAwaitingJobWhoseRenameActuallyLanded(t *testin
 	h := newHarness(t)
 	j := h.interrupted(domain.JobAwaitingStreamEnd, 0)
 
-	// The staging file is gone because it was renamed into place: the promoter
-	// reports a block but never an unblock, so the row can still say
-	// awaiting_stream_end at the moment of the replace.
+	// The staging file was renamed into place: the promoter reports a block but
+	// never an unblock, so the row can still say awaiting_stream_end.
 	promoted(h)
 
 	require.NoError(t, h.svc.Recover(t.Context()))
@@ -212,9 +210,8 @@ func TestService_RecoverLeavesTerminalJobsAlone(t *testing.T) {
 	require.Equal(t, domain.JobQueued, h.jobRow(queued.ID).State)
 }
 
-// plan.md 15.1: the temp directory is the fallback when the destination lacks
-// space, and rename(2) is not atomic across filesystems. CrossDevice is not a
-// column, so resuming has to re-measure it.
+// plan.md 15.1: rename(2) is not atomic across filesystems, and CrossDevice is not
+// a column, so resuming has to re-measure it.
 func TestService_ResumeRebuildsCrossDeviceStagingFromTheTempDirectory(t *testing.T) {
 	t.Parallel()
 
@@ -261,10 +258,8 @@ func TestService_ResumeIgnoresAJobThatIsNoLongerAwaiting(t *testing.T) {
 	require.Empty(t, h.promoter.PromoteCalls())
 }
 
-// plan.md 15.3's legacy-container fallback compares the output against ffmpeg's
-// own out_time, because a VOB or AVI header routinely lies about duration. That
-// value is written when the encode ends and read back here, because 19.2
-// resumes the promotion in a process that never ran the encode.
+// plan.md 15.3's out_time fallback is written when the encode ends and read back
+// here, because 19.2 resumes the promotion in a process that never ran the encode.
 func TestService_ResumedLegacyContainerJobStillHasTheDurationFallback(t *testing.T) {
 	t.Parallel()
 

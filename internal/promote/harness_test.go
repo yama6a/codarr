@@ -31,9 +31,8 @@ const (
 	sourceSize  = int64(8 << 30)
 )
 
-// recorder is the ordered log of every filesystem and Plex call. plan.md 15.6
-// demands nothing between the final stream check and the rename, which is an
-// assertion about ordering, so ordering is what the tests observe.
+// recorder is the ordered log of every filesystem and Plex call, because plan.md
+// 15.6's "nothing between the check and the rename" is an assertion about order.
 type recorder struct {
 	mu    sync.Mutex
 	calls []string

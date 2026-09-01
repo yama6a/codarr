@@ -1,10 +1,5 @@
-// Package job is the queue: one worker goroutine consuming it, the state
-// machine each job walks, the crash recovery that decides what an interrupted
-// job actually did, and the bulk operations that fill it.
-//
-// It owns no policy and talks to no subprocess directly. Everything it needs
-// arrives as a narrow interface (plan.md 2.2), including the parts of the
-// store it touches, so nothing here depends on the 74-method store.Store.
+// Package job is the queue: one worker goroutine, the job state machine, crash
+// recovery, and the bulk operations that fill it, all behind narrow seams (2.2).
 package job
 
 import (
@@ -26,8 +21,7 @@ import (
 //go:generate go run -mod=mod github.com/matryer/moq -out mock/job_mock.go -pkg mock . Store Prober Encoder Promoter FS Fingerprinter Notifier Hardware Analyzer
 
 // Store is the persistence this package uses, split by concern so no single
-// interface grows into a second copy of store.Store. The same concrete store
-// satisfies all of it.
+// interface grows into a second copy of store.Store.
 type Store interface {
 	QueueStore
 	MediaStore
@@ -87,9 +81,8 @@ type Encoder interface {
 	Run(ctx context.Context, args []string, progress func(p ffmpeg.Progress)) (ffmpeg.RunResult, error)
 }
 
-// NewEncoder builds the runner for one invocation. The runner turns out_time
-// into a percentage against the probed duration (14.3), which is per file, so
-// it cannot be a singleton.
+// NewEncoder builds the runner for one invocation, which cannot be a singleton
+// because out_time becomes a percentage of the probed duration (14.3).
 type NewEncoder func(duration time.Duration) Encoder
 
 // Promoter is preflight, verification and the irreversible replace.
@@ -101,40 +94,34 @@ type Promoter interface {
 	Sweep(ctx context.Context, roots, claimed []string) ([]string, error)
 }
 
-// FS is the filesystem this package touches: staging files it has to delete,
-// and the temp directory the sample probe writes into. fsx.FS satisfies it,
-// and so does ffmpeg.SampleFS.
+// FS is the filesystem this package touches: staging files it deletes and the
+// temp directory the sample probe writes into.
 type FS interface {
 	Stat(path string) (fsx.FileInfo, error)
 	Remove(path string) error
 	MkdirAll(path string, mode os.FileMode) error
 }
 
-// Fingerprinter is the file identity of plan.md 12.1, needed by the interrupted
-// promoting check: it is what tells a source that is still intact apart from an
-// output that already landed.
+// Fingerprinter is the file identity of plan.md 12.1, which is what tells an
+// intact source apart from an output that already landed.
 type Fingerprinter interface {
 	Sparse(path string) (string, error)
 }
 
-// Notifier is the Plex and *arr fan-out of plan.md 15.2 step 10. The worker
-// only calls it directly for a promotion that completed during a crash and
-// never got to notify (19.2); the normal path goes through the promoter.
+// Notifier is the Plex and *arr fan-out of plan.md 15.2 step 10, called directly
+// only for a promotion that completed during a crash (19.2).
 type Notifier interface {
 	NotifyPromoted(ctx context.Context, path string) error
 }
 
-// Hardware is the probed encoder capability of plan.md 10. It answers three
-// questions a job asks and makes none of the decisions itself: which encoder to
-// start on, which to fall back to when one fails at runtime, and whether the
-// source can be decoded on the iGPU. hardware.Prober satisfies it.
+// Hardware is the probed encoder capability of plan.md 10; it answers what the
+// silicon and driver can do and makes none of the decisions itself.
 type Hardware interface {
 	Capabilities(ctx context.Context) (hardware.Capabilities, error)
 }
 
-// The concrete types cmd/codarr wires in. They are asserted here rather than in
-// a test so a change to any of these packages breaks the build at the seam
-// instead of at the wiring.
+// The concrete types cmd/codarr wires in, asserted here rather than in a test so
+// a change breaks the build at the seam instead of at the wiring.
 var (
 	_ Store         = store.Store(nil)
 	_ Prober        = (*ffprobe.CLI)(nil)
@@ -146,9 +133,8 @@ var (
 	_ Metrics       = (*metrics.Metrics)(nil)
 )
 
-// Analyzer re-probes one file and recomputes its plan against the current
-// policy, persisting both. The bulk operations of plan.md 19 are re-analysis
-// followed by an enqueue, and internal/ingest already owns the analysis half.
+// Analyzer re-probes one file and recomputes its plan against the current policy;
+// internal/ingest owns the analysis half of the bulk operations of plan.md 19.
 type Analyzer interface {
 	Analyze(ctx context.Context, m domain.MediaFile) (domain.MediaFile, error)
 }

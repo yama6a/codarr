@@ -65,9 +65,8 @@ func (s *Server) UpdatePlex(
 	return gen.UpdatePlex200JSONResponse(plexConfig(stored, storedMappings)), nil
 }
 
-// TestPlex proves both that the token works and that Codarr can see the
-// libraries. A reachable server that rejects the token is a successful test
-// with ok false, not an error.
+// TestPlex proves the token works and the libraries are visible; a reachable server
+// rejecting the token is a successful test with ok false, not an error.
 func (s *Server) TestPlex(ctx context.Context, _ gen.TestPlexRequestObject) (gen.TestPlexResponseObject, error) {
 	client, err := s.plexClient(ctx)
 	if err != nil {
@@ -117,9 +116,8 @@ func (s *Server) ListPlexLibraries(
 	return gen.ListPlexLibraries200JSONResponse(out), nil
 }
 
-// ResolvePlexPath shows how one of Codarr's paths translates through the stored
-// mappings, which is the resolver of plan.md 18.4. It answers from the mappings
-// rather than the server, so it works before a token is configured.
+// ResolvePlexPath is the resolver of plan.md 18.4, answering from the stored mappings
+// rather than the server so it works before a token is configured.
 func (s *Server) ResolvePlexPath(
 	ctx context.Context, req gen.ResolvePlexPathRequestObject,
 ) (gen.ResolvePlexPathResponseObject, error) {
@@ -168,9 +166,8 @@ func matchedMappingID(mappings []domain.PathMapping, local string) *int64 {
 	return best
 }
 
-// StartPlexAuth begins the plex.tv PIN flow. The client identifier is generated
-// once and persisted: plex.tv ties the token to it, so a fresh one on every
-// start would register Codarr as a new device each time (plan.md 16.1).
+// StartPlexAuth begins the PIN flow; the client identifier is persisted because plex.tv
+// ties the token to it and a fresh one registers a new device (plan.md 16.1).
 func (s *Server) StartPlexAuth(
 	ctx context.Context, _ gen.StartPlexAuthRequestObject,
 ) (gen.StartPlexAuthResponseObject, error) {
@@ -206,9 +203,8 @@ func (s *Server) StartPlexAuth(
 	}, nil
 }
 
-// PollPlexAuth checks whether the PIN has been claimed and stores the token if
-// it has. The token itself is never returned: this is the one path where a
-// secret is legitimately in flight, and returning it would contradict 18.4.
+// PollPlexAuth stores the token once the PIN is claimed and never returns it, which
+// would contradict 18.4.
 func (s *Server) PollPlexAuth(
 	ctx context.Context, req gen.PollPlexAuthRequestObject,
 ) (gen.PollPlexAuthResponseObject, error) {
@@ -265,7 +261,6 @@ func (s *Server) plexState(ctx context.Context) (domain.PlexConfig, []domain.Pat
 	return cfg, mappings, nil
 }
 
-// plexClient builds a client from the current configuration.
 func (s *Server) plexClient(ctx context.Context) (PlexClient, error) {
 	if s.plex == nil {
 		return nil, fmt.Errorf("%w: no plex client factory wired", plex.ErrNotConfigured)

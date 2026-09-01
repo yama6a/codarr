@@ -21,15 +21,14 @@ import (
 // different problem from a codec that does not work.
 var ErrNoFfmpeg = errors.New("hardware: ffmpeg is not runnable")
 
-// Runner executes one ffmpeg invocation to completion and returns everything it
-// printed. The probe reads both streams: the version lands on stdout and a
-// codec failure lands on stderr.
+// Runner executes one ffmpeg invocation and returns both streams, because the version
+// lands on stdout and a codec failure on stderr.
 type Runner interface {
 	Run(ctx context.Context, args []string) (string, error)
 }
 
-// Store is the capability cache. plan.md 10.1 keys it on the ffmpeg version so
-// an image upgrade re-probes instead of trusting the old answer.
+// Store is the capability cache, keyed on the ffmpeg version so an image upgrade
+// re-probes instead of trusting the old answer (plan.md 10.1).
 type Store interface {
 	ReplaceHWCapabilities(ctx context.Context, caps []domain.HWCapability) error
 	ListHWCapabilities(ctx context.Context) ([]domain.HWCapability, error)
@@ -163,8 +162,8 @@ func (p *Prober) encodeEntry(ctx context.Context, b Backend, prof Profile, versi
 	return e
 }
 
-// decodeEntries covers the VP9 check of plan.md 10.1. The sample is synthesised
-// once and decoded on each backend; lavfi cannot be fed to a hardware decoder.
+// The VP9 sample is synthesised once and decoded on each backend, because lavfi cannot
+// be fed to a hardware decoder (plan.md 10.1).
 func (p *Prober) decodeEntries(ctx context.Context, version string, now time.Time) []domain.HWCapability {
 	entries := make([]domain.HWCapability, 0, len(Backends()))
 	sample := filepath.Join(p.tempDir, ".codarr-vp9-probe.webm")
@@ -190,8 +189,7 @@ func (p *Prober) decodeEntries(ctx context.Context, version string, now time.Tim
 
 		switch {
 		case sampleErr != nil:
-			// Inconclusive rather than negative, but the schema has one flag.
-			// The text is what the UI shows, so it says which it is.
+			// Inconclusive rather than negative, but the schema has one flag, so the text says which.
 			e.Error = "inconclusive: could not synthesise a VP9 sample to decode: " +
 				failureText(sampleOut, sampleErr)
 		default:

@@ -74,9 +74,8 @@ type Target struct {
 	RemoteDir  string
 }
 
-// Resolve maps a local path into the server's view and finds the section whose
-// Location contains it, longest prefix first so nested locations resolve to the
-// most specific one.
+// Resolve finds the section whose Location contains the path, longest prefix first so
+// nested locations resolve to the most specific one.
 func (c *Client) Resolve(ctx context.Context, localPath string) (Target, error) {
 	norm := pathmap.Normalise(localPath)
 	if norm == "" {

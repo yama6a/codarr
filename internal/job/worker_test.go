@@ -498,9 +498,8 @@ func TestService_RunDrainsTheQueue(t *testing.T) {
 	}, 2*time.Second, time.Millisecond)
 }
 
-// TestService_FpsRidesTheSameThrottledProgressWrite is plan.md 18.1's fps on the
-// current-job card. The parser has always read the key; what mattered here was
-// that carrying it to the UI costs no second write (14.3).
+// plan.md 18.1's fps on the current-job card, carried to the UI at no cost of a
+// second write (14.3).
 func TestService_FpsRidesTheSameThrottledProgressWrite(t *testing.T) {
 	t.Parallel()
 

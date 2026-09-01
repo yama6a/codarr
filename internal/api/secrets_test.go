@@ -12,9 +12,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
-// plan.md 18.4: API keys and the Plex token are stored in plaintext, but a GET
-// never returns one and a PUT only overwrites when the value is not the mask.
-// Both directions are tested, for both secrets.
+// Secrets are stored in plaintext, but a GET never returns one and a PUT only overwrites
+// a non-mask value (plan.md 18.4). Both directions, for both secrets.
 
 const storedKey = "real-radarr-api-key"
 

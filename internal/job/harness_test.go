@@ -40,9 +40,8 @@ const (
 	mediaDur    = 7200.0
 )
 
-// harness wires a Service with the in-memory store and moq'd collaborators.
-// Every default is the happy path; a test changes exactly the one thing it is
-// about.
+// harness wires a Service with the in-memory store and moq'd collaborators, every
+// default on the happy path so a test changes the one thing it is about.
 type harness struct {
 	t        *testing.T
 	store    *fakeStore
@@ -168,9 +167,8 @@ func newHarnessWith(t *testing.T, mx *fakeMetrics) *harness {
 		IdlePoll:      time.Millisecond,
 	}
 
-	// Assigned rather than passed, so an absent fake leaves Deps.Metrics a true
-	// nil. A typed nil in the interface is a different thing, and the absent
-	// case is the one every other test here relies on.
+	// Assigned rather than passed, so an absent fake leaves Deps.Metrics a true nil
+	// rather than a typed nil in the interface.
 	if mx != nil {
 		deps.Metrics = mx
 	}
@@ -473,9 +471,8 @@ func fullProbe() ffprobe.Result {
 	return p
 }
 
-// hwFullProbe is a 10-bit H.264 file: High 10 is off the copy list, so the
-// video is re-encoded, and h264 is hardware-decodable, so the job takes the
-// hardware decode path (10.1).
+// hwFullProbe is a 10-bit H.264 file: off the copy list, so it re-encodes, and
+// hardware-decodable, so it takes the hardware decode path (10.1).
 func hwFullProbe() ffprobe.Result {
 	p := fullProbe()
 	p.Streams[0] = videoStream("h264", "High 10", 40, "yuv420p10le")

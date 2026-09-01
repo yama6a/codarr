@@ -215,15 +215,8 @@ func joinFailures(fails []copyFailure) string {
 	return strings.Join(texts, ", ")
 }
 
-// ForceVideoEncode returns p with its primary video stream re-encoded to the
-// policy's target codec, and reports whether that is allowed. It exists for the
-// space reclaim sweep of plan.md 11, which is the one caller that re-encodes
-// video the copy test of 6.2 passed; reason is what the sweep wants recorded
-// against the stream.
-//
-// It reports false when there is no video stream to force, and when plan.md 9
-// forbids re-encoding this one: Dolby Vision profile 5 has no HDR10 base layer,
-// so no saving justifies it.
+// ForceVideoEncode re-encodes a video stream the copy test of 6.2 passed, for the
+// space reclaim sweep of plan.md 11; false when plan.md 9 forbids it (DV profile 5).
 func ForceVideoEncode(p domain.Plan, reason string) (domain.Plan, bool) {
 	if p.DolbyVision && p.DolbyVisionProfile == dolbyVisionNoEncodeProfile {
 		return domain.Plan{}, false
@@ -254,9 +247,8 @@ func ForceVideoEncode(p domain.Plan, reason string) (domain.Plan, bool) {
 
 	// The stream is being re-encoded, so there is no level flag left to rewrite.
 	p.LevelRewrite = false
-	// The reason block is rewritten in place rather than appended to: leaving
-	// the original "video: COPY" line next to a new "video: ENCODE" one puts two
-	// contradictory statements in front of the user (plan.md 7).
+	// Rewritten in place, not appended to: a "video: COPY" line next to a new
+	// "video: ENCODE" one puts two contradictory statements to the user (plan.md 7).
 	p.Reasons = rewriteReasons(p.Reasons,
 		"video: "+strings.ToUpper(string(domain.DecisionEncode))+" - "+reason,
 		"plan: "+strings.ToUpper(string(domain.KindFull))+" - "+summarise(p))

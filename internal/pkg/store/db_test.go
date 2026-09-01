@@ -43,9 +43,8 @@ func pragmaPair(t *testing.T, db *store.DB, write bool) (int, int) {
 	return fk, busy
 }
 
-// TestDB_ReadPoolIsQueryOnly proves the split is enforced by SQLite rather than
-// by convention: a write that reached the read pool would fail loudly here
-// instead of racing the worker for the write lock.
+// The read pool's split is enforced by SQLite rather than by convention: a write that
+// reached it fails loudly instead of racing the worker for the write lock.
 func TestDB_ReadPoolIsQueryOnly(t *testing.T) {
 	t.Parallel()
 
@@ -56,11 +55,8 @@ func TestDB_ReadPoolIsQueryOnly(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestDB_ConcurrentWritesNeverReturnBusy is the integration test plan.md 17
-// asks for. Sixteen goroutines write through the store at once while others
-// read, which is the HTTP handlers and the worker in miniature. Without the
-// single-connection write pool this is where SQLITE_BUSY shows up; the
-// assertion is that every one of the 160 writes succeeded and landed.
+// The integration test plan.md 17 asks for: without the single-connection write pool,
+// sixteen concurrent writers are where SQLITE_BUSY shows up.
 func TestDB_ConcurrentWritesNeverReturnBusy(t *testing.T) {
 	t.Parallel()
 

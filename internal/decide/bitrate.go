@@ -9,9 +9,8 @@ import (
 // in the file size but not in any stream.
 const containerAllowance = 0.98
 
-// ResolveVideoBitrate walks the chain in plan.md 8.4, first match wins.
-// ffprobe's per-stream bit_rate is usually absent for Matroska, which is the
-// whole reason the chain exists. Copy decisions never consult it (6.2).
+// ResolveVideoBitrate walks the fallback chain of plan.md 8.4, first match
+// wins; ffprobe's per-stream bit_rate is usually absent for Matroska.
 func ResolveVideoBitrate(probe *ffprobe.Result) (int, domain.BitrateSource) {
 	if probe == nil {
 		return 0, domain.BitrateUnresolved

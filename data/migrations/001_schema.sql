@@ -1,17 +1,8 @@
 -- +migrate Up
 --
--- Consolidated starting schema, transcribed from plan.md section 17.1. Do not
--- edit this file once it has landed; corrections ship as a new numbered file.
---
--- Two things here are load-bearing rather than cosmetic:
---
---   * idx_jobs_one_active_per_file is a PARTIAL unique index. It is what makes
---     enqueue idempotent: a webhook and a manual trigger racing on the same
---     file produce one job, not two, via ON CONFLICT DO NOTHING.
---
---   * media_files.codarr_output_fingerprint being NULL is exactly the statement
---     "Codarr never wrote this file". Nothing else encodes that, and the skip
---     rule in section 12 depends on it.
+-- Consolidated starting schema from plan.md 17.1. Frozen: corrections ship as a new file.
+-- idx_jobs_one_active_per_file is a PARTIAL unique index, which is what makes enqueue idempotent.
+-- media_files.codarr_output_fingerprint IS NULL is the only record that Codarr never wrote a file (12).
 
 -- Configuration, edited via the UI. Single row.
 CREATE TABLE settings (
@@ -91,9 +82,8 @@ CREATE TABLE media_files (
   nlink              INTEGER,
   fingerprint        TEXT,
   probe_json         TEXT,          -- full ffprobe output
-  -- Intentionally never written. internal/api/mediainfo.go derives the same
-  -- summary from probe_json on read, so the two can never disagree. Kept so the
-  -- schema still matches plan.md 17.1; do not start populating it.
+  -- Never written: internal/api/mediainfo.go derives the same summary from probe_json
+  -- on read. Kept only to match plan.md 17.1, do not start populating it.
   media_info_json    TEXT,          -- parsed summary for the UI modal, unused
   analyzed_at        TIMESTAMP,
   plan_json          TEXT,

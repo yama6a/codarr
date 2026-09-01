@@ -33,9 +33,8 @@ func TestParseIdet_ReadsBothVerdicts(t *testing.T) {
 func TestParseIdet_PrefersTheMultiFrameCountersOverTheSingleFrameOnes(t *testing.T) {
 	t.Parallel()
 
-	// Single-frame detection is the noisier of the two and disagrees here.
-	// The multi-frame counters win, which is what the filter's own
-	// documentation recommends.
+	// Single-frame detection is the noisier of the two and disagrees here; the
+	// multi-frame counters win, as the filter's own documentation recommends.
 	mixed := `[Parsed_idet_0 @ 0x1] Single frame detection: TFF:   300 BFF:   100 Progressive:    80 Undetermined:    20
 [Parsed_idet_0 @ 0x1] Multi frame detection: TFF:     4 BFF:     2 Progressive:   480 Undetermined:    14`
 

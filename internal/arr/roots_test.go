@@ -12,9 +12,8 @@ import (
 
 func ptr[T any](v T) *T { return &v }
 
-// The fixture is a real capture: every one of the four live instances answers
-// with the literal "/media", because each mounts only its own slice via a
-// subPath (VERIFY.md).
+// The fixture is a real capture: every one of the four live instances answers with the
+// literal "/media", each mounting only its own slice via a subPath (VERIFY.md).
 func TestRootFolders_MapsTheReportedPathIntoCodarrsView(t *testing.T) {
 	t.Parallel()
 
@@ -39,9 +38,8 @@ func TestRootFolders_MapsTheReportedPathIntoCodarrsView(t *testing.T) {
 	}}, got)
 }
 
-// Two instances with their own mappings resolve the same reported path to two
-// different directories. Without the mapping they would produce identical roots
-// and the longest-prefix attribution of plan.md 16.2 could not tell them apart.
+// Two instances resolve the same reported path to different directories; without the
+// mapping the longest-prefix attribution of plan.md 16.2 cannot tell them apart.
 func TestRootFolders_KeepsTwoInstancesApartDespiteTheSameReportedPath(t *testing.T) {
 	t.Parallel()
 

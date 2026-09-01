@@ -32,8 +32,7 @@ type RunResult struct {
 	StderrTail string
 }
 
-// Encoder runs one ffmpeg invocation to completion, reporting progress as it
-// goes.
+// Encoder runs one ffmpeg invocation to completion, reporting progress as it goes.
 type Encoder interface {
 	Run(ctx context.Context, args []string, progress func(Progress)) (RunResult, error)
 }
@@ -47,14 +46,14 @@ type Runner struct {
 
 var _ Encoder = (*Runner)(nil)
 
-// NewRunner returns a Runner for the given ffmpeg binary. duration is the
-// probed source duration, used only to turn out_time into a percentage.
+// NewRunner returns a Runner for the given ffmpeg binary, where duration is the
+// probed source duration used to turn out_time into a percentage.
 func NewRunner(bin string, grace, duration time.Duration) *Runner {
 	return &Runner{bin: bin, grace: grace, duration: duration}
 }
 
-// Run executes ffmpeg and blocks until it exits. Cancelling ctx sends SIGTERM
-// and, after the grace period, SIGKILL.
+// Run executes ffmpeg and blocks until it exits; cancelling ctx sends SIGTERM
+// then, after the grace period, SIGKILL.
 func (r *Runner) Run(ctx context.Context, args []string, progress func(Progress)) (RunResult, error) {
 	//nolint:gosec // G204: the binary comes from injected configuration (21) and the args from Build.
 	cmd := exec.CommandContext(ctx, r.bin, args...)

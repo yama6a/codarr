@@ -1,6 +1,5 @@
-// Package fsx is the filesystem boundary. Promotion is irreversible and rests
-// on stat, free space, rename and fsync behaving exactly as expected, so all of
-// it goes through one mockable interface.
+// Package fsx is the filesystem boundary: promotion is irreversible and rests on stat,
+// free space, rename and fsync behaving exactly as expected.
 package fsx
 
 import (
@@ -12,9 +11,8 @@ import (
 
 //go:generate go run -mod=mod github.com/matryer/moq -out mock/fs_mock.go -pkg mock . FS
 
-// FileInfo is the subset of stat Codarr acts on. Device is what the preflight
-// same-filesystem assertion compares; NLink > 1 fails preflight outright,
-// because renaming over a seeding copy that shares an inode would damage it.
+// FileInfo is the subset of stat Codarr acts on. NLink > 1 fails preflight, because
+// renaming over a seeding copy that shares an inode would damage it.
 type FileInfo struct {
 	Size   int64
 	Mode   os.FileMode
@@ -32,9 +30,8 @@ type SpaceInfo struct {
 	FreeBytes  uint64
 }
 
-// WriteSyncCloser is a file open for writing. Sync has to run before Close on
-// anything that will be renamed into place: the data and the directory entry
-// are separately durable (plan.md 15.2).
+// WriteSyncCloser is a file open for writing; Sync runs before Close on anything to be
+// renamed into place, since data and directory entry are separately durable (plan.md 15.2).
 type WriteSyncCloser interface {
 	io.WriteCloser
 	Sync() error
@@ -50,10 +47,8 @@ type FS interface {
 	// name a claim rather than a race.
 	Create(path string, mode os.FileMode) (WriteSyncCloser, error)
 
-	// Copy writes src over dst and fsyncs dst before returning. Promotion needs
-	// it when the staging file landed on another filesystem, where rename(2)
-	// returns EXDEV (plan.md 15.1). Unlike Create it overwrites, so a partial
-	// file left by a crashed attempt does not block the retry.
+	// Copy is the EXDEV path of plan.md 15.1, for a staging file that landed on
+	// another filesystem. It overwrites, so a crashed attempt does not block the retry.
 	Copy(ctx context.Context, src, dst string) (int64, error)
 
 	// Rename replaces newpath atomically. On NFSv4 this is a single server-side

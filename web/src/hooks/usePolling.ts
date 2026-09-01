@@ -10,18 +10,13 @@ export interface Polling<T> {
   refresh: () => void;
 }
 
-/**
- * Polls `fetcher` every 10s while the tab is visible. Polling stops when the tab is hidden and one
- * immediate poll fires when it becomes visible again. Call `refresh()` straight after a mutation
- * rather than waiting for the next tick.
- */
+// Call `refresh()` straight after a mutation rather than waiting for the next tick.
 export function usePolling<T>(fetcher: () => Promise<T>): Polling<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Held in a ref so an inline arrow passed by the caller does not restart the interval on every
-  // render.
+  // Held in a ref so an inline arrow from the caller does not restart the interval on every render.
   const fetcherRef = useRef(fetcher);
   useEffect(() => {
     fetcherRef.current = fetcher;

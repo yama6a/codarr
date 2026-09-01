@@ -6,9 +6,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
-// Conflict is two or more enabled *arr instances claiming the same root path.
-// plan.md 16.2 calls this a configuration error: show it, and process the files
-// there without notifying any instance rather than guessing which one owns them.
+// Conflict is two or more enabled *arr instances claiming the same root path, which
+// plan.md 16.2 says to show and process without notifying, never to guess at.
 type Conflict struct {
 	Path        string
 	InstanceIDs []int64
@@ -24,10 +23,8 @@ type Attribution struct {
 
 // ImportedRoot is one root folder an *arr reported, mapped into Codarr's view.
 //
-// VERIFY.md: all four live instances report the literal path "/media", because
-// each mounts only its own slice via a subPath. Creating roots from the reported
-// path directly gives four identical rows and makes attribution impossible, so
-// the mapping has to happen here, before the row exists.
+// All four live instances report the literal path "/media" (VERIFY.md), so mapping has
+// to happen before the row exists or attribution is impossible.
 type ImportedRoot struct {
 	ArrInstanceID int64
 	ReportedPath  string
@@ -47,10 +44,8 @@ func (r ImportedRoot) Root() domain.Root {
 	}
 }
 
-// ImportRoots maps the paths GET /api/v3/rootfolder reported through the
-// instance's own mappings. A candidate with Mapped false went through unchanged,
-// which on this cluster is the signal that the instance is missing its mapping
-// and is about to collide with the other three.
+// ImportRoots maps reported root folders through the instance's own mappings; Mapped
+// false means the instance is missing its mapping and is about to collide.
 func ImportRoots(m *Mapper, instanceID int64, reported []string) []ImportedRoot {
 	out := make([]ImportedRoot, 0, len(reported))
 
@@ -73,9 +68,8 @@ func ImportRoots(m *Mapper, instanceID int64, reported []string) []ImportedRoot 
 	return out
 }
 
-// Conflicts lists every path claimed by more than one enabled instance. It
-// takes plain roots so it serves both the stored rows and a set of import
-// candidates that have not been written yet.
+// Conflicts lists every path claimed by more than one enabled instance, taking plain
+// roots so it also serves import candidates that have not been written yet.
 func Conflicts(roots []domain.Root) []Conflict {
 	byPath := map[string][]int64{}
 
@@ -104,9 +98,8 @@ func Conflicts(roots []domain.Root) []Conflict {
 	return out
 }
 
-// Attribute picks the enabled root with the longest matching prefix (plan.md
-// 16.2), which is what makes nested roots resolve to the inner one. It reports
-// false when the path lies under no root at all.
+// Attribute picks the enabled root with the longest matching prefix (plan.md 16.2), so
+// nested roots resolve to the inner one, and reports false when no root matches.
 func Attribute(roots []domain.Root, filePath string) (Attribution, bool) {
 	norm := Normalise(filePath)
 	if norm == "" {

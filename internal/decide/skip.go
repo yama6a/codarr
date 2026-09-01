@@ -14,9 +14,8 @@ const (
 	TagPolicy  = "CODARR_POLICY"
 )
 
-// SkipCheck is the loop-prevention conjunction of plan.md 12. All three parts
-// are reported, not just the verdict, because "tagged but modified" is the case
-// that has to be visible in the UI rather than silently reprocessed.
+// SkipCheck is the loop-prevention conjunction of plan.md 12, reporting all
+// three parts so "tagged but modified" stays visible in the UI.
 type SkipCheck struct {
 	Skip               bool
 	Tagged             bool
@@ -26,10 +25,8 @@ type SkipCheck struct {
 	Reason             string
 }
 
-// CheckSkip answers "has Codarr already done this file, and is it still the
-// file Codarr wrote?". The tag alone is never enough: mkvmerge carries global
-// tags through a subtitle embed, so a re-tagged file with a fresh PGS track
-// would otherwise be invisible forever.
+// CheckSkip reports whether this is still the file Codarr wrote; the tag alone
+// is never enough, since mkvmerge carries global tags through a subtitle embed.
 func (e Engine) CheckSkip(probe *ffprobe.Result, currentFingerprint, recordedOutputFingerprint string) SkipCheck {
 	c := SkipCheck{
 		Provenance: domain.DeriveProvenance(recordedOutputFingerprint, currentFingerprint),

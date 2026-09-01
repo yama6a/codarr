@@ -12,9 +12,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/clock"
 )
 
-// FlushInterval is how often progress reaches the database. Writing every
-// ffmpeg line would hammer SQLite for no benefit; with a 10-second UI poll this
-// is more resolution than anyone sees (14.3).
+// FlushInterval is how often progress reaches the database; the UI polls every
+// 10 seconds, so a finer interval only costs SQLite writes (14.3).
 const FlushInterval = 5 * time.Second
 
 // StderrTailLines is how much ffmpeg stderr is kept for a failure message.
@@ -30,10 +29,8 @@ type Progress struct {
 	Percent   float64
 }
 
-// ParseProgress reads an ffmpeg -progress pipe:1 stream, calling emit once per
-// completed block, and returns the last block seen. Its OutTime is what
-// verification uses for legacy containers whose headers lie about duration
-// (15.3).
+// ParseProgress reads an ffmpeg -progress stream, calling emit per block and
+// returning the last, whose OutTime verification trusts over a legacy header (15.3).
 func ParseProgress(r io.Reader, duration time.Duration, emit func(Progress)) (Progress, error) {
 	var (
 		last    Progress
@@ -116,8 +113,7 @@ func percentOf(out, total time.Duration) float64 {
 }
 
 // Throttle holds the live progress value in memory and releases it to the
-// caller's sink at most once per interval (14.3). It does not know about the
-// store; the sink is whatever the job worker passes in.
+// caller's sink at most once per interval (14.3).
 type Throttle struct {
 	mu       sync.Mutex
 	clock    clock.Clock
@@ -133,8 +129,8 @@ func NewThrottle(c clock.Clock, interval time.Duration, sink func(Progress)) *Th
 	return &Throttle{clock: c, interval: interval, sink: sink}
 }
 
-// Update records the live value and emits it if the interval has elapsed. The
-// first update always emits, so the UI sees a job move as soon as it starts.
+// Update records the live value and emits it if the interval has elapsed, always
+// emitting the first so the UI sees a job move as soon as it starts.
 func (t *Throttle) Update(p Progress) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -152,8 +148,8 @@ func (t *Throttle) Update(p Progress) {
 	t.sink(p)
 }
 
-// Flush emits whatever is held, regardless of the interval. The worker calls it
-// once the run ends so the final value is never lost to the throttle.
+// Flush emits whatever is held regardless of the interval, so the run's final
+// value is never lost to the throttle.
 func (t *Throttle) Flush() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -185,8 +181,8 @@ func NewStderrRing(n int) *StderrRing {
 	return &StderrRing{buf: make([]string, n), limit: n}
 }
 
-// Write splits incoming bytes on newlines and keeps the trailing lines. A
-// partial final line is held until its newline arrives.
+// Write splits incoming bytes on newlines and keeps the trailing lines, holding
+// a partial final line until its newline arrives.
 func (r *StderrRing) Write(p []byte) (int, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

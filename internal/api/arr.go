@@ -13,9 +13,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/pathmap"
 )
 
-// webhookIDBytes is how much entropy the per-instance webhook id carries. It is
-// the only thing standing between an unauthenticated POST and Codarr ingesting
-// somebody else's payload, so it is generated server-side and never chosen.
+// webhookIDBytes is all that stands between an unauthenticated POST and Codarr ingesting
+// somebody else's payload, so the id is generated server-side and never chosen.
 const webhookIDBytes = 16
 
 // ListArrInstances returns every configured instance, API keys masked (18.4).
@@ -157,9 +156,8 @@ func (s *Server) TestArrInstance(
 	}, nil
 }
 
-// ListArrRootFolders is a live query, already mapped into Codarr's view. Every
-// live instance reports the literal "/media" (VERIFY.md), so the mapping is what
-// makes the answer mean anything.
+// ListArrRootFolders is a live query, mapped into Codarr's view because every live
+// instance reports the literal "/media" (VERIFY.md).
 func (s *Server) ListArrRootFolders(
 	ctx context.Context, req gen.ListArrRootFoldersRequestObject,
 ) (gen.ListArrRootFoldersResponseObject, error) {
@@ -183,9 +181,8 @@ func (s *Server) ListArrRootFolders(
 	return gen.ListArrRootFolders200JSONResponse(out), nil
 }
 
-// ImportArrRoots creates roots from the instance's root folders. A path another
-// enabled instance already claims is skipped and surfaced rather than guessed
-// at (plan.md 16.2).
+// ImportArrRoots creates roots from the instance's root folders, skipping and surfacing
+// a path another enabled instance already claims (plan.md 16.2).
 func (s *Server) ImportArrRoots(
 	ctx context.Context, req gen.ImportArrRootsRequestObject,
 ) (gen.ImportArrRootsResponseObject, error) {
@@ -226,9 +223,8 @@ func (s *Server) ImportArrRoots(
 	return gen.ImportArrRoots200JSONResponse(result), nil
 }
 
-// importRoot decides what to do with one reported folder and returns the root it
-// created, if any, so the caller can keep the ownership view current within the
-// loop.
+// Returns the root it created, if any, so the caller can keep the ownership view
+// current within the loop.
 func (s *Server) importRoot(
 	ctx context.Context, f arr.RootFolder, instanceID int64,
 	roots []domain.Root, instances map[int64]string, result *gen.ImportRootsResult,
@@ -262,7 +258,6 @@ func (s *Server) importRoot(
 	return &created, nil
 }
 
-// ownerOf reports which instance already claims a path, and whether any does.
 func ownerOf(roots []domain.Root, path string) (int64, bool) {
 	norm := pathmap.Normalise(path)
 

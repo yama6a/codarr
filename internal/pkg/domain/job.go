@@ -26,9 +26,8 @@ func ActiveJobStates() []JobState {
 	return []JobState{JobQueued, JobRunning, JobVerifying, JobAwaitingStreamEnd, JobPromoting}
 }
 
-// InFlightJobStates are the non-terminal states a crash can leave behind. There
-// is only ever one worker process, so anything found in one of these at startup
-// is by definition interrupted.
+// InFlightJobStates are the non-terminal states a crash can leave behind; with one
+// worker process, anything found in one at startup was interrupted.
 func InFlightJobStates() []JobState {
 	return []JobState{JobRunning, JobVerifying, JobAwaitingStreamEnd, JobPromoting}
 }
@@ -89,10 +88,8 @@ type Job struct {
 	EstimatedSeconds int
 	ActualSeconds    int
 
-	// FinalOutTimeUS is ffmpeg's own last out_time for the run (14.3). It is a
-	// column rather than in-memory state because 19.2 resumes
-	// awaiting_stream_end across a restart, and 15.3's legacy-container
-	// fallback has nothing to compare against without it.
+	// ffmpeg's own last out_time (14.3), persisted because 19.2 resumes
+	// awaiting_stream_end across a restart and 15.3 needs it for the fallback.
 	FinalOutTimeUS int64
 
 	EncoderUsed    Encoder

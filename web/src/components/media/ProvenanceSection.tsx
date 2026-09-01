@@ -13,10 +13,8 @@ interface ProvenanceSectionProps {
   onVerify: () => void;
 }
 
-/**
- * ProvenanceSection is the view plan.md 17.1 and 18.3 exist for: the recorded output fingerprint
- * against the current one, and a plain statement when they differ.
- */
+// plan.md 17.1 and 18.3: the recorded output fingerprint against the current one, and a plain
+// statement when they differ.
 export function ProvenanceSection({ media, integrity, verifying, onVerify }: ProvenanceSectionProps) {
   const modified = media.provenance === 'modified_since_transcode';
   const written = Boolean(media.codarr_output_fingerprint);

@@ -15,9 +15,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/store"
 )
 
-// countingStore stops the scheduler by cancelling once it has read settings
-// enough times. clock.Fake's After fires immediately and advances time, so the
-// loop runs at full speed and nothing sleeps.
+// countingStore cancels once settings have been read enough times; clock.Fake's After
+// fires immediately, so the loop runs at full speed and nothing sleeps.
 func countingStore(t *testing.T, cancel context.CancelFunc, reads *atomic.Int64,
 	after int64, s domain.Settings,
 ) *mock.ScanStoreMock {

@@ -1,6 +1,5 @@
-// Package ffprobe wraps the ffprobe binary and models the JSON it prints. It
-// holds no policy: it reports what the file says, and internal/decide decides
-// what that means.
+// Package ffprobe wraps the ffprobe binary and models the JSON it prints; it
+// holds no policy, internal/decide decides what the file's facts mean.
 package ffprobe
 
 import (
@@ -17,8 +16,8 @@ import (
 // ErrProbeFailed is returned when the ffprobe process itself fails.
 var ErrProbeFailed = errors.New("ffprobe: probe failed")
 
-// ErrUnreadable is returned when ffprobe succeeded but printed something that
-// is not a probe result.
+// ErrUnreadable is returned when ffprobe succeeded but printed something other
+// than a probe result.
 var ErrUnreadable = errors.New("ffprobe: unreadable output")
 
 // Prober reads one file. One method, per plan.md 2.2.
@@ -26,8 +25,7 @@ type Prober interface {
 	Probe(ctx context.Context, path string) (*Result, error)
 }
 
-// CLI is the ffprobe binary. Its path is bootstrap configuration (plan.md 21),
-// never hard-coded.
+// CLI is the ffprobe binary, whose path is bootstrap configuration (plan.md 21).
 type CLI struct {
 	binary string
 }
@@ -40,7 +38,7 @@ func New(binary string) *CLI {
 }
 
 // Args are the ffprobe arguments every probe uses, exported so the argv is
-// visible in tests and logs rather than buried in the exec call.
+// visible in tests and logs.
 func Args(path string) []string {
 	return []string{
 		"-v", "quiet",
@@ -71,8 +69,8 @@ func (c *CLI) Probe(ctx context.Context, path string) (*Result, error) {
 	return res, nil
 }
 
-// Parse turns ffprobe's JSON into a Result, keeping the raw bytes so the
-// caller can persist exactly what was read.
+// Parse turns ffprobe's JSON into a Result, keeping the raw bytes so the caller
+// can persist exactly what was read.
 func Parse(raw []byte) (*Result, error) {
 	var res Result
 	if err := json.Unmarshal(raw, &res); err != nil {

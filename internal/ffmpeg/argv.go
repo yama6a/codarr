@@ -29,7 +29,7 @@ const (
 )
 
 // Source is the probe-derived facts about the input that argv construction
-// depends on. internal/ffprobe supplies it.
+// depends on.
 type Source struct {
 	Path string
 
@@ -64,16 +64,15 @@ type Request struct {
 	ForceSoftwareDecode bool
 }
 
-// Command is a built invocation. The binary is not part of it; the runner
-// prepends the injected path (21).
+// Command is a built invocation without the binary, which the runner prepends
+// from injected configuration (21).
 type Command struct {
 	Args       []string
 	DecodePath domain.DecodePath
 }
 
-// HardwareDecodable reports whether Gen 9.5 has a fixed-function decoder for a
-// codec. Passing -hwaccel for anything else fails on exactly the sources the
-// encode path exists for (10.1).
+// HardwareDecodable reports whether Gen 9.5 has a fixed-function decoder; passing
+// -hwaccel for anything else fails on exactly the sources the encode path exists for (10.1).
 func HardwareDecodable(codec string) bool {
 	switch codec {
 	case "h264", "hevc", "mpeg2video", "vc1", "vp9":
@@ -83,10 +82,8 @@ func HardwareDecodable(codec string) bool {
 	}
 }
 
-// outStream is one kept stream at its position in the output file. The output
-// position is derived here and nowhere else, because -c:a:N, -b:a:N,
-// -metadata:s:a:N, -disposition:a:N and -bsf:v:N all address it rather than the
-// source position (14.2).
+// outStream is one kept stream at its OUTPUT position, derived here and nowhere
+// else: -c:a:N, -metadata:s:a:N, -disposition:a:N and -bsf:v:N all address that (14.2).
 type outStream struct {
 	plan   domain.StreamPlan
 	letter string
@@ -293,9 +290,8 @@ func videoArgs(req Request, o outStream, decode domain.DecodePath) []string {
 
 	args = append(args, "-c:v", string(req.Encoder), "-profile:v", videoProfile(req.Plan))
 
-	// -pix_fmt only ever appears on the pure software encode; on a hardware
-	// pipeline it conflicts with QSV surfaces, so the format goes in the filter
-	// chain instead (14.1).
+	// On a hardware pipeline -pix_fmt conflicts with QSV surfaces, so the format
+	// goes in the filter chain instead (14.1).
 	if req.Encoder == domain.EncoderSoftware {
 		args = append(args, "-pix_fmt", softwarePixFmt(req.Plan))
 	}
@@ -383,8 +379,8 @@ func softwarePixFmt(p domain.Plan) string {
 	return "yuv420p"
 }
 
-// rateControlArgs is the 8.3 rate control triple. The multipliers are exact
-// integer ratios so the argv is reproducible.
+// rateControlArgs is the 8.3 rate control triple, multiplied by exact integer
+// ratios so the argv is reproducible.
 func rateControlArgs(target int) []string {
 	return []string{
 		"-b:v", strconv.Itoa(target),
@@ -449,8 +445,8 @@ func metadataArgs(o outStream) []string {
 	return args
 }
 
-// dispositionValue is always emitted: ffmpeg does not reliably carry
-// dispositions through a container rebuild (6.3).
+// Always emitted: ffmpeg does not reliably carry dispositions through a
+// container rebuild (6.3).
 func dispositionValue(s domain.StreamPlan) string {
 	var flags []string
 
@@ -477,9 +473,8 @@ func dispositionValue(s domain.StreamPlan) string {
 	return strings.Join(flags, "+")
 }
 
-// hdrTransfer returns the transfer characteristic to stamp on an HDR encode.
-// plan.md 9 hard-codes smpte2084, which is wrong for the HLG half of its own HDR
-// test: an arib-std-b67 source re-encoded as PQ renders washed out.
+// hdrTransfer deviates from plan.md 9, which hard-codes smpte2084: an
+// arib-std-b67 source re-encoded as PQ renders washed out.
 func hdrTransfer(p domain.Plan) string {
 	if p.HDRTransfer == "arib-std-b67" {
 		return "arib-std-b67"
@@ -488,9 +483,8 @@ func hdrTransfer(p domain.Plan) string {
 	return "smpte2084"
 }
 
-// mp4HEVCTagArgs picks the MP4 sample entry tag for an HEVC stream. 14.1 says
-// hvc1 unconditionally, which is right for everything except Dolby Vision: see
-// HEVCTagMP4DolbyVision.
+// 14.1 says hvc1 unconditionally, which is right for everything except Dolby
+// Vision; see HEVCTagMP4DolbyVision.
 func mp4HEVCTagArgs(p domain.Plan) []string {
 	if p.DolbyVision {
 		return append(DolbyVisionStrictness(), "-tag:v", HEVCTagMP4DolbyVision)

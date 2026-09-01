@@ -7,14 +7,12 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
-// IdetFrames is how much of the file the interlacing sample decodes. plan.md
-// 6.2 asks for roughly 500 frames, which is around 20 seconds of content and
+// IdetFrames is the interlacing sample length of plan.md 6.2, around 20 seconds,
 // enough for the filter's counters to separate combing from noise.
 const IdetFrames = 500
 
-// IdetArgs is the sample of plan.md 6.2, run only for the legacy encode-path
-// codecs whose field_order is absent. The decision engine will not shell out,
-// which is why it reports NeedsIdetSample and leaves the run to the worker.
+// IdetArgs is the sample of plan.md 6.2, run by the worker rather than the
+// decision engine, which will not shell out.
 func IdetArgs(src string) []string {
 	return []string{
 		"-hide_banner", "-nostdin",
@@ -35,10 +33,8 @@ type idetCounts struct {
 
 func (c idetCounts) total() int { return c.tff + c.bff + c.progressive }
 
-// ParseIdet reads the counters the idet filter prints to stderr and answers the
-// one question the plan asks of it. Anything it cannot read is progressive:
-// plan.md 6.2 makes that the default for an unknown scan type, and a wrong
-// interlaced verdict costs a deinterlace filter on progressive content.
+// ParseIdet reads the idet filter's stderr counters; anything it cannot read is
+// progressive (plan.md 6.2), since a wrong interlaced verdict combs clean frames.
 func ParseIdet(stderr string) domain.Scan {
 	var multi, single idetCounts
 

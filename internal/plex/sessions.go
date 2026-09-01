@@ -22,9 +22,8 @@ type Session struct {
 	LocalPaths  []string
 }
 
-// Describe is the human-readable form that ends up in jobs.blocked_by: who is
-// watching what, so the reason a promotion is deferred is legible without
-// opening the logs (plan.md 19.1).
+// Describe is what ends up in jobs.blocked_by, so a deferred promotion is legible
+// without opening the logs (plan.md 19.1).
 func (s Session) Describe() string {
 	who := s.User
 	if who == "" {
@@ -49,10 +48,8 @@ func (s Session) Describe() string {
 	return desc
 }
 
-// Sessions lists what is playing. The listing itself is never cached: the
-// guard's last check runs immediately before the rename and a cached answer
-// there would reopen the race it exists to close (plan.md 15.6). Only the
-// rating-key-to-file lookups behind it are cached.
+// Sessions is never cached, only the rating-key lookups behind it: the guard's last check
+// runs immediately before the rename, and a cached answer reopens the race it closes (15.6).
 func (c *Client) Sessions(ctx context.Context) ([]Session, error) {
 	var resp metadataResponse
 
@@ -81,9 +78,8 @@ func (c *Client) Sessions(ctx context.Context) ([]Session, error) {
 	return out, nil
 }
 
-// sessionPaths resolves what a session is reading. plan.md 16.1: a direct-play
-// session's Part carries the file attribute and a transcoding one does not, so
-// the item is fetched by rating key whenever the session itself is silent.
+// A direct-play session's Part carries the file attribute and a transcoding one does
+// not, so the item is fetched by rating key when the session is silent (plan.md 16.1).
 func (c *Client) sessionPaths(ctx context.Context, m metadata) ([]string, error) {
 	remote := m.files()
 
@@ -184,9 +180,8 @@ func playerName(m metadata) string {
 	}
 }
 
-// partCache holds a rating key's file paths for a short while. plan.md 16.1
-// asks for a brief cache; the TTL is short because a `full` job can change a
-// file's extension, which changes the path the key resolves to.
+// partCache holds a rating key's file paths briefly (plan.md 16.1); the TTL is short
+// because a full job can change the extension, and so the path the key resolves to.
 type partCache struct {
 	mu      sync.Mutex
 	ttl     time.Duration

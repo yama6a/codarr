@@ -1,8 +1,7 @@
-// Package hardware answers "does this box actually encode HEVC on the iGPU?"
-// with a real one-second encode rather than a compiled-in feature list, and
-// turns the answer into an encoder and a decode path (plan.md 10).
+// Package hardware answers "does this box actually encode HEVC on the iGPU?" with a real
+// one-second encode rather than a compiled-in feature list (plan.md 10).
 //
-// Nothing here runs a transcode. It reports what works; internal/job acts on it.
+// It reports what works; internal/job acts on it.
 package hardware
 
 import (
@@ -105,9 +104,8 @@ type Capabilities struct {
 // Probed reports whether a probe has ever run against this ffmpeg build.
 func (c Capabilities) Probed() bool { return len(c.Entries) > 0 }
 
-// Encodes reports whether a real encode of this profile succeeded on this
-// backend. An unprobed capability set answers false for everything, which is
-// what makes "not probed yet" fall to software rather than to an assumption.
+// Encodes reports whether a real encode of this profile succeeded on this backend;
+// an unprobed set answers false throughout, so "not probed yet" falls to software.
 func (c Capabilities) Encodes(b Backend, p Profile) bool {
 	return c.works(b, DirectionEncode, CodecHEVC, string(p))
 }
@@ -135,9 +133,8 @@ func (c Capabilities) entry(b Backend, d Direction, codec, profile string) (doma
 	return domain.HWCapability{}, false
 }
 
-// Selection is the encoder one job will use, plus why it is not the preferred
-// one. plan.md 10.2 wants a software fallback recorded on the job in a colour
-// that is hard to ignore, so the reason travels with the choice.
+// Selection is the encoder one job will use plus why it is not the preferred one,
+// because plan.md 10.2 wants a software fallback recorded on the job.
 type Selection struct {
 	Encoder domain.Encoder
 	Profile Profile
@@ -145,8 +142,7 @@ type Selection struct {
 	// FellBack is true for anything that is not the preferred QSV.
 	FellBack bool
 
-	// Software is the case the UI has to shout about: a 20-minute job becomes
-	// a 4-hour one.
+	// Software is the case the UI has to shout about: 20 minutes becomes 4 hours.
 	Software bool
 
 	Reason string
@@ -188,9 +184,8 @@ func (c Capabilities) softwareReason(p Profile) string {
 		" on this host; libx265 is many times slower"
 }
 
-// Next is the runtime fallback: the encoder to try after current failed. It
-// reports false once software has been reached, because there is nothing below
-// it.
+// Next is the encoder to try after current failed, reporting false at software
+// because there is nothing below it.
 func (c Capabilities) Next(current domain.Encoder, hdr bool) (Selection, bool) {
 	p := ProfileFor(hdr)
 
@@ -221,9 +216,8 @@ func (c Capabilities) Next(current domain.Encoder, hdr bool) (Selection, bool) {
 	}
 }
 
-// DecodePath decides where the video is decoded. plan.md 10.1: only the Gen 9.5
-// set decodes on the iGPU, and VP9 additionally has to have been confirmed by
-// the probe, since the decoder is in the silicon but not always in the driver.
+// DecodePath decides where the video is decoded: only the Gen 9.5 set uses the iGPU, and
+// VP9 additionally needs the probe, being in the silicon but not always the driver (10.1).
 func (c Capabilities) DecodePath(enc domain.Encoder, sourceCodec string) domain.DecodePath {
 	b, ok := BackendOf(enc)
 	if !ok {
@@ -241,19 +235,15 @@ func (c Capabilities) DecodePath(enc domain.Encoder, sourceCodec string) domain.
 	return domain.DecodeHardware
 }
 
-// DecodeRetry is the one software-decode retry of plan.md 10.1. It sets
-// ffmpeg.Request.ForceSoftwareDecode; running the job is the job package's
-// business.
+// DecodeRetry is the one software-decode retry of plan.md 10.1; running the job is the
+// job package's business.
 type DecodeRetry struct {
 	ForceSoftwareDecode bool
 	Reason              string
 }
 
-// RetryInSoftware answers whether a failed job earns the retry. A hardware
-// decode can fail on a driver quirk or a malformed stream that ffprobe read
-// happily, and the cheap answer is one more attempt with the frames coming up
-// from the CPU. A job that already decoded in software has nowhere left to
-// fall.
+// RetryInSoftware answers whether a failed job earns the retry: a hardware decode can
+// fail on a driver quirk ffprobe read happily, and software has nowhere left to fall.
 func RetryInSoftware(decode domain.DecodePath, alreadyRetried bool) (DecodeRetry, bool) {
 	if decode != domain.DecodeHardware || alreadyRetried {
 		return DecodeRetry{}, false

@@ -481,10 +481,8 @@ func TestImportArrRoots_RefusesAnUnmappedRootFolder(t *testing.T) {
 	require.Empty(t, h.store.CreateRootCalls())
 }
 
-// TestListRoots_ReportsARootTwoEnabledInstancesBothClaim is the standing error
-// of plan.md 18.4. It rides on the roots listing rather than an endpoint of its
-// own, so the settings page has it on every poll rather than only after an
-// import.
+// The standing error of plan.md 18.4, riding on the roots listing so the settings page
+// has it on every poll rather than only after an import.
 func TestListRoots_ReportsARootTwoEnabledInstancesBothClaim(t *testing.T) {
 	t.Parallel()
 

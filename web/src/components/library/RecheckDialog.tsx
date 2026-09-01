@@ -13,10 +13,8 @@ interface RecheckDialogProps {
   onCancel: () => void;
 }
 
-/**
- * RecheckDialog only ever opens on the back of a `confirm: false` dry run, which is what plan.md
- * 15.5 requires of anything touching more than one file.
- */
+// Only ever opens on the back of a `confirm: false` dry run, which plan.md 15.5 requires of
+// anything touching more than one file.
 export function RecheckDialog({ open, title, scope, preview, busy, onConfirm, onCancel }: RecheckDialogProps) {
   return (
     <ConfirmDialog

@@ -75,9 +75,8 @@ func NewAnalyzer(fs FS, fp Fingerprinter, prober ffprobe.Prober, st AnalysisStor
 	}
 }
 
-// Analyze loads the roots and settings itself. Use it for a one-off, from the
-// API or a webhook; a scan uses AnalyzeIn so ten thousand files do not re-read
-// the same two rows ten thousand times.
+// Analyze loads the roots and settings itself, for a one-off; a scan uses AnalyzeIn so
+// ten thousand files do not re-read the same two rows.
 func (a *Analyzer) Analyze(ctx context.Context, path string, origin domain.JobOrigin) (Result, error) {
 	env, err := a.Env(ctx, origin)
 	if err != nil {

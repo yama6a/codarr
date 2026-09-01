@@ -18,18 +18,14 @@ import (
 	"github.com/yama6a/codarr/internal/web"
 )
 
-// DrainTimeout is how long in-flight requests get after SIGTERM. It must stay
-// under the pod's terminationGracePeriodSeconds, which bolan sets to 30; 20
-// leaves the kubelet ten seconds of headroom before it sends SIGKILL.
+// DrainTimeout is how long in-flight requests get after SIGTERM; it must stay under the
+// pod's terminationGracePeriodSeconds or the kubelet sends SIGKILL mid-drain.
 const DrainTimeout = 20 * time.Second
 
-// ReadHeaderTimeout bounds a slow-header client. Everything else is deliberately
-// unbounded: a webhook body is small, but a scan triggered by the UI answers
-// 202 immediately and the *arr rescans can be slow.
+// ReadHeaderTimeout bounds a slow-header client; every other timeout is
+// deliberately unbounded because *arr rescans can be slow.
 const ReadHeaderTimeout = 10 * time.Second
 
-// serve starts every long-running goroutine, runs the startup sweeps and blocks
-// until ctx is cancelled, then drains.
 func (a *app) serve(ctx context.Context) error {
 	a.startup(ctx)
 
@@ -97,20 +93,14 @@ func (a *app) serve(ctx context.Context) error {
 	return <-errCh
 }
 
-// startup runs the sweeps of plan.md 19.2 in the order they have to happen:
-// crash recovery first, which decides what every interrupted job actually did
-// and claims the staging files still in use; then the orphan staging sweep,
-// which deletes what nothing claims; then the hardware capability read.
-//
-// Recovery owns the first two, because the orphan sweep is only safe once the
-// claims are known.
+// startup runs the sweeps of plan.md 19.2 in order: the orphan staging sweep is
+// only safe once crash recovery has claimed the staging files still in use.
 func (a *app) startup(ctx context.Context) {
 	if err := a.queue.Recover(ctx); err != nil {
 		a.logger.ErrorContext(ctx, "recovering interrupted jobs failed", slog.String("error", err.Error()))
 	}
 
-	// Cache-first: every restart would otherwise burn six ffmpeg invocations
-	// for an answer already in SQLite (plan.md 10.1).
+	// Cache-first, or every restart burns six ffmpeg invocations (plan.md 10.1).
 	caps, err := a.hardware.Capabilities(ctx)
 	if err != nil {
 		a.logger.ErrorContext(ctx, "reading the hardware capabilities failed",
@@ -126,9 +116,8 @@ func (a *app) startup(ctx context.Context) {
 		slog.Bool("software_fallback", caps.Select(false).Software))
 }
 
-// handler is the whole HTTP surface. /healthz, /readyz and /metrics sit on a
-// plain mux above the chi router so a kubelet probe and a Prometheus scrape skip
-// every middleware; everything else goes through chi.
+// /healthz, /readyz and /metrics sit on a plain mux above the chi router so a
+// kubelet probe and a Prometheus scrape skip every middleware.
 func (a *app) handler() http.Handler {
 	root := http.NewServeMux()
 
@@ -143,8 +132,7 @@ func (a *app) handler() http.Handler {
 	return root
 }
 
-// readyz is 503 while the database does not answer a ping, which is what makes
-// a pod with an unreachable volume drop out of the endpoints list.
+// A 503 here is what drops a pod with an unreachable volume out of the endpoints list.
 func (a *app) readyz(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
@@ -158,9 +146,7 @@ func (a *app) readyz(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, probeResult{Status: "ok"})
 }
 
-// router is the application surface: the generated API routes, and the embedded
-// SPA for everything that is not one. There is no auth middleware and there must
-// not be one (plan.md 21).
+// There is no auth middleware here and there must not be one (plan.md 21).
 func (a *app) router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -172,9 +158,8 @@ func (a *app) router() http.Handler {
 	return a.api.Router(r)
 }
 
-// notFound splits the two halves of the surface: an unknown /api path is a
-// client error and must not be answered with an HTML shell, everything else is a
-// client-side route the SPA resolves.
+// An unknown /api path is a client error and must not get the HTML shell;
+// everything else is a client-side route the SPA resolves.
 func (a *app) notFound(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/api/") {
 		writeJSON(w, http.StatusNotFound, gen.Error{
@@ -203,8 +188,7 @@ func (a *app) requestLogger(next http.Handler) http.Handler {
 	})
 }
 
-// probeResult is the body of /healthz and /readyz. It is a named type rather
-// than a map so the encode cannot fail on an unserialisable value.
+// probeResult is a named type rather than a map so the encode cannot fail.
 type probeResult struct {
 	Status string `json:"status"`
 	Error  string `json:"error,omitempty"`

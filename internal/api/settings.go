@@ -58,13 +58,8 @@ func (s *Server) UpdateSettings(
 	return gen.UpdateSettings200JSONResponse(settings(stored)), nil
 }
 
-// warnRestartRequired names the two settings that do not take effect until the
-// process restarts. promote.Deps.TempDir and hardware.New's device are fixed at
-// construction in cmd/codarr, deliberately: the temp directory is read inside
-// the pre-rename window plan.md 15.6 keeps free of allocation and I/O, and the
-// capability cache is keyed on the device it was probed against (migration
-// 003), so a device swapped under a running probe would answer about hardware
-// the encoder is not using.
+// Both are fixed at construction in cmd/codarr: the temp dir is read inside the
+// allocation-free window of plan.md 15.6, the capability cache is keyed on the device.
 func (s *Server) warnRestartRequired(ctx context.Context, before, after domain.Settings) {
 	var changed []string
 

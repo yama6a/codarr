@@ -12,9 +12,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/store"
 )
 
-// plan.md 18.1 and 18.6: one call returns the current job, the queue, the
-// awaiting-stream-end list, recent completions, failures, stats and the
-// compatibility summary, because the UI polls it every ten seconds.
+// One call returns everything the dashboard shows, because the UI polls it every ten
+// seconds (plan.md 18.1, 18.6).
 
 func dashboardStore(h *harness) {
 	started := testNow.Add(-90 * time.Second)

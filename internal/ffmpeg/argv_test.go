@@ -81,9 +81,8 @@ func TestBuild_Golden(t *testing.T) {
 			},
 		},
 		{
-			// plan.md 14.2: every indexed option addresses the OUTPUT position.
-			// Source video 0, subtitles 0 and 2 are dropped, so source video 1
-			// becomes v:0 and source subtitles 1, 3, 4 become s:0, s:1, s:2.
+			// plan.md 14.2: every indexed option addresses the OUTPUT position, so
+			// dropping source video 0 and subtitles 0, 2 renumbers everything after.
 			name: "output_index_trap",
 			req: ffmpeg.Request{
 				Source: ffmpeg.Source{Path: "/library/trap.mkv", VideoCodec: "h264"},
@@ -291,10 +290,8 @@ func TestBuild_Golden(t *testing.T) {
 			},
 		},
 		{
-			// plan.md 14.1 mandates -tag:v hvc1 for HEVC in MP4, but on a Dolby
-			// Vision source that silently destroys the dvcC record. Verified on
-			// jellyfin-ffmpeg 7.1.4: the mov muxer needs dvh1 plus -strict
-			// unofficial, and warns at no log level when it declines.
+			// 14.1 mandates -tag:v hvc1 for HEVC in MP4, but on a Dolby Vision
+			// source that silently destroys the dvcC record; see VERIFY.md.
 			name: "audio_only_mp4_dolby_vision",
 			req: ffmpeg.Request{
 				Source: ffmpeg.Source{Path: "/library/dv.mp4", VideoCodec: "hevc"},
@@ -315,9 +312,8 @@ func TestBuild_Golden(t *testing.T) {
 			},
 		},
 		{
-			// plan.md 9 calls a stream HDR on smpte2084 OR arib-std-b67, then
-			// prescribes -color_trc smpte2084 unconditionally. An HLG source
-			// stamped PQ renders wrong, so the transfer is carried through.
+			// plan.md 9 prescribes -color_trc smpte2084 unconditionally, but an HLG
+			// source stamped PQ renders wrong, so the transfer is carried through.
 			name: "full_hdr_hlg_hw_decode",
 			req: ffmpeg.Request{
 				Source:  ffmpeg.Source{Path: "/library/hlg.mkv", VideoCodec: "hevc"},

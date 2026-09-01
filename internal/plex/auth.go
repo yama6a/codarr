@@ -18,9 +18,8 @@ const PlexTVBaseURL = "https://plex.tv"
 // AuthAppURL is the page the operator opens to claim a PIN.
 const AuthAppURL = "https://app.plex.tv/auth"
 
-// Auth runs the plex.tv PIN flow of plan.md 16.1. It deliberately uses the
-// legacy long-lived token rather than the newer JWT, which expires every seven
-// days and would leave an unattended service signed out once a week.
+// Auth runs the plex.tv PIN flow of plan.md 16.1, using the legacy long-lived token
+// rather than the JWT, which expires weekly and would sign an unattended service out.
 type Auth struct {
 	tr      *transport
 	product string
@@ -108,9 +107,8 @@ func (r pinResponse) pin() Pin {
 	return p
 }
 
-// NewClientIdentifier generates the X-Plex-Client-Identifier. It is generated
-// once and persisted: plex.tv ties the token to it, so a new one each start
-// would register Codarr as a new device on every restart.
+// NewClientIdentifier is called once and the value persisted: plex.tv ties the token to
+// it, so a fresh one would register Codarr as a new device on every restart.
 func NewClientIdentifier() (string, error) {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {

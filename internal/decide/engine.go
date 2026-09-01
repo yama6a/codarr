@@ -10,9 +10,8 @@ import (
 
 // Options are the per-file inputs that are not in the probe.
 type Options struct {
-	// Path is the source file. The output container keys on its extension
-	// (plan.md 6.1), not on the demuxer name, so that MKV and MP4 filenames
-	// never change. Empty falls back to the probe's filename.
+	// Path is the source file; the output container keys on its extension
+	// (plan.md 6.1), not the demuxer name. Empty falls back to the probe.
 	Path string
 
 	// IdetScan is the answer to an earlier Analysis.NeedsIdetSample. Empty
@@ -25,15 +24,13 @@ type Options struct {
 type Analysis struct {
 	Plan domain.Plan
 
-	// NeedsIdetSample is set for the legacy encode-path codecs of plan.md 6.2
-	// whose field_order is absent or unknown. The engine will not shell out, so
-	// the caller runs the idet sample and re-plans with Options.IdetScan. The
-	// plan returned alongside is the progressive reading.
+	// NeedsIdetSample asks the caller to run an idet sample and re-plan with
+	// Options.IdetScan (plan.md 6.2). The plan alongside is the progressive read.
 	NeedsIdetSample bool
 }
 
-// Engine turns a probe into a plan. It holds no state and no dependencies: the
-// policy is hard-coded, so the same probe always produces the same plan.
+// Engine turns a probe into a plan, with no state and no dependencies, so the
+// same probe always produces the same plan.
 type Engine struct{}
 
 // New returns the decision engine.
@@ -92,9 +89,8 @@ func sourcePath(probe *ffprobe.Result, opts Options) string {
 	return probe.Format.Filename
 }
 
-// resolveScan implements the field_order rule of plan.md 6.2: only explicit
-// interlaced values count, and legacy encode-path codecs that say nothing earn
-// an idet sample rather than a guess.
+// plan.md 6.2: only an explicit interlaced field_order counts, and a legacy
+// encode-path codec that says nothing earns an idet sample rather than a guess.
 func resolveScan(video ffprobe.Stream, opts Options) (domain.Scan, bool) {
 	if opts.IdetScan == domain.ScanInterlaced {
 		return domain.ScanInterlaced, false
@@ -184,9 +180,8 @@ func subtitlePlans(probe *ffprobe.Result, container domain.Container) []domain.S
 	return plans
 }
 
-// basePlan carries the per-track metadata forward. ffmpeg does not reliably
-// propagate dispositions, so plan.md 6.3 wants them set explicitly downstream,
-// which means recording them here.
+// ffmpeg does not reliably propagate dispositions, so plan.md 6.3 sets them
+// explicitly downstream, which means recording them here.
 func basePlan(t domain.StreamType, ordinal int, s ffprobe.Stream) domain.StreamPlan {
 	return domain.StreamPlan{
 		Type:           t,
@@ -200,9 +195,8 @@ func basePlan(t domain.StreamType, ordinal int, s ffprobe.Stream) domain.StreamP
 	}
 }
 
-// assignOutputIndices numbers the kept streams per type, which is the mapping
-// plan.md 14.2 says every codec, disposition and bitstream-filter option is
-// addressed by.
+// Per-type numbering of the kept streams: the mapping plan.md 14.2 says every
+// codec, disposition and bitstream-filter option is addressed by.
 func assignOutputIndices(plans []domain.StreamPlan) {
 	next := map[domain.StreamType]int{}
 
@@ -250,9 +244,8 @@ func hasOutputAudio(p domain.Plan) bool {
 	return false
 }
 
-// normaliseFormatName reduces ffprobe's demuxer list to one family name, so
-// "matroska,webm" and "mov,mp4,m4a,3gp,3g2,mj2" compare against the output
-// container.
+// ffprobe reports a demuxer list, so "matroska,webm" has to reduce to one
+// family name before it compares against the output container.
 func normaliseFormatName(formatName string) string {
 	if formatName == "" {
 		return "unknown"

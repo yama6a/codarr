@@ -18,13 +18,10 @@ import (
 	"github.com/yama6a/codarr/internal/promote"
 )
 
-// The adapters every package asked for but none of them owns, because owning
-// one would mean depending on another (plan.md 2.2). They live here for the
-// same reason the constructors do.
+// The adapters live here because owning one would make one package depend on another (plan.md 2.2).
 
-// prober adapts *ffprobe.CLI to promote.Prober. promote deliberately declares
-// its own narrow result type so verification cannot accidentally depend on the
-// whole probe.
+// prober adapts *ffprobe.CLI to promote.Prober, whose narrow result type keeps
+// verification from depending on the whole probe.
 type prober struct {
 	cli *ffprobe.CLI
 }
@@ -67,9 +64,8 @@ func (p *prober) Probe(ctx context.Context, path string) (promote.Output, error)
 	return out, nil
 }
 
-// analyzer adapts *ingest.Analyzer to job.Analyzer. The bulk operations of
-// plan.md 19 are a re-analysis followed by an enqueue, and ingest owns the
-// analysis half but speaks in paths while the queue speaks in rows.
+// analyzer adapts *ingest.Analyzer to job.Analyzer: ingest owns analysis but
+// speaks in paths, the queue in rows (plan.md 19).
 type analyzer struct {
 	inner *ingest.Analyzer
 	store store.Store
@@ -88,10 +84,8 @@ func (a *analyzer) Analyze(ctx context.Context, m domain.MediaFile) (domain.Medi
 	return refreshed, nil
 }
 
-// plexProvider builds the Plex client from the stored configuration and rebuilds
-// it only when that configuration changes. A client per call would throw away
-// the section and rating-key caches; a client built once at startup would keep
-// talking to a server the operator has since edited.
+// plexProvider rebuilds the Plex client only when the stored config changes: a
+// client per call loses the section and rating-key caches, one built at startup goes stale.
 type plexProvider struct {
 	store  store.Store
 	logger *slog.Logger
@@ -124,8 +118,7 @@ func (p *plexProvider) resolve(ctx context.Context) (*plex.Client, error) {
 		return nil, fmt.Errorf("read plex path mappings: %w", err)
 	}
 
-	// The token is part of the identity but never part of a log line, so the
-	// fingerprint is only ever compared, never printed.
+	// The fingerprint carries the token, so it is only ever compared, never logged.
 	fp := fmt.Sprintf("%s|%s|%s|%t|%t|%v", cfg.BaseURL, cfg.Token, cfg.ClientIdentifier,
 		cfg.RefreshAfter, cfg.AnalyzeAfter, mappings)
 
@@ -154,14 +147,12 @@ func (p *plexProvider) resolve(ctx context.Context) (*plex.Client, error) {
 	return client, nil
 }
 
-// APIClient is the narrow view the API layer holds.
 func (p *plexProvider) APIClient(ctx context.Context) (api.PlexClient, error) {
 	return p.resolve(ctx)
 }
 
-// NotifyPromoted is the Plex half of the post-promotion fan-out (16.1). A Plex
-// that is not configured is not a failure: the file is already promoted and
-// nothing about it depends on Plex knowing.
+// NotifyPromoted is the Plex half of the post-promotion fan-out (plan.md 16.1),
+// where an unconfigured Plex is not a failure.
 func (p *plexProvider) NotifyPromoted(ctx context.Context, path string) error {
 	client, err := p.resolve(ctx)
 	if err != nil {
@@ -179,9 +170,8 @@ func (p *plexProvider) NotifyPromoted(ctx context.Context, path string) error {
 	return nil
 }
 
-// IsStreaming is the guard of plan.md 15.6. It answers "not streaming" when the
-// guard is switched off or Plex is not configured at all, and otherwise defers
-// to the live session listing, which is deliberately never cached.
+// IsStreaming is the guard of plan.md 15.6, deferring to the live session
+// listing, which is deliberately never cached.
 func (p *plexProvider) IsStreaming(ctx context.Context, path string) (bool, string, error) {
 	cfg, err := p.store.GetPlexConfig(ctx)
 	if errors.Is(err, store.ErrNotFound) {
@@ -220,7 +210,7 @@ var (
 )
 
 // arrProvider builds one client per instance, rebuilt when that instance's row
-// changes. Same reasoning as plexProvider.
+// changes, for the same reason as plexProvider.
 type arrProvider struct {
 	store  store.Store
 	logger *slog.Logger
@@ -267,15 +257,12 @@ func (a *arrProvider) client(ctx context.Context, instance domain.ArrInstance) (
 	return client, nil
 }
 
-// APIClient is the narrow view the API layer holds.
 func (a *arrProvider) APIClient(ctx context.Context, instance domain.ArrInstance) (api.ArrClient, error) {
 	return a.client(ctx, instance)
 }
 
-// ResolveOwner maps a promoted path to the instance that owns it. It reports
-// false when nothing should be notified: no root, no instance on the root, or
-// two enabled instances claiming it, which plan.md 16.2 says to surface rather
-// than guess at.
+// ResolveOwner maps a promoted path to the instance that owns it, reporting
+// false when no instance or two claim it, which plan.md 16.2 says not to guess at.
 func (a *arrProvider) ResolveOwner(ctx context.Context, path string) (arr.Owner, bool, error) {
 	roots, err := a.store.ListRoots(ctx)
 	if err != nil {
@@ -309,9 +296,8 @@ func (a *arrProvider) ResolveOwner(ctx context.Context, path string) (arr.Owner,
 	}, true, nil
 }
 
-// itemFor reads the entity id a webhook recorded on the row. A file that only a
-// scan has ever seen carries none, and the rescan then names nothing, which the
-// *arrs treat as a full-library rescan rather than an error.
+// A file only a scan has seen carries no entity id, and a rescan naming nothing
+// is a full-library rescan to the *arrs, not an error.
 func (a *arrProvider) itemFor(ctx context.Context, instance domain.ArrInstance, path string) arr.ItemRef {
 	media, err := a.store.GetMediaFileByPath(ctx, path)
 	if err != nil || media.ArrEntityID == nil {

@@ -59,9 +59,8 @@ func (r Retry) wait(attempt int) time.Duration {
 	return d
 }
 
-// transport is the shared request plumbing. It injects X-Plex-Token and
-// Accept: application/json on every call and never puts the token anywhere it
-// could be logged.
+// transport injects X-Plex-Token and Accept: application/json on every call, and never
+// puts the token anywhere it could be logged.
 type transport struct {
 	base    *url.URL
 	headers http.Header
@@ -78,9 +77,8 @@ type request struct {
 	out    any
 }
 
-// do runs req, retrying transient failures, and decodes JSON into req.out when
-// that is non-nil. A 204 or an empty body with an out target is not an error;
-// refresh and analyze both answer with nothing.
+// do runs req, retrying transient failures. An empty body with an out target is not an
+// error, because refresh and analyze both answer with nothing.
 func (t *transport) do(ctx context.Context, req request) error {
 	var lastErr error
 

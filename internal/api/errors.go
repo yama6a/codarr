@@ -16,9 +16,8 @@ import (
 	"github.com/yama6a/codarr/internal/plex"
 )
 
-// Error is the failure the API renders. plan.md's spec has one default response
-// per operation carrying {error, message, details}, so the status code travels
-// on the error rather than in the response type.
+// Error is the failure the API renders; the spec has one default response per operation,
+// so the status code travels on the error rather than in the response type.
 type Error struct {
 	Status  int
 	Code    string

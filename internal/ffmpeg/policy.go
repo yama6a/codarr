@@ -3,9 +3,8 @@ package ffmpeg
 // The rate-control and sample-probe constants of plan.md 8.1 to 8.3, named so
 // GET /api/policy renders them rather than restating the literals.
 const (
-	// MaxrateFactor and BufsizeFactor are the 8.3 rate control triple. They are
-	// held as exact integer ratios because the argv builder multiplies with
-	// them and a float would make the emitted numbers depend on rounding.
+	// The 8.3 rate control triple, held as exact integer ratios so the emitted
+	// argv numbers do not depend on float rounding.
 	maxrateNum, maxrateDen = 8, 5
 	bufsizeNum, bufsizeDen = 2, 1
 
@@ -35,8 +34,8 @@ const (
 	SampleCRF    = 21
 	SamplePreset = "veryfast"
 
-	// SampleEncoder is the software encoder the sample probe measures with; the
-	// 1.35 hardware correction exists because the real encode does not use it.
+	// SampleEncoder is the software encoder the sample probe measures with;
+	// HardwareCorrection exists because the real encode does not use it.
 	SampleEncoder = "libx265"
 
 	// LevelRewriteBSF is the bitstream filter that rewrites an H.264 level flag
@@ -53,11 +52,7 @@ func MP4Movflags() []string { return []string{"+faststart", "+use_metadata_tags"
 const HEVCTagMP4 = "hvc1"
 
 // HEVCTagMP4DolbyVision is the tag a Dolby Vision stream must carry in MP4
-// instead. Verified on jellyfin-ffmpeg 7.1.4: the mov muxer writes the dvcC/dvvC
-// configuration record only when the sample entry is dvh1 or dvhe AND -strict
-// unofficial is set. With hvc1 it writes nothing and warns at no log level, so
-// following 14.1 literally silently destroys the record on a DV source, which
-// 15.3 then correctly fails as a hard error for profile 5.
+// instead, because hvc1 silently drops the dvcC record; see VERIFY.md.
 const HEVCTagMP4DolbyVision = "dvh1"
 
 // DolbyVisionStrictness is what the mov muxer demands before it will write the

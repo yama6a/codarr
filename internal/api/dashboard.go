@@ -10,18 +10,14 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/store"
 )
 
-// CompatibilityTTL is how long the compatibility breakdown is reused. The
-// dashboard polls every 10 seconds (plan.md 18.6) and the per-reason counts mean
-// reading every non-skip plan, so the answer is shared rather than recomputed
-// per poll.
+// CompatibilityTTL is how long the breakdown is reused: the per-reason counts read every
+// non-skip plan, and the dashboard polls every 10 seconds (plan.md 18.6).
 const CompatibilityTTL = time.Minute
 
-// compatPageSize is how many rows the breakdown walks at a time.
 const compatPageSize = 500
 
-// GetDashboard is the one call the UI polls. Everything on it comes from
-// indexed counts and short limited reads, so the 10-second interval costs one
-// request rather than six.
+// GetDashboard is the one call the UI polls, built from indexed counts and short limited
+// reads so the 10-second interval costs one request rather than six.
 func (s *Server) GetDashboard(
 	ctx context.Context, _ gen.GetDashboardRequestObject,
 ) (gen.GetDashboardResponseObject, error) {
@@ -124,13 +120,10 @@ func (s *Server) compatibility(ctx context.Context) (gen.CompatibilitySummary, e
 	return out, nil
 }
 
-// reasonBreakdown classifies the files that still need work by what needs
-// doing. The counts overlap: one file can need three of them at once.
+// The counts overlap: one file can need three of them at once.
 //
-// It is derived from the stored plan's stream decisions rather than from the
-// plan kind, because the kind cannot tell a subtitle conversion from an audio
-// re-encode, and it is derived from the plan rather than the reason strings
-// because those are prose meant for a human.
+// Derived from the stored plan's stream decisions, because the kind cannot tell a
+// subtitle conversion from an audio re-encode and the reason strings are prose.
 func (s *Server) reasonBreakdown(ctx context.Context) (gen.CompatibilityReasons, error) {
 	filter := store.MediaFilter{
 		PlanKind: []domain.Kind{domain.KindRemux, domain.KindAudioOnly, domain.KindFull},
@@ -184,7 +177,6 @@ func classifyPlan(p *domain.Plan, out *gen.CompatibilityReasons) {
 	}
 }
 
-// streamWork reports whether any stream of each type needs work.
 func streamWork(streams []domain.StreamPlan) (video, audio, subtitle bool) {
 	for _, s := range streams {
 		switch s.Type {

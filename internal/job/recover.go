@@ -19,11 +19,8 @@ import (
 // nothing here handles.
 var errUnknownSweepAction = errors.New("job: unknown interrupted-job sweep action")
 
-// verdict is what an interrupted promotion turned out to have done. Promotion
-// is a single rename(), so exactly one of the first two is true (19.2); the
-// third exists because "neither" means the file on disk is not what either
-// answer predicts, and guessing there would be the one guess that destroys
-// something.
+// Promotion is a single rename(), so one of the first two holds (19.2); the third
+// is "the file on disk matches neither", where guessing would destroy something.
 type verdict int
 
 const (
@@ -32,11 +29,8 @@ const (
 	verdictPromoted
 )
 
-// Recover is the startup sweep of plan.md 19.2. There is one worker process, so
-// every job left in a non-terminal in-flight state was interrupted. The store
-// has already re-queued or failed the ones it can decide alone; the two that
-// need the filesystem are decided here, and the orphan sweep of 15.2 runs last
-// so it only removes what no job still claims.
+// Recover is the startup sweep of plan.md 19.2, deciding the two states that need
+// the filesystem; the orphan sweep runs last so it only removes unclaimed files.
 func (s *Service) Recover(ctx context.Context) error {
 	results, err := s.store.SweepInterruptedJobs(ctx)
 	if err != nil {
@@ -75,10 +69,8 @@ func (s *Service) Recover(ctx context.Context) error {
 	return nil
 }
 
-// observeSweep records what the store already did with an interrupted job.
-// jobs_total is not touched here: the sweep result carries no kind or origin,
-// and plan.md 24 names jobs_requeued_total and jobs_failed_total for exactly
-// these two outcomes.
+// jobs_total is not touched here: the sweep result carries no kind or origin, and
+// plan.md 24 names the two counters that do cover these outcomes.
 func (s *Service) observeSweep(action store.SweepAction) {
 	switch action {
 	case store.SweepRequeued:
@@ -93,9 +85,8 @@ func (s *Service) observeSweep(action store.SweepAction) {
 func (s *Service) recoverOne(ctx context.Context, r store.SweepResult) (string, error) {
 	switch r.Action {
 	case store.SweepRequeued, store.SweepFailed:
-		// running and verifying: the store already applied the attempt cap and
-		// the front-of-queue rule, and whatever staging file exists is a
-		// half-written encode.
+		// running and verifying: the store already applied the attempt cap, and any
+		// staging file here is a half-written encode.
 		s.removeStaging(ctx, r.StagingPath)
 
 		return "", nil
@@ -110,10 +101,8 @@ func (s *Service) recoverOne(ctx context.Context, r store.SweepResult) (string, 
 	}
 }
 
-// recoverPromoting is the consistency check of plan.md 19.2. It is the only
-// state where the library file itself may be mid-change, and the CODARR tag is
-// checked rather than a timestamp inferred from precisely because a timestamp
-// cannot tell the two outcomes apart.
+// The consistency check of plan.md 19.2, the only state where the library file may
+// be mid-change; the CODARR tag decides because a timestamp cannot.
 func (s *Service) recoverPromoting(ctx context.Context, r store.SweepResult) error {
 	media, err := s.store.GetMediaFile(ctx, r.MediaFileID)
 	if err != nil {
@@ -136,12 +125,8 @@ func (s *Service) recoverPromoting(ctx context.Context, r store.SweepResult) err
 	return nil
 }
 
-// promotionVerdict answers which side of the rename the process died on.
-//
-// The fingerprint comes first and the tag second on purpose: mkvmerge carries
-// global tags through a third-party rewrite, so a source that was promoted once
-// before and has since been modified still reports the tag. Only the
-// fingerprint recorded at analysis proves the file on disk is still the source.
+// The fingerprint is checked before the tag on purpose: mkvmerge carries global
+// tags through a third-party rewrite, so only the fingerprint proves the source.
 func (s *Service) promotionVerdict(ctx context.Context, media domain.MediaFile) (verdict, *ffprobe.Result, string) {
 	if media.Fingerprint != "" {
 		current, err := s.fp.Sparse(media.Path)
@@ -167,9 +152,8 @@ func (s *Service) promotionVerdict(ctx context.Context, media domain.MediaFile) 
 	return verdictPromoted, probe, ""
 }
 
-// taggedWithCurrentPolicy is the half of plan.md 12's conjunction that is
-// available mid-promotion: the output fingerprint was never recorded, because
-// recording it is exactly what the crash interrupted.
+// The half of plan.md 12's conjunction available mid-promotion: recording the
+// output fingerprint is exactly what the crash interrupted.
 func taggedWithCurrentPolicy(probe *ffprobe.Result) bool {
 	if _, ok := probe.Format.Tag(decide.TagPresent); !ok {
 		return false
@@ -180,9 +164,8 @@ func taggedWithCurrentPolicy(probe *ffprobe.Result) bool {
 	return ok && policy == decide.PolicyHash()
 }
 
-// markPromoted finishes a job whose rename landed but which never got to record
-// anything. plan.md 19.2 asks specifically for the Plex and *arr notifications
-// that never fired.
+// markPromoted finishes a job whose rename landed but recorded nothing; plan.md
+// 19.2 asks specifically for the notifications that never fired.
 func (s *Service) markPromoted(
 	ctx context.Context,
 	r store.SweepResult,
@@ -246,9 +229,8 @@ func (s *Service) markPromoted(
 	return nil
 }
 
-// failUndecidable is the case plan.md 19.2 says cannot happen. Re-queueing
-// would re-encode from a probe that no longer describes the file on disk, so
-// the job fails with a message naming what was found instead.
+// The case plan.md 19.2 says cannot happen: re-queueing would re-encode from a
+// probe that no longer describes the file on disk.
 func (s *Service) failUndecidable(ctx context.Context, r store.SweepResult, media domain.MediaFile, detail string) error {
 	message := "the job was interrupted while promoting and the outcome could not be established: " + detail +
 		"; the staging file has been left in place for inspection"
@@ -265,9 +247,8 @@ func (s *Service) failUndecidable(ctx context.Context, r store.SweepResult, medi
 	return nil
 }
 
-// recoverAwaiting is plan.md 19.2's resumable case. The expensive work is done
-// and the staging file is a verified output already sitting on the destination
-// filesystem, so it is worth far more than a re-encode.
+// plan.md 19.2's resumable case: the staging file is a verified output already on
+// the destination filesystem, worth far more than a re-encode.
 func (s *Service) recoverAwaiting(ctx context.Context, r store.SweepResult) (string, error) {
 	j, err := s.store.GetJob(ctx, r.JobID)
 	if err != nil {
@@ -282,10 +263,8 @@ func (s *Service) recoverAwaiting(ctx context.Context, r store.SweepResult) (str
 		return j.StagingPath, nil
 	}
 
-	// The output is gone or no longer verifies. The rename may still have
-	// landed: the promoter reports a block but not an unblock, so a job can be
-	// in awaiting_stream_end at the moment of the replace. The consistency
-	// check settles it rather than re-queueing over a finished promotion.
+	// The rename may still have landed: the promoter reports a block but not an
+	// unblock, so the consistency check settles it rather than re-queueing.
 	return "", s.recoverPromoting(ctx, r)
 }
 
@@ -313,9 +292,8 @@ func (s *Service) stagingVerifies(ctx context.Context, j domain.Job) bool {
 		Plan:       t.plan,
 		Source:     t.source,
 
-		// Without this a resumed job on a legacy container is re-verified with
-		// no fallback and fails on a duration its own source header misreported
-		// (15.3), which is the one case 19.2 calls worth resuming.
+		// Without this a resumed legacy-container job is re-verified with no fallback
+		// and fails on a duration its own source header misreported (15.3).
 		FinalOutTimeSeconds: t.finalOut.Seconds(),
 	})
 	if err != nil {
@@ -374,9 +352,8 @@ func (s *Service) sweepOrphans(ctx context.Context, claimed []string) {
 	}
 }
 
-// resume finishes a promotion that a restart interrupted. It runs on the worker
-// goroutine, ahead of claiming new work, so the one-transcode-at-a-time rule
-// still holds.
+// resume finishes a promotion a restart interrupted, on the worker goroutine and
+// ahead of new work, so one-transcode-at-a-time still holds.
 func (s *Service) resume(parent context.Context, jobID int64) error {
 	j, err := s.store.GetJob(parent, jobID)
 	if err != nil {
@@ -399,9 +376,8 @@ func (s *Service) resumePipeline(ctx context.Context, j domain.Job) error {
 	return s.finalise(ctx, t)
 }
 
-// taskFromRow rebuilds enough of a job to promote its finished output. The plan
-// comes from the media row rather than a fresh one, because what has to be
-// verified is the file that was actually produced.
+// The plan comes from the media row rather than a fresh one, because what has to
+// be verified is the file that was actually produced.
 func (s *Service) taskFromRow(ctx context.Context, j domain.Job) (*task, error) {
 	settings, err := s.store.GetSettings(ctx)
 	if err != nil {
@@ -456,9 +432,8 @@ func (s *Service) taskFromRow(ctx context.Context, j domain.Job) (*task, error) 
 	return t, nil
 }
 
-// stagingFor rebuilds where the output is and where the rename takes it from.
 // CrossDevice is not persisted, so it is re-measured; on the primary path the
-// staging file is a sibling of the destination and the answer is trivially no.
+// staging file is a sibling of the destination and the answer is no.
 func (s *Service) stagingFor(j domain.Job, destPath string) (promote.Staging, error) {
 	if j.StagingPath == "" {
 		return promote.Staging{}, failf(domain.FailPromote,

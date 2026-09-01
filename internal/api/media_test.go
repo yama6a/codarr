@@ -391,9 +391,8 @@ func TestGetMediaFile_RendersThePlanStreams(t *testing.T) {
 	require.True(t, got.Plan.Streams[2].Forced)
 }
 
-// TestListMedia_SortsByProvenance closes the gap where the spec offered
-// provenance and -provenance but the store had no such column, so the query
-// quietly ordered by path instead (plan.md 18.2).
+// The spec offers provenance and -provenance; without the store column the query
+// quietly orders by path instead (plan.md 18.2).
 func TestListMedia_SortsByProvenance(t *testing.T) {
 	t.Parallel()
 

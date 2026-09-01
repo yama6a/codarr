@@ -1,11 +1,9 @@
 package domain
 
-// StreamPlan is the decision for one source stream, plus where it lands in the
-// output. OutputIndex is nil for a dropped stream.
+// StreamPlan is the decision for one source stream, plus where it lands in the output.
 //
-// Both indices are carried on purpose: ffmpeg's -c:a:N, -b:a:N, -disposition:a:N
-// and -bsf:v:N all address the OUTPUT position, so keeping the mapping explicit
-// is what makes that addressable and debuggable.
+// Both indices are carried because ffmpeg's -c:a:N and friends address the output
+// position, not the source. OutputIndex is nil for a dropped stream.
 type StreamPlan struct {
 	Type        StreamType `json:"type"`
 	SourceIndex int        `json:"source_index"`
@@ -36,8 +34,8 @@ type Plan struct {
 
 	Streams []StreamPlan `json:"streams"`
 
-	// LevelRewrite is set when an H.264 stream fails only the level test and
-	// its content fits 4.2. The stream is still copied; only the flag changes.
+	// Set when an H.264 stream fails only the level test and fits the carve-out of
+	// plan.md 6.2, whose bounds live in internal/decide. The stream is still copied.
 	LevelRewrite bool `json:"level_rewrite"`
 
 	// Deinterlace is set for explicitly interlaced sources, or for legacy
@@ -46,11 +44,8 @@ type Plan struct {
 
 	HDR bool `json:"hdr"`
 
-	// HDRTransfer is the source stream's color_transfer, kept because plan.md 9
-	// calls a stream HDR on either smpte2084 (PQ) or arib-std-b67 (HLG) but then
-	// prescribes -color_trc smpte2084 unconditionally. Re-encoding an HLG source
-	// with a PQ transfer flag renders it wrong, so the encoder emits this rather
-	// than a constant. Empty means PQ.
+	// The source color_transfer, because plan.md 9 prescribes -color_trc smpte2084
+	// unconditionally and that renders an HLG source wrong. Empty means PQ.
 	HDRTransfer        string `json:"hdr_transfer,omitempty"`
 	DolbyVision        bool   `json:"dolby_vision"`
 	DolbyVisionProfile int    `json:"dolby_vision_profile,omitempty"`

@@ -33,10 +33,8 @@ var mediaSortColumns = map[MediaSort]string{
 	SortProvenance: "provenance",
 }
 
-// UpsertMediaFile inserts a file seen by a scan or webhook, or refreshes the
-// identity fields of one already known. Provenance is re-derived here rather
-// than taken from the argument: plan.md 12 makes it a function of the recorded
-// output fingerprint and the current one, and nothing else.
+// UpsertMediaFile inserts a file seen by a scan or webhook, or refreshes the identity
+// fields of a known one. Provenance is re-derived, never taken from the argument (plan.md 12).
 func (s *store) UpsertMediaFile(ctx context.Context, m domain.MediaFile) (domain.MediaFile, error) {
 	var out domain.MediaFile
 
@@ -339,10 +337,8 @@ func (s *store) SetMediaIntegrity(ctx context.Context, id int64, fingerprint, fu
 	})
 }
 
-// RecordPromotion is step 9 of plan.md 15.2. The current size, mtime and
-// fingerprint move to the output's own values in the same transaction as the
-// codarr_output_* columns, so the next scan sees an unchanged file instead of
-// re-probing Codarr's own work and looping.
+// RecordPromotion is step 9 of plan.md 15.2: size, mtime and fingerprint move to the
+// output's values in the same transaction, or the next scan re-probes and loops.
 func (s *store) RecordPromotion(ctx context.Context, u PromotionUpdate) error {
 	transform, err := marshalJSON(u.Transform)
 	if err != nil {
@@ -499,7 +495,7 @@ func escapeLike(s string) string {
 	return r.Replace(s)
 }
 
-//nolint:funlen,cyclop // 38 columns; the length is the schema's, not a branchy function's
+//nolint:funlen,cyclop // one column per mediaColumns entry; the length is the schema's
 func scanMediaFile(row rowScanner) (domain.MediaFile, error) {
 	var (
 		m                domain.MediaFile

@@ -1,10 +1,8 @@
 import { Icon } from '../ui/Icon';
 import type { JobSummary } from '../../api/types';
 
-/**
- * FallbackWarning is deliberately the loudest thing on the page. plan.md 10.2: a silent software
- * fallback turns a 20-minute job into a 4-hour one, and nothing else on the dashboard says so.
- */
+// Deliberately the loudest thing on the page. plan.md 10.2: a silent software fallback turns a
+// 20-minute job into a 4-hour one, and nothing else on the dashboard says so.
 export function FallbackWarning({ job }: { job: Pick<JobSummary, 'fell_back' | 'fallback_reason' | 'encoder_used'> }) {
   if (!job.fell_back) {
     return null;

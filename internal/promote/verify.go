@@ -22,8 +22,8 @@ type Output struct {
 	Streams         []OutputStream
 }
 
-// OutputStream is one stream of the probed output. DolbyVision is true when the
-// stream carries a DOVI configuration record.
+// OutputStream is one stream of the probed output, where DolbyVision means it
+// carries a DOVI configuration record.
 type OutputStream struct {
 	Type        domain.StreamType
 	Codec       string
@@ -35,9 +35,8 @@ type OutputStream struct {
 	DolbyVision bool
 }
 
-// Verify is plan.md 15.3. It runs before anything is destroyed, and on failure
-// the staging file is left in place for inspection. Every failure names the
-// value that was wrong (19.1), never just "verification failed".
+// Verify is plan.md 15.3, run before anything is destroyed, leaving the staging
+// file in place on failure.
 func (p *Promoter) Verify(ctx context.Context, req Request) ([]string, error) {
 	out, err := p.prober.Probe(ctx, req.Staging.Path)
 	if err != nil {
@@ -72,9 +71,8 @@ func (p *Promoter) Verify(ctx context.Context, req Request) ([]string, error) {
 	return warnings, nil
 }
 
-// verifyDuration carries the legacy fallback of plan.md 15.3: VOB, AVI and
-// friends routinely lie in their container headers, so ffmpeg's own final
-// out_time is the ground truth for what it actually wrote.
+// plan.md 15.3: VOB and AVI headers routinely lie, so ffmpeg's own final out_time
+// is the ground truth for what it wrote.
 func verifyDuration(req Request, out Output) ([]string, error) {
 	src := req.Source.DurationSeconds
 
@@ -141,8 +139,7 @@ func verifyAudio(req Request, out Output) error {
 		present[strings.ToLower(s.Language)] = true
 	}
 
-	// The checklist in plan.md 26 makes this absolute: never produce a file with
-	// zero audio streams.
+	// plan.md 26 makes this absolute: never produce a file with zero audio streams.
 	if count == 0 {
 		return fail(domain.FailVerification, "the output has no audio streams at all")
 	}
@@ -216,8 +213,8 @@ func verifyLevel(plan domain.Plan, source, output string) error {
 		"the output video level is %q and the source was %q, but the plan said copy", output, source)
 }
 
-// verifyDolbyVision: profile 5 has no HDR10 base layer, so losing the record
-// renders green and purple. Profiles 7 and 8 degrade to HDR10 (plan.md 9).
+// Profile 5 has no HDR10 base layer, so losing the record renders green and
+// purple; profiles 7 and 8 degrade to HDR10 (plan.md 9).
 func verifyDolbyVision(req Request, out Output) ([]string, error) {
 	if !req.Plan.DolbyVision {
 		return nil, nil
@@ -238,8 +235,8 @@ func verifyDolbyVision(req Request, out Output) ([]string, error) {
 	)}, nil
 }
 
-// verifySize applies to full plans only. An audio_only plan legitimately grows
-// a file when a 1.5 Mbps DTS track becomes 640k AC3 (plan.md 15.3).
+// Full plans only: an audio_only plan legitimately grows a file when a 1.5 Mbps
+// DTS track becomes 640k AC3 (plan.md 15.3).
 func verifySize(req Request, outputSize int64) error {
 	if req.Plan.Kind != domain.KindFull || outputSize <= req.Source.SizeBytes {
 		return nil

@@ -14,9 +14,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
-// GET /api/policy renders the hard-coded policy for read-only display. Every
-// assertion below compares against the constants themselves rather than a copy,
-// which is the point: a policy change moves the endpoint with it.
+// Every assertion compares against the policy constants themselves rather than a copy,
+// so a policy change moves the endpoint with it.
 
 func TestGetPolicy_IsDerivedFromTheCompiledConstants(t *testing.T) {
 	t.Parallel()

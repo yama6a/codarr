@@ -11,9 +11,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/store"
 )
 
-// Run consumes the queue until ctx is cancelled. plan.md 19: one goroutine, one
-// transcode at a time. It returns nil on shutdown, leaving whatever was in
-// flight for the interrupted-job sweep of 19.2 to pick up on the next start.
+// Run consumes the queue until ctx is cancelled, returning nil on shutdown and
+// leaving whatever was in flight for the sweep of 19.2 (plan.md 19).
 func (s *Service) Run(ctx context.Context) error {
 	for {
 		select {
@@ -41,9 +40,8 @@ func (s *Service) Run(ctx context.Context) error {
 	}
 }
 
-// RunOnce takes at most one piece of work and reports whether it found any. A
-// promotion resumed from a crash (19.2) comes first: its expensive half is
-// already done and it is holding a verified output on the destination.
+// RunOnce takes at most one piece of work, preferring a promotion resumed from a
+// crash (19.2), whose expensive half is already done.
 func (s *Service) RunOnce(ctx context.Context) (bool, error) {
 	if id, ok := s.nextPending(); ok {
 		return true, s.resume(ctx, id)
@@ -117,11 +115,8 @@ func (s *Service) setPaused(ctx context.Context, paused bool) error {
 	return nil
 }
 
-// Cancel stops a job. A running one gets SIGTERM, the grace period and then
-// SIGKILL from the runner, its staging file is deleted and it ends in
-// cancelled, where it stays visible; a queued one simply moves to cancelled
-// (19). It blocks until the running job has actually stopped, so the caller's
-// next read of the job row sees the final state.
+// Cancel stops a job, blocking until a running one has actually stopped so the
+// caller's next read of the job row sees the final state (19).
 func (s *Service) Cancel(ctx context.Context, jobID int64) error {
 	if done, ok := s.requestCancel(jobID); ok {
 		select {
@@ -178,8 +173,7 @@ func (s *Service) Restart(ctx context.Context, jobID int64) (domain.Job, error) 
 	return j, nil
 }
 
-// finishCancelled is the terminal transition for a job someone stopped. It runs
-// on a context detached from the cancelled one, because that context is exactly
+// Runs on a context detached from the job's own, because that context is exactly
 // what was just cancelled.
 func (s *Service) finishCancelled(ctx context.Context, j domain.Job, stagingPath string) error {
 	ctx = context.WithoutCancel(ctx)
@@ -197,10 +191,8 @@ func (s *Service) finishCancelled(ctx context.Context, j domain.Job, stagingPath
 	return nil
 }
 
-// finishFailed writes both halves of plan.md 19.1 and cleans up after the
-// attempt. The staging file survives a verification failure and only that:
-// 15.3 keeps it for inspection, while a half-written encode is gigabytes of
-// nothing.
+// The staging file survives a verification failure and only that: 15.3 keeps it
+// for inspection, while a half-written encode is gigabytes of nothing (19.1).
 func (s *Service) finishFailed(ctx context.Context, j domain.Job, f *Error, stagingPath string) error {
 	ctx = context.WithoutCancel(ctx)
 
@@ -223,8 +215,8 @@ func (s *Service) finishFailed(ctx context.Context, j domain.Job, f *Error, stag
 	return nil
 }
 
-// releaseMedia takes a file back out of processing. Nothing was written, so it
-// returns to the state analysis left it in.
+// releaseMedia takes a file back out of processing, to the state analysis left it
+// in, since nothing was written.
 func (s *Service) releaseMedia(ctx context.Context, mediaFileID int64) {
 	if err := s.store.SetMediaStatus(ctx, mediaFileID, domain.MediaAnalyzed, ""); err != nil {
 		s.mx.error(errorState)

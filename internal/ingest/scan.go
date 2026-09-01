@@ -133,9 +133,8 @@ func (s *Scanner) finish(r ScanReport) ScanReport {
 func (s *Scanner) scanRoot(ctx context.Context, root domain.Root, env Env,
 	lim *limiter, report *ScanReport,
 ) error {
-	// An unmounted NFS export stats as an error and walks as an empty tree. The
-	// second one would mark the whole library missing, so the root is checked
-	// before anything is pruned against it (13.2).
+	// An unmounted NFS export walks as an empty tree, which would mark the whole
+	// library missing, so the root is checked before anything is pruned (13.2).
 	info, err := s.fs.Stat(root.Path)
 	if err != nil {
 		return fmt.Errorf("%w: %s: %w", ErrRootUnreadable, root.Path, err)
@@ -257,9 +256,8 @@ func (s *Scanner) visit(ctx context.Context, path string, info fsx.FileInfo, env
 	return nil
 }
 
-// unchanged is the cheap comparison of plan.md 12: same size and same mtime
-// means no re-analysis, which is the whole reason media_files exists. A row
-// still marked new or missing is re-analysed whatever the stat says.
+// Same size and same mtime means no re-analysis (plan.md 12). A row still marked new
+// or missing is re-analysed whatever the stat says.
 func unchanged(prior store.MediaStat, info fsx.FileInfo) bool {
 	if prior.Status == domain.MediaNew || prior.Status == domain.MediaMissing {
 		return false
@@ -268,9 +266,8 @@ func unchanged(prior store.MediaStat, info fsx.FileInfo) bool {
 	return prior.SizeBytes == info.Size && prior.MTime == info.MTime.Unix()
 }
 
-// prune marks rows whose path is gone as missing. The row and its history are
-// kept: if the path comes back, the next scan re-fingerprints and re-analyses
-// it (13.2).
+// Rows whose path is gone go missing rather than away: if the path comes back, the next
+// scan re-fingerprints and re-analyses it (13.2).
 func (s *Scanner) prune(ctx context.Context, known []store.MediaStat,
 	seen map[string]struct{}, report *ScanReport,
 ) error {

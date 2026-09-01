@@ -8,19 +8,16 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
-// StagingPrefix is the dotfile prefix of every file Codarr writes next to a
-// destination. plan.md 15.1: a dotfile so the *arrs and Plex ignore it, a
-// sibling so rename() never crosses a filesystem boundary.
+// StagingPrefix is a dotfile so the *arrs and Plex ignore it, written as a sibling
+// so rename() never crosses a filesystem boundary (plan.md 15.1).
 const StagingPrefix = ".codarr-staging-"
 
-// writeProbePrefix names the dotfile the writability check of plan.md 15.4
-// creates and removes. Checking mode bits would be a guess; creating a file is
-// the only answer that accounts for the export options and the effective uid.
+// writeProbePrefix names the dotfile of the writability check (plan.md 15.4);
+// mode bits would be a guess, only a real write accounts for the export options.
 const writeProbePrefix = ".codarr-writetest-"
 
-// SourceState is what analysis recorded about the file being replaced.
-// LegacyContainer comes from the decision engine, which already classifies
-// AVI, VOB, MPEG-TS and friends for -fflags +genpts (plan.md 14.1).
+// SourceState is what analysis recorded about the file being replaced;
+// LegacyContainer is the decision engine's classification (plan.md 14.1).
 type SourceState struct {
 	SizeBytes       int64
 	MTime           int64
@@ -38,9 +35,8 @@ type PreflightRequest struct {
 	OutputExt  string
 }
 
-// Staging is where the encode writes and where the rename takes its argument
-// from. The two differ only when the destination lacked space and the temp
-// directory turned out to be on another filesystem.
+// Staging is where the encode writes and where the rename takes its argument from,
+// which differ only when the destination lacked space.
 type Staging struct {
 	Path        string
 	FinalPath   string
@@ -51,8 +47,8 @@ type Staging struct {
 	CrossDevice bool
 }
 
-// Preflight is plan.md 15.4. Every check here runs before a single byte is
-// encoded, because after the rename in 15.2 there is nothing to fall back to.
+// Preflight runs every check of plan.md 15.4 before a byte is encoded, because
+// after the rename in 15.2 there is nothing to fall back to.
 func (p *Promoter) Preflight(req PreflightRequest) (Staging, error) {
 	if !filepath.IsAbs(req.SourcePath) {
 		return Staging{}, fail(domain.FailPreflight, "the source path %q is not absolute", req.SourcePath)
@@ -78,13 +74,8 @@ func (p *Promoter) Preflight(req PreflightRequest) (Staging, error) {
 		return Staging{}, err
 	}
 
-	// plan.md 15.4 asks that the staging and destination directories report the
-	// same device number. On the primary path they ARE the same directory, so
-	// the literal comparison can never fail; it is kept as the tripwire 15.6
-	// asks for. NFSv4 presents every export inside one pseudo-filesystem, so a
-	// dataset split leaves the client-side paths looking identical while
-	// rename() silently starts returning EXDEV and stops being the atomic
-	// replace the whole sequence depends on.
+	// On the primary path these ARE the same directory, so this can never fire;
+	// it is the tripwire plan.md 15.4 asks for, see crossDevice.
 	if staging.CrossDevice && !staging.UsedTempDir {
 		return Staging{}, fail(domain.FailPreflight,
 			"the staging directory %s and the destination %s report different device numbers, so the replace would not be atomic",
@@ -203,10 +194,8 @@ func (p *Promoter) free(dir string) (uint64, error) {
 	return space.FreeBytes, nil
 }
 
-// crossDevice is plan.md 15.6. NFSv4 presents every export inside one
-// pseudo-filesystem, so a dataset split leaves the client-side paths looking
-// unchanged while rename() silently starts returning EXDEV. Compare the numbers
-// rather than trusting the paths.
+// NFSv4 presents every export inside one pseudo-filesystem, so a dataset split
+// leaves paths looking unchanged while rename() starts returning EXDEV (15.6).
 func (p *Promoter) crossDevice(stagingDir, destDir string) (bool, error) {
 	staging, err := p.fs.Stat(stagingDir)
 	if err != nil {

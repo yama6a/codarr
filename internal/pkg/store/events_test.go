@@ -52,9 +52,8 @@ func TestEventStore_AppendAndCursorRead(t *testing.T) {
 	require.Equal(t, first, byCategory[0].ID)
 }
 
-// TestEventStore_AppendReportsItsFailure: the events table is a convenience for
-// the UI and stdout is the source of truth (plan.md 24), so a write failure has
-// to come back to the caller rather than be swallowed here.
+// The events table is a convenience and stdout is the source of truth (plan.md 24), so
+// a write failure comes back to the caller rather than being swallowed.
 func TestEventStore_AppendReportsItsFailure(t *testing.T) {
 	t.Parallel()
 

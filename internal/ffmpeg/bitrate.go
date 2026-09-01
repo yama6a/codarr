@@ -4,18 +4,8 @@ import (
 	"sort"
 )
 
-// HardwareCorrection scales an x265 measurement up to what the UHD 630
-// fixed-function encoder needs for the same quality (8.1).
-//
-// 8.1 proposes 1.35 and says to tune it after the VMAF spot-check in 27. That
-// was run on the real silicon against six clips of differing complexity,
-// measuring the hevc_qsv bitrate that reaches the same VMAF as the probe's own
-// libx265 -crf 21 -preset veryfast on identical frames. The per-clip ratios were
-// 1.17, 1.20, 1.24, 1.29, 1.33 and 1.33; mean and median both 1.26. See
-// VERIFY.md.
-//
-// Only meaningful paired with SamplePreset: change the probe's preset and this
-// has to be re-measured.
+// HardwareCorrection scales an x265 measurement up to what the UHD 630 encoder
+// needs for the same quality; measured against SamplePreset, see VERIFY.md.
 const HardwareCorrection = 1.25
 
 // Resolution is the tier the BPP, floor and ceiling tables are keyed on.
@@ -29,8 +19,8 @@ const (
 	Res2160p Resolution = "2160p"
 )
 
-// ResolutionOf tiers on width. Letterboxing shrinks height, not width, so a
-// 1280x536 scope transfer is 720p and not 576p.
+// ResolutionOf tiers on width, because letterboxing shrinks height: a 1280x536
+// scope transfer is 720p, not 576p.
 func ResolutionOf(width, _ int) Resolution {
 	switch {
 	case width >= 3840:
@@ -109,8 +99,8 @@ type BitrateInput struct {
 	SourceBitrate int
 }
 
-// TargetFromSamples turns the sample probe's measurements into the encode
-// target: median, hardware correction, then the clamps of 8.1 in order.
+// TargetFromSamples is the median sample bitrate, hardware-corrected, then run
+// through the clamps of 8.1 in order.
 func TargetFromSamples(sampleBps []int, in BitrateInput) int {
 	base := Median(sampleBps)
 	if base == 0 {
@@ -120,9 +110,8 @@ func TargetFromSamples(sampleBps []int, in BitrateInput) int {
 	return Clamp(int(float64(base)*HardwareCorrection), in)
 }
 
-// TargetFromFallback is the 8.2 formula plus the clamps. The hardware
-// correction does not apply: the BPP table is already an HEVC target rather
-// than an x265 measurement.
+// TargetFromFallback is the 8.2 formula plus the clamps, with no hardware
+// correction: the BPP table is already an HEVC target, not an x265 measurement.
 func TargetFromFallback(in BitrateInput) int {
 	return Clamp(FallbackBitrate(in), in)
 }
@@ -149,9 +138,8 @@ func FallbackBitrate(in BitrateInput) int {
 	return int(bps)
 }
 
-// Clamp applies the three clamps of 8.1 in the order they are written there:
-// the source ceiling first, then the resolution floor, then the resolution
-// ceiling. The order matters, because the floor is allowed to win.
+// Clamp applies the three clamps of 8.1 in order, source ceiling first, because
+// the resolution floor is allowed to win over it.
 func Clamp(target int, in BitrateInput) int {
 	if in.SourceBitrate > 0 {
 		target = min(target, in.SourceBitrate*85/100)
@@ -163,9 +151,8 @@ func Clamp(target int, in BitrateInput) int {
 	return min(target, Ceiling(res))
 }
 
-// Median is the middle of the sample bitrates. An even count averages the two
-// middle values; the probe always takes three, so that only happens when a
-// caller passes something else.
+// Median is the middle of the sample bitrates, averaging the two middle values
+// on an even count.
 func Median(v []int) int {
 	if len(v) == 0 {
 		return 0

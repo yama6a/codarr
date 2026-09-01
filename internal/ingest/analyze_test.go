@@ -516,9 +516,8 @@ func TestAnalyzer_AnalyzeInSurfacesAStatFailure(t *testing.T) {
 	require.ErrorContains(t, err, "stat "+filePath)
 }
 
-// A legacy codec with no field_order cannot be settled from the probe alone
-// (6.2). The engine says so rather than guessing, and the caller has to run the
-// idet sample.
+// A legacy codec with no field_order cannot be settled from the probe alone (6.2), so
+// the engine says so rather than guessing and the caller runs the idet sample.
 func TestAnalyzer_AnalyzeInReportsWhenAnIdetSampleIsStillOwed(t *testing.T) {
 	t.Parallel()
 

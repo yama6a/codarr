@@ -1,15 +1,15 @@
 # CLAUDE.md - Codarr
 
-`plan.md` is the specification. It is the source of truth for every behavioural
-question, and its section 26 checklist is the thing to re-read before claiming a
-piece of work is done. This file covers how the repo is built, not what it does.
+`plan.md` is the specification and the source of truth for every behavioural
+question. Re-read its section 26 checklist before calling a piece of work done.
+This file covers how the repo is built, not what it does.
 
 ## Tech stack
 
 - **Language**: Go 1.27+, one binary, CGO off
 - **HTTP**: `go-chi/v5`, handlers generated from `api/openapi.yaml` by `oapi-codegen`
 - **DB**: SQLite via `modernc.org/sqlite` (pure Go), migrations via `rubenv/sql-migrate`
-- **Logging**: `log/slog`, JSON to stdout, with a secondary sink into the `events` table
+- **Logging**: `log/slog`, JSON to stdout, plus a sink into the `events` table
 - **Mocks**: `matryer/moq`
 - **Frontend**: Vite + React 19 + TypeScript + Tailwind v4, embedded via `go:embed`
 - **Linting**: golangci-lint v2, strict config in `.golangci.yaml`
@@ -54,8 +54,7 @@ before moving on.**
 
 ## Non-negotiables
 
-These come straight out of `plan.md` and a change that violates one is a bug,
-not a preference.
+Straight out of `plan.md`. A change that violates one is a bug.
 
 - **Encoding policy is hard-coded.** No setting changes what gets transcoded or
   to what. Policy lives in Go constants in `internal/decide` and is displayed
@@ -89,7 +88,7 @@ Follows `bolan-api`.
   every query as one wide interface because `plan.md` 2.2 asks for exactly that.
   Consumers must NOT depend on it: declare the three or four methods you
   actually use as a local interface, satisfied by the same concrete value, and
-  mock that. A 74-method mock in a unit test is a smell, not a convention.
+  mock that. A 60-method mock in a unit test is a smell.
 
 ### Comments
 
@@ -100,9 +99,9 @@ constraint, a deliberate deviation, a pointer at the `plan.md` section that
 explains it. Never restate what a line does. Go doc comments on exported
 identifiers only, one sentence, starting with the identifier name.
 
-`plan.md` is full of "the obvious implementation is wrong here" reasoning. Where
-a piece of code exists because of one of those, cite the section number rather
-than reproducing the argument.
+Where a piece of code exists because of one of `plan.md`'s "the obvious
+implementation is wrong here" arguments, cite the section number rather than
+reproducing the argument.
 
 ## Tests
 

@@ -10,9 +10,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/pathmap"
 )
 
-// EventType is the *arr's eventType field, kept as a string rather than a
-// closed enum. New event types arrive with new *arr releases and an unknown one
-// has to be ignored, not rejected.
+// EventType is a string rather than a closed enum, because new event types arrive with
+// new *arr releases and an unknown one has to be ignored, not rejected.
 type EventType string
 
 // The events Codarr acts on (plan.md 13.1). Everything else parses fine and
@@ -25,10 +24,8 @@ const (
 	EventEpisodeFileDelete EventType = "EpisodeFileDelete"
 )
 
-// Event is one webhook, reduced to what Codarr reads. The *arr payloads carry
-// far more; declaring only these fields is deliberate, because they are
-// external schemas that vary by event type and by *arr version and mirroring
-// them exactly would break on every release (plan.md 13.1).
+// Event is one webhook reduced to what Codarr reads; the payloads carry far more, and
+// mirroring an external schema would break on every *arr release (plan.md 13.1).
 type Event struct {
 	Flavour      domain.Flavour
 	Type         EventType
@@ -40,9 +37,8 @@ type Event struct {
 	Files        []EventFile
 }
 
-// EventFile is one file the event is about. RemotePath is the sending
-// instance's view of the filesystem and has to be rewritten with THAT
-// instance's mappings before it means anything to Codarr.
+// EventFile is one file the event is about; RemotePath is the sending instance's view
+// and means nothing until rewritten with that same instance's mappings.
 type EventFile struct {
 	ID                 int64
 	RelativePath       string
@@ -50,9 +46,8 @@ type EventFile struct {
 	PreviousRemotePath string
 }
 
-// LocalFile is an EventFile after this instance's mappings. Mapped is false
-// when no mapping matched, which for a real path is a configuration error and
-// for the Test payload's "C:\testpath" is simply expected.
+// LocalFile is an EventFile after this instance's mappings; Mapped false is a config
+// error for a real path and expected for the Test payload's "C:\testpath".
 type LocalFile struct {
 	ID           int64
 	Path         string
@@ -99,9 +94,8 @@ func (e Event) Local(m *pathmap.Mapper) []LocalFile {
 	return out
 }
 
-// ParseWebhook turns one raw webhook body into a typed event. It takes the
-// flavour rather than sniffing the payload because the receiving URL already
-// identifies the instance exactly (plan.md 13.1).
+// ParseWebhook takes the flavour rather than sniffing the payload, because the
+// receiving URL already identifies the instance exactly (plan.md 13.1).
 func ParseWebhook(flavour domain.Flavour, body []byte) (Event, error) {
 	switch flavour {
 	case domain.FlavourRadarr:
@@ -127,9 +121,8 @@ type (
 		} `json:"movie"`
 		MovieFile *arrFile `json:"movieFile"`
 
-		// Rename carries renamedMovieFiles and no movieFile at all, which
-		// plan.md 13.1 does not mention. Without this a rename is parsed as an
-		// event with no files and the stored path silently goes stale.
+		// Rename carries renamedMovieFiles and no movieFile, which plan.md 13.1 omits.
+		// Without this a rename parses as an event with no files and the path goes stale.
 		RenamedMovieFiles []arrFile `json:"renamedMovieFiles"`
 	}
 
@@ -236,9 +229,8 @@ func collectFiles(folder string, single *arrFile, renamed []arrFile) []EventFile
 	return files
 }
 
-// event builds the file, falling back to folder plus relativePath when the
-// payload omits path. Both *arrs set it today; the fallback costs one branch
-// and removes a dependency on that staying true.
+// Falls back to folder plus relativePath when the payload omits path: both *arrs set it
+// today, and one branch removes the dependency on that staying true.
 func (f arrFile) event(folder string) (EventFile, bool) {
 	full := strings.TrimSpace(f.Path)
 	if full == "" && folder != "" && f.RelativePath != "" {
@@ -257,9 +249,8 @@ func (f arrFile) event(folder string) (EventFile, bool) {
 	}, true
 }
 
-// validate only rejects events Codarr would act on with nothing to act upon. A
-// Test carries a placeholder Windows path and no file, and an unhandled type is
-// allowed to be empty.
+// Only events Codarr acts on are rejected for being empty: a Test carries a placeholder
+// path and no file, and an unhandled type is allowed to be empty.
 func validate(e Event) error {
 	if !e.Handled() || e.Type == EventTest {
 		return nil

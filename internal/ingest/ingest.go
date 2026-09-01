@@ -1,10 +1,8 @@
-// Package ingest finds work: a webhook from an *arr for immediacy, a daily scan
-// as the safety net (plan.md 13).
+// Package ingest finds work: an *arr webhook for immediacy, a daily scan as the safety
+// net (plan.md 13).
 //
-// There is deliberately no filesystem watcher. The library is on NFS, where
-// inotify only reports writes made through this client's own mount, so imports
-// done by *arrs running elsewhere are invisible to it. A watcher would suggest
-// coverage it does not have.
+// There is deliberately no filesystem watcher: on NFS, inotify only reports writes made
+// through this client's own mount, so imports done elsewhere are invisible to it.
 package ingest
 
 import (
@@ -36,9 +34,8 @@ var (
 	// ErrNotAFile is a directory or a special file reaching per-file analysis.
 	ErrNotAFile = errors.New("ingest: not a regular file")
 
-	// ErrRootUnreadable is a root that cannot be stat'ed. An unmounted NFS
-	// export looks exactly like an empty library, so the scan refuses to prune
-	// against it (13.2).
+	// ErrRootUnreadable is a root that cannot be stat'ed. An unmounted NFS export looks
+	// exactly like an empty library, so the scan refuses to prune against it (13.2).
 	ErrRootUnreadable = errors.New("ingest: root is unreadable")
 )
 
@@ -94,16 +91,14 @@ type FileAnalyzer interface {
 	AnalyzeIn(ctx context.Context, path string, env Env) (Result, error)
 }
 
-// Env is the per-pass context an analysis needs: the roots to attribute
-// against, the settings that set job priority, and what asked for the work.
-// It is loaded once per scan rather than once per file.
+// Env is the per-pass context an analysis needs, loaded once per scan rather than once
+// per file.
 type Env struct {
 	Roots    []domain.Root
 	Settings domain.Settings
 	Origin   domain.JobOrigin
 
-	// ArrEntityID is the movie or series id a webhook event named, recorded on
-	// the row so the post-promotion rescan of 16.2 knows what to name. A scan
-	// leaves it nil and keeps whatever the row already carries.
+	// The movie or series id a webhook named, so the rescan of 16.2 knows what to name.
+	// A scan leaves it nil and keeps whatever the row already carries.
 	ArrEntityID *int64
 }

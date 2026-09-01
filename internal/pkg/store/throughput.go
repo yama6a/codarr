@@ -10,9 +10,8 @@ import (
 
 const throughputColumns = `id, kind, encoder, resolution, samples, avg_value, updated_at`
 
-// UpsertThroughputStat keys on (kind, encoder, resolution). 001_schema.sql
-// declares no unique constraint over those, so the update path is explicit
-// rather than an ON CONFLICT clause.
+// UpsertThroughputStat keys on (kind, encoder, resolution), matched through COALESCE
+// because encoder and resolution are NULL for audio_only and remux (migration 002).
 func (s *store) UpsertThroughputStat(ctx context.Context, st domain.ThroughputStat) error {
 	return s.write(ctx, func(tx *sql.Tx) error {
 		const update = `

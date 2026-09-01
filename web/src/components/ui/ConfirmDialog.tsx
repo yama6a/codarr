@@ -14,10 +14,8 @@ interface ConfirmDialogProps {
   children: React.ReactNode;
 }
 
-/**
- * ConfirmDialog is the gate on every bulk action. plan.md 15.5: promotion destroys the original,
- * so a preview and an explicit confirmation are mandatory, not a nicety.
- */
+// plan.md 15.5: promotion destroys the original, so every bulk action needs a preview and an
+// explicit confirmation.
 export function ConfirmDialog({
   open,
   title,
@@ -53,10 +51,7 @@ export function ConfirmDialog({
   );
 }
 
-/**
- * IrreversibleNotice carries the reasoning plan.md 15.5 asks to keep visible in the UI rather than
- * only in the README.
- */
+// plan.md 15.5 wants this reasoning visible in the UI, not only in the README.
 export function IrreversibleNotice() {
   return (
     <div className="flex gap-3 rounded-lg border border-red-800 bg-red-950/50 p-4">

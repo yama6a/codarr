@@ -71,9 +71,8 @@ func TestParseWebhook_CollectsEveryEpisodeIDOnAMultiEpisodeFile(t *testing.T) {
 	require.True(t, got.IsUpgrade)
 }
 
-// Rename carries renamedMovieFiles, not movieFile, which plan.md 13.1 does not
-// say. Reading only movieFile would parse a rename as an event with no files
-// and leave the stored path pointing at a file that no longer exists.
+// Rename carries renamedMovieFiles, not movieFile, which plan.md 13.1 omits. Reading
+// only movieFile leaves the stored path pointing at a file that no longer exists.
 func TestParseWebhook_ReadsARadarrRenameFromRenamedMovieFiles(t *testing.T) {
 	t.Parallel()
 
@@ -120,9 +119,8 @@ func TestParseWebhook_ReadsAnEpisodeFileDelete(t *testing.T) {
 	require.Equal(t, arr.ItemRef{SeriesID: 77, EpisodeIDs: []int64{5501}}, got.Item)
 }
 
-// The Test payload has a Windows placeholder path and no file at all. It must
-// still parse, because the handler has to answer 200 with a body for the *arr's
-// Test button to report success (plan.md 13.1).
+// The Test payload has a placeholder path and no file, and must still parse: the *arr's
+// Test button only reports success on a 200 with a body (plan.md 13.1).
 func TestParseWebhook_AcceptsTheTestPayloadWithNoFile(t *testing.T) {
 	t.Parallel()
 

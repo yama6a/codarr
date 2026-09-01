@@ -124,9 +124,8 @@ func TestTargetFromSamples_AppliesTheHardwareCorrection(t *testing.T) {
 
 	in := ffmpeg.BitrateInput{Width: 1920, Height: 1080}
 
-	// Median of the three is 4 Mbps. Derived from the constant rather than
-	// written out, so retuning it after a VMAF pass (8.1, 27) does not fail a
-	// test that is about the multiplication, not the value.
+	// Derived from the constant rather than written out, so retuning it does not
+	// fail a test that is about the multiplication, not the value.
 	want := int(4_000_000 * ffmpeg.HardwareCorrection)
 	require.Equal(t, want, ffmpeg.TargetFromSamples([]int{3_000_000, 4_000_000, 9_000_000}, in))
 	require.Equal(t, 0, ffmpeg.TargetFromSamples(nil, in))

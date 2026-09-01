@@ -10,15 +10,12 @@ import (
 	"strings"
 )
 
-// dist is populated by `make web`, which points vite's outDir here. Only
-// .gitkeep is committed, so a clean checkout still compiles; Available reports
-// whether a real build is present.
+// dist is populated by `make web`; only .gitkeep is committed, so a clean checkout still compiles.
 //
 //go:embed all:dist
 var dist embed.FS
 
-// ErrNotBuilt is returned when the binary was built without running the
-// frontend build first.
+// ErrNotBuilt is returned when the binary was built without running the frontend build first.
 var ErrNotBuilt = errors.New("web: frontend not built, run `make web`")
 
 // FS returns the built SPA rooted at dist/.
@@ -43,9 +40,8 @@ func Available() bool {
 	return err == nil
 }
 
-// Handler serves the SPA with a fallback to index.html, so client-side routes
-// resolve on a hard refresh. Hashed assets are immutable; index.html never is,
-// or a redeploy serves a stale shell pointing at deleted bundles.
+// Handler serves the SPA with a fallback to index.html, so client-side routes resolve on a hard refresh.
+// index.html is never cached, or a redeploy serves a stale shell pointing at deleted bundles.
 func Handler() http.Handler {
 	sub, err := FS()
 	if err != nil || !Available() {

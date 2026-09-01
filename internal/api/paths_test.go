@@ -10,9 +10,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
-// plan.md 21: there is no authentication, deliberately. Path validation is input
-// validation, not authorisation, and it stops a malformed request naming a file
-// outside the library.
+// There is no authentication, deliberately (plan.md 21). Path validation is input
+// validation: it stops a malformed request naming a file outside the library.
 
 func TestResolvePlexPath_RejectsTraversalAndPathsOutsideTheRoots(t *testing.T) {
 	t.Parallel()

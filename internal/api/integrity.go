@@ -9,9 +9,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
-// Integrity is the answer to "is this file still byte-identical to what Codarr
-// wrote?" (plan.md 12). Provenance is derived from the fingerprints and never
-// set by a user, so this endpoint recomputes rather than accepts.
+// Provenance is derived from the fingerprints and never set by a user, so these
+// endpoints recompute rather than accept (plan.md 12).
 
 // VerifyMediaIntegrity recomputes one file's fingerprint and compares it with
 // what was recorded at promotion.
@@ -114,9 +113,8 @@ func (s *Server) verifyOne(ctx context.Context, id int64) (gen.IntegrityResult, 
 
 	res.CurrentFingerprint = ptrOf(current)
 
-	// The whole-file hash is only recomputed when one was recorded at
-	// promotion; computing one now would have nothing to compare against
-	// (plan.md 12.2).
+	// Only recomputed when one was recorded at promotion; a fresh one would have
+	// nothing to compare against (plan.md 12.2).
 	fullHash := ""
 
 	if media.CodarrOutputFullHash != "" {

@@ -51,9 +51,8 @@ func TestExcludeFile_AppliesTheHardCodedRules(t *testing.T) {
 	}
 }
 
-// plan.md 15.1 names Codarr's staging files .codarr-staging-*, and 13.3 excludes
-// dotfiles. This asserts the two actually meet, so a scan can never pick up a
-// transcode in flight.
+// plan.md 15.1 names staging files .codarr-staging-* and 13.3 excludes dotfiles; this
+// pins the two meeting, so a scan can never pick up a transcode in flight.
 func TestExcludeFile_NeverSeesCodarrsOwnStagingFiles(t *testing.T) {
 	t.Parallel()
 

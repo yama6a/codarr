@@ -73,8 +73,8 @@ func mediaMapping() []domain.PathMapping {
 	return []domain.PathMapping{{ID: 1, Remote: "/media", Local: moviesRoot}}
 }
 
-// VERIFY.md: all four instances report /media, so remapping through THAT
-// instance's mappings is mandatory rather than optional.
+// All four instances report /media (VERIFY.md), so remapping through the sending
+// instance's own mappings is mandatory rather than optional.
 func TestWebhook_HandleRemapsDownloadPathsThroughTheSendingInstance(t *testing.T) {
 	t.Parallel()
 
@@ -169,9 +169,8 @@ func TestWebhook_HandleMarksDeletedEpisodesMissing(t *testing.T) {
 	require.Equal(t, []int64{44}, state.missing)
 }
 
-// plan.md 13.1: Test must return 200 with a body so the *arr's Test button
-// reports success. It works even for an instance disabled in Codarr, because
-// the operator is pasting the URL in at that moment.
+// Test must return 200 with a body for the *arr's Test button (plan.md 13.1), even for
+// an instance disabled in Codarr, because the operator is pasting the URL in right then.
 func TestWebhook_HandleAcknowledgesTest(t *testing.T) {
 	t.Parallel()
 
@@ -269,9 +268,8 @@ func TestWebhook_HandleReportsAnEventWithNothingUsableInIt(t *testing.T) {
 		"no file paths in the payload that map into Codarr's view of the filesystem", ack.Message)
 }
 
-// An unmapped instance is VERIFY.md's failure mode: the path goes through
-// unchanged and lands outside every root, so analysis refuses it. The webhook
-// still acknowledges, because failing it makes the *arr retry forever.
+// An unmapped path lands outside every root and analysis refuses it (VERIFY.md), but the
+// webhook still acknowledges, because failing it makes the *arr retry forever.
 func TestWebhook_HandleKeepsGoingWhenOneFileFailsAnalysis(t *testing.T) {
 	t.Parallel()
 

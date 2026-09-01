@@ -11,9 +11,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/store"
 )
 
-// The seeds of plan.md 14.3, used until real jobs have measured anything. All
-// three are deliberately pessimistic: an estimate that turns out generous is
-// read as progress, one that turns out short reads as a stall.
+// The seeds of plan.md 14.3, deliberately pessimistic: a generous estimate reads
+// as progress, a short one reads as a stall.
 const (
 	// SeedThroughput is the read+write rate an I/O bound job is assumed to get,
 	// in bytes per second. audio_only and remux move the whole file twice.
@@ -28,15 +27,12 @@ const (
 	SeedSpeedSoftware = 0.2
 )
 
-// throughputWindow caps the rolling average's sample count so a library whose
-// storage changes still converges instead of being pinned by ten thousand old
-// measurements.
+// throughputWindow caps the sample count so a library that moves to faster storage
+// converges instead of being pinned by old measurements.
 const throughputWindow = 20
 
-// estimator is the two estimates of plan.md 14.3 and the rolling averages
-// behind them. throughput_stats holds bytes per second for the I/O bound kinds
-// and encoded seconds per wall second for full, keyed by (kind, encoder,
-// resolution) in both cases.
+// estimator is the two estimates of plan.md 14.3: bytes per second for the I/O
+// bound kinds, encoded seconds per wall second for full.
 type estimator struct {
 	store ThroughputStore
 	clk   clock.Clock
@@ -52,13 +48,12 @@ type work struct {
 	mediaSeconds float64
 }
 
-// ioBound reports the kinds whose cost is moving the file rather than encoding
-// it. plan.md 7: audio encoding inside an audio_only job is negligible because
-// every stream encodes concurrently with the copy.
+// plan.md 7: audio encoding inside an audio_only job is negligible, because every
+// stream encodes concurrently with the copy.
 func (w work) ioBound() bool { return w.kind != domain.KindFull }
 
-// key is the throughput_stats natural key. The I/O bound kinds do not vary by
-// encoder or resolution, so they share one row per kind.
+// The I/O bound kinds do not vary by encoder or resolution, so they share one
+// throughput_stats row per kind.
 func (w work) key() (domain.Kind, string, string) {
 	if w.ioBound() {
 		return w.kind, "", ""
@@ -105,10 +100,8 @@ func (w work) predict(rate float64) int {
 	return int(math.Ceil(w.mediaSeconds / rate))
 }
 
-// Estimate is plan.md 14.3's prediction: source_bytes * 2 / throughput for the
-// I/O bound kinds, media_duration / speed_ratio for full. It never returns an
-// error, because a missing statistic is the normal case on a fresh install and
-// a job must not fail for want of a progress bar.
+// Estimate is plan.md 14.3's prediction, never returning an error because a
+// missing statistic is normal and no job may fail for want of a progress bar.
 func (e estimator) Estimate(ctx context.Context, w work) int {
 	kind, encoder, resolution := w.key()
 
@@ -125,9 +118,8 @@ func (e estimator) Estimate(ctx context.Context, w work) int {
 	return w.predict(stat.AvgValue)
 }
 
-// Record is plan.md 14.3's "measure at completion". The average is a rolling
-// one so a library that moves to faster storage converges rather than carrying
-// its history forever.
+// Record is plan.md 14.3's "measure at completion", into a rolling average so
+// changed storage converges rather than carrying its history forever.
 func (e estimator) Record(ctx context.Context, w work, actualSeconds int) {
 	observed := w.observe(actualSeconds)
 	if observed <= 0 {

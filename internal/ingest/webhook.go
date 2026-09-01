@@ -27,9 +27,8 @@ const (
 	EventEpisodeFileDelete EventType = "EpisodeFileDelete"
 )
 
-// Event is an *arr webhook payload reduced to the fields plan.md 13.1 reads.
-// internal/arr owns the JSON and the Radarr/Sonarr differences; this is the
-// shape it hands over.
+// Event is an *arr webhook payload reduced to what plan.md 13.1 reads; internal/arr owns
+// the JSON and the Radarr and Sonarr differences.
 type Event struct {
 	Type EventType
 
@@ -238,9 +237,8 @@ func (w *Webhook) mapPaths(instance domain.ArrInstance, mapper *pathmap.Mapper, 
 		local, mapped := mapper.ToLocal(r)
 
 		if !mapped {
-			// VERIFY.md: every live instance reports /media. An unmapped path
-			// is a missing mapping, and processing it would attribute the file
-			// to the wrong instance or to none.
+			// Every live instance reports /media (VERIFY.md), so an unmapped path would
+			// be attributed to the wrong instance or to none.
 			w.logger.Warn("webhook path has no mapping for this instance",
 				slog.String("instance", instance.Name), slog.String("path", r))
 		}

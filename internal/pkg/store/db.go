@@ -1,15 +1,8 @@
-// Package store is Codarr's SQLite persistence layer. Every query lives behind
-// the Store interface defined in store.go.
+// Package store is Codarr's SQLite persistence layer, behind the Store interface in store.go.
 //
-// # Time representation
-//
-// SQLite has no native time type. Every TIMESTAMP column in 001_schema.sql
-// holds an RFC 3339 string in UTC, always nine fractional digits, produced by
-// timeLayout below. Fixed width is the point: it makes the text sort
-// identically to the instant, which ORDER BY queued_at in the queue claim
-// depends on. The INTEGER columns named mtime are the exception and stay unix
-// seconds, because that is what os.FileInfo hands us and what a later scan
-// compares against.
+// Every TIMESTAMP column holds a fixed-width RFC 3339 string in UTC, nine fractional digits, so
+// the text sorts identically to the instant, which the queue claim's ORDER BY queued_at needs.
+// The INTEGER mtime columns stay unix seconds, which is what os.FileInfo hands us.
 package store
 
 import (
@@ -35,10 +28,8 @@ const (
 	pingTimeout     = 10 * time.Second
 )
 
-// DB is the pair of pools plan.md 17 calls for. WAL gives many readers and one
-// writer, but database/sql will happily open several writing connections and
-// collect SQLITE_BUSY, so writes are funnelled through a pool capped at one
-// connection and reads get their own.
+// DB is the pair of pools plan.md 17 calls for: database/sql would otherwise open
+// several writing connections and collect SQLITE_BUSY, so writes get a pool of one.
 type DB struct {
 	read  *sql.DB
 	write *sql.DB
@@ -139,9 +130,8 @@ func writeDSN(path string) string {
 	q.Set("_journal_mode", "WAL")
 	q.Set("_foreign_keys", "1")
 	q.Set("_synchronous", "NORMAL")
-	// Take the write lock at BEGIN rather than on first write. With one
-	// connection there is nothing to upgrade against, but it keeps the
-	// behaviour honest if the cap is ever raised.
+	// Take the write lock at BEGIN rather than on first write, so raising the
+	// one-connection cap later cannot turn into an upgrade deadlock.
 	q.Set("_txlock", "immediate")
 
 	return "file:" + url.PathEscape(path) + "?" + q.Encode()

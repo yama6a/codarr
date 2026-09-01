@@ -10,9 +10,8 @@ import (
 
 const hwColumns = `id, backend, codec, profile, direction, works, error, ffmpeg_version, probed_at`
 
-// ReplaceHWCapabilities swaps the whole probe result in one transaction. A
-// probe is a complete picture of one ffmpeg build (plan.md 10.1), so merging
-// old rows into new ones would keep stale entries alive across an upgrade.
+// ReplaceHWCapabilities swaps the whole probe result in one transaction, because merging
+// into a picture of one ffmpeg build (plan.md 10.1) keeps stale rows across an upgrade.
 func (s *store) ReplaceHWCapabilities(ctx context.Context, caps []domain.HWCapability) error {
 	return s.write(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM hw_capabilities`); err != nil {

@@ -2,9 +2,8 @@ package ffprobe
 
 import "strings"
 
-// Chroma is a pixel format's chroma subsampling. plan.md 6.2 makes the copy
-// test a subsampling test: yuv420p, yuv420p10le and p010le are all 4:2:0, and
-// a string compare against "yuv420p" fails every HEVC Main 10 file.
+// Chroma is a pixel format's subsampling, which plan.md 6.2 tests instead of the
+// pix_fmt string: yuv420p, yuv420p10le and p010le are all 4:2:0.
 type Chroma string
 
 // The subsamplings ffprobe pixel formats reduce to.

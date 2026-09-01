@@ -24,9 +24,8 @@ import (
 	"github.com/yama6a/codarr/internal/plex"
 )
 
-// The handler tests run against the generated router with moq'd services
-// (plan.md 2.3), so the routing, the parameter binding and the response codes
-// are exercised rather than the method bodies alone.
+// The handler tests run against the generated router with moq'd services (plan.md 2.3),
+// so routing, parameter binding and response codes are exercised, not method bodies.
 
 var testNow = time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
 

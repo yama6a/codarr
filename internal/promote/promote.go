@@ -1,7 +1,5 @@
-// Package promote is the irreversible half of Codarr. plan.md 15.5: the rename
-// destroys the original, there is no trash and no undo, so verification (15.3)
-// and preflight (15.4) are the only things between a bad encode and a lost
-// source. There is deliberately no way to promote past a failed check.
+// Package promote is the irreversible half of Codarr: the rename destroys the
+// original (15.5), so there is deliberately no way past a failed check.
 package promote
 
 import (
@@ -31,10 +29,8 @@ type Prober interface {
 	Probe(ctx context.Context, path string) (Output, error)
 }
 
-// StreamGuard answers whether Plex is currently streaming a path. plan.md 15.6:
-// replacing a file an NFS client has open gives that client ESTALE, so this is
-// load-bearing rather than defensive. The string is a human-readable
-// description of the session, for the job's blocked_by column.
+// StreamGuard answers whether Plex is streaming a path; replacing a file an NFS
+// client has open gives that client ESTALE (plan.md 15.6).
 type StreamGuard interface {
 	IsStreaming(ctx context.Context, path string) (bool, string, error)
 }
@@ -45,21 +41,20 @@ type Fingerprinter interface {
 	Full(path string) (string, error)
 }
 
-// Notifier is the post-promotion refresh of Plex and the owning *arr instance.
-// It runs after the source is already gone, so a failure is a warning.
+// Notifier is the post-promotion refresh of Plex and the owning *arr, running
+// after the source is gone, so a failure is only a warning.
 type Notifier interface {
 	NotifyPromoted(ctx context.Context, path string) error
 }
 
-// Copier moves the staging file onto the destination filesystem when the
-// staging file landed on another device. It is its own seam so the promote
-// tests can fail a copy without a real filesystem.
+// Copier moves the staging file onto the destination filesystem when it landed
+// on another device.
 type Copier interface {
 	Copy(ctx context.Context, src, dst string) (int64, error)
 }
 
-// FSCopier is the Copier every caller should use. fsx.Copy fsyncs the
-// destination before returning, which the promote sequence relies on.
+// FSCopier is the Copier every caller should use, because fsx.Copy fsyncs the
+// destination before returning.
 type FSCopier struct {
 	fs fsx.FS
 }
@@ -135,8 +130,8 @@ func New(d Deps) *Promoter {
 	}
 }
 
-// Request is one promotion: steps 3 to 10 of plan.md 15.2. The encode itself
-// happens between Preflight and here.
+// Request is one promotion, steps 3 to 10 of plan.md 15.2, with the encode
+// itself happening between Preflight and here.
 type Request struct {
 	JobID           int64
 	SourcePath      string
@@ -154,26 +149,20 @@ type Request struct {
 	OnBlocked func(reason string)
 }
 
-// Result is what promotion produced. It is returned on the error paths too, as
-// far as promotion got.
+// Result is what promotion produced, returned on the error paths too, as far as
+// promotion got.
 type Result struct {
 	Identity   domain.OutputIdentity
 	OutputSize int64
 	Warnings   []string
 
-	// Renamed reports that step 7 of plan.md 15.2 completed: the source inode is
-	// freed and the destination path now holds Codarr's output.
-	//
-	// When it is true the caller MUST persist Identity even though Promote also
-	// returned an error. Skipping it leaves codarr_output_fingerprint NULL on a
-	// file Codarr wrote, which reads as provenance "untouched" forever (12).
-	// Identity is zero only if the post-rename fingerprint itself failed.
+	// Renamed reports that step 7 of plan.md 15.2 completed. When true the caller
+	// MUST persist Identity even on error, or provenance reads "untouched" forever (12).
 	Renamed bool
 }
 
-// Promote verifies the staging file and replaces the source with it. Every
-// return path before the rename leaves the source untouched and the staging
-// file in place for inspection.
+// Promote verifies the staging file and replaces the source with it; every return
+// path before the rename leaves the source untouched.
 func (p *Promoter) Promote(ctx context.Context, req Request) (Result, error) {
 	warnings, err := p.Verify(ctx, req)
 	if err != nil {
@@ -202,9 +191,8 @@ func (p *Promoter) Promote(ctx context.Context, req Request) (Result, error) {
 	return p.settle(ctx, req, fullHash, origin, warnings)
 }
 
-// settle runs everything after the rename. The source is already gone here, so
-// nothing in it may abandon the output identity: every path returns a Result
-// with Renamed set.
+// The source is already gone here, so no path may abandon the output identity:
+// every one returns a Result with Renamed set.
 func (p *Promoter) settle(
 	ctx context.Context,
 	req Request,
@@ -245,9 +233,8 @@ func (p *Promoter) fullHash(req Request) (*string, error) {
 		return nil, nil //nolint:nilnil // absent is the normal case; the column is nullable
 	}
 
-	// plan.md 12.2: over the staging file, after verification and before
-	// promotion. The bytes do not change in the rename, so this is the same
-	// value the promoted file has.
+	// plan.md 12.2: over the staging file, whose bytes the rename does not change,
+	// so this is the value the promoted file has.
 	sum, err := p.fp.Full(req.Staging.Path)
 	if err != nil {
 		return nil, wrap(domain.FailPromote, err, "computing the whole-file hash of %s failed", req.Staging.Path)
@@ -256,9 +243,8 @@ func (p *Promoter) fullHash(req Request) (*string, error) {
 	return &sum, nil
 }
 
-// originState re-stats the source immediately before the replace. Preflight ran
-// before an encode that may have taken hours, and the nlink guard of plan.md
-// 15.4 is only worth anything if it is true at the moment of the rename.
+// Preflight ran before an encode that may have taken hours, and the nlink guard
+// of plan.md 15.4 only counts if it holds at the moment of the rename.
 func (p *Promoter) originState(sourcePath string) (fsx.FileInfo, error) {
 	info, err := p.fs.Stat(sourcePath)
 	if err != nil {
@@ -274,9 +260,8 @@ func (p *Promoter) originState(sourcePath string) (fsx.FileInfo, error) {
 	return info, nil
 }
 
-// stageOnDestination returns the path the rename will take its argument from.
-// plan.md 15.1: rename(2) is not atomic across filesystems, so a staging file
-// on another device is copied to a destination-side sibling first.
+// plan.md 15.1: rename(2) is not atomic across filesystems, so a staging file on
+// another device is copied to a destination-side sibling first.
 func (p *Promoter) stageOnDestination(ctx context.Context, req Request) (string, error) {
 	if !req.Staging.CrossDevice {
 		return req.Staging.Path, nil
@@ -295,9 +280,8 @@ func (p *Promoter) stageOnDestination(ctx context.Context, req Request) (string,
 	return req.Staging.FinalPath, nil
 }
 
-// checkRoomForCopy closes the gap in plan.md 15.1: preflight gated on 1.2x the
-// SOURCE size, but what gets copied back is the OUTPUT, and nothing had
-// measured it. Running out of space mid-copy leaves a partial dotfile.
+// Preflight gated on 1.2x the SOURCE size, but what is copied back is the OUTPUT,
+// and running out of space mid-copy leaves a partial dotfile (plan.md 15.1).
 func (p *Promoter) checkRoomForCopy(req Request) error {
 	info, err := p.fs.Stat(req.Staging.Path)
 	if err != nil {
@@ -341,8 +325,7 @@ func (p *Promoter) replace(ctx context.Context, req Request, staging string) err
 			return nil
 		}
 
-		// The final check changed its mind. Nothing was renamed; go back to
-		// waiting.
+		// The final check changed its mind; nothing was renamed.
 		if err := p.deferReplace(ctx, req, reason); err != nil {
 			return err
 		}
@@ -362,11 +345,8 @@ func (p *Promoter) waitForStreamEnd(ctx context.Context, req Request) error {
 	}
 }
 
-// blocked collapses "Plex says the file is streaming" and "Plex could not
-// answer" into one verdict. plan.md 15.6 makes an unknown answer unsafe, and
-// awaiting_stream_end is the closed state that costs nothing: the verified
-// staging file is kept, the retry is automatic, and 19.2 resumes it across a
-// restart. Failing here would throw away a finished encode and need a human.
+// plan.md 15.6 makes an unanswerable Plex as unsafe as a streaming one, and
+// deferring costs nothing where failing would throw away a finished encode.
 func (p *Promoter) blocked(ctx context.Context, path string) (bool, string) {
 	streaming, who, err := p.guard.IsStreaming(ctx, path)
 
@@ -399,8 +379,8 @@ func (p *Promoter) deferReplace(ctx context.Context, req Request, reason string)
 	}
 }
 
-// sync is plan.md 15.2 step 5: the data and the directory entry are separately
-// durable, so both are flushed before the rename.
+// plan.md 15.2 step 5: the data and the directory entry are separately durable,
+// so both are flushed before the rename.
 func (p *Promoter) sync(staging, destDir string) error {
 	if err := p.fs.SyncFile(staging); err != nil {
 		return wrap(domain.FailPromote, err, "fsync of the staging file %s failed", staging)
@@ -413,13 +393,8 @@ func (p *Promoter) sync(staging, destDir string) error {
 	return nil
 }
 
-// recheckAndRename holds the window plan.md 15.6 cares about. Nothing may be
-// logged, written to the database or allocated between the check and the
-// rename: a stream starting in that gap dies with ESTALE rather than degrading.
-// The happy path below is two constant-folded branches and the rename itself;
-// every string it can build is on a path that has already decided not to
-// rename. It returns (blocked, reason, renameError) so the caller can tell a
-// deferral apart from a real failure without inspecting an error.
+// Nothing may be logged, written to the database or allocated between the Plex
+// check and the rename (plan.md 15.6): a stream starting in that gap dies with ESTALE.
 func (p *Promoter) recheckAndRename(ctx context.Context, staging, dest string) (bool, string, error) {
 	streaming, who, err := p.guard.IsStreaming(ctx, dest)
 	if err != nil {
@@ -436,8 +411,8 @@ func (p *Promoter) recheckAndRename(ctx context.Context, staging, dest string) (
 	return false, "", p.fs.Rename(staging, dest) //nolint:wrapcheck // wrapped by the caller; nothing may allocate here
 }
 
-// restore is plan.md 15.2 step 8. A chown failure is expected under root_squash
-// and is never a job failure; mode and mtime need no privilege and must succeed.
+// plan.md 15.2 step 8: a chown failure is expected under root_squash and is never
+// a job failure, while mode and mtime need no privilege and must succeed.
 func (p *Promoter) restore(ctx context.Context, dest string, origin fsx.FileInfo) ([]string, error) {
 	var warnings []string
 
@@ -448,8 +423,8 @@ func (p *Promoter) restore(ctx context.Context, dest string, origin fsx.FileInfo
 			slog.String("path", dest), slog.Int("uid", origin.UID), slog.Int("gid", origin.GID), slog.Any("error", err))
 	}
 
-	// Both are attempted even when the first fails, so the promoted file ends up
-	// as close to the original as the export allows.
+	// Both are attempted even when the first fails, so the promoted file lands as
+	// close to the original as the export allows.
 	var failure error
 
 	if err := p.fs.Chmod(dest, origin.Mode.Perm()); err != nil {

@@ -15,9 +15,8 @@ type MediaServer interface {
 	NotifyPromoted(ctx context.Context, path string) error
 }
 
-// Owner is the *arr instance that owns a promoted path, and what to tell it.
-// The flags come from the instance row rather than from the client so that the
-// decision to notify is visible at the call site.
+// Owner is the instance that owns a promoted path and what to tell it; the flags come
+// from the instance row so the decision to notify is visible at the call site.
 type Owner struct {
 	Client         Client
 	Item           ItemRef
@@ -25,18 +24,14 @@ type Owner struct {
 	UnmonitorAfter bool
 }
 
-// OwnerResolver maps a promoted path to its owning instance. It reports false
-// when nothing should be notified: the path lies under no root, under a root
-// with no instance, or under a root two enabled instances both claim, which
-// plan.md 16.2 says to surface rather than guess at.
+// OwnerResolver maps a promoted path to its owning instance, reporting false when no
+// instance or two claim it, which plan.md 16.2 says not to guess at.
 type OwnerResolver interface {
 	ResolveOwner(ctx context.Context, path string) (Owner, bool, error)
 }
 
-// Notifier composes the Plex refresh and analyze with the owning instance's
-// rescan (plan.md 16.1 and 16.2). Everything it does happens after the source
-// file is already gone, so nothing it returns may fail the job: promote turns
-// the error into a warning on the job record.
+// Notifier composes the Plex refresh with the owning instance's rescan (plan.md 16.1,
+// 16.2). It runs after the source file is gone, so its errors are warnings, not failures.
 type Notifier struct {
 	plex     MediaServer
 	resolver OwnerResolver
@@ -54,9 +49,8 @@ func NewNotifier(plex MediaServer, resolver OwnerResolver, log *slog.Logger) *No
 	return &Notifier{plex: plex, resolver: resolver, log: log}
 }
 
-// NotifyPromoted refreshes Plex and rescans the owning instance. Neither half
-// short-circuits the other: a Plex that is down must not stop Radarr being told
-// about the new file, and vice versa.
+// NotifyPromoted refreshes Plex and rescans the owning instance, neither half
+// short-circuiting the other.
 func (n *Notifier) NotifyPromoted(ctx context.Context, path string) error {
 	var failures []error
 

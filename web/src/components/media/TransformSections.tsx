@@ -67,10 +67,8 @@ interface TransformSectionsProps {
   produced: boolean;
 }
 
-/**
- * TransformSections renders one schema for both halves of a job's life. plan.md 18.3 insists the
- * `after` column says which it is: the plan, or what ffprobe measured on the real output.
- */
+// One schema for both halves of a job's life. plan.md 18.3 insists the `after` column says which
+// it is: the plan, or what ffprobe measured on the real output.
 export function TransformSections({ transform, produced }: TransformSectionsProps) {
   const afterLabel = produced ? 'After (produced)' : 'After (planned)';
   const afterHint = produced

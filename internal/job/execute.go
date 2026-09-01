@@ -31,9 +31,8 @@ type task struct {
 	caps      hardware.Capabilities
 	selection hardware.Selection
 
-	// decodeRetried and forceSoftware carry the two fallback chains of 10.1 and
-	// 10.2 across attempts: the software-decode retry is allowed once per
-	// encoder, and re-armed when the encoder changes.
+	// The software-decode retry of 10.1 is allowed once per encoder, and re-armed
+	// when the encoder changes.
 	decodeRetried bool
 	forceSoftware bool
 
@@ -46,10 +45,8 @@ type task struct {
 	argv      []string
 }
 
-// execute runs one claimed job to a terminal state. Only three things end it:
-// success, a cancel someone asked for, and a failure that always carries both
-// halves of plan.md 19.1. A shutdown ends none of them, and deliberately leaves
-// the row in flight for the sweep of 19.2.
+// execute runs one claimed job to success, cancellation or failure; a shutdown
+// ends none of them and leaves the row in flight for the sweep of 19.2.
 func (s *Service) execute(parent context.Context, j domain.Job) error {
 	s.observe(parent, domain.JobRunning, j.Kind, j.Origin)
 
@@ -106,10 +103,8 @@ func (s *Service) pipeline(ctx context.Context, j domain.Job) error {
 	return s.finalise(ctx, t)
 }
 
-// load reads everything the job needs and re-plans from the stored probe. The
-// plan is recomputed rather than trusted from the queue row because the policy
-// is what decides, the probe is what it decides from, and only a fresh call
-// reports whether an idet sample is still owed (6.2).
+// The plan is recomputed rather than trusted from the queue row, because only a
+// fresh call reports whether an idet sample is still owed (6.2).
 func (s *Service) load(ctx context.Context, j domain.Job) (*task, error) {
 	settings, err := s.store.GetSettings(ctx)
 	if err != nil {
@@ -137,8 +132,8 @@ func (s *Service) load(ctx context.Context, j domain.Job) (*task, error) {
 	return t, nil
 }
 
-// replan applies the policy to the stored probe. scan is the answer to an
-// earlier idet sample, empty when none has run.
+// replan applies the policy to the stored probe, where scan is the answer to an
+// earlier idet sample and empty when none has run.
 func (s *Service) replan(t *task, scan domain.Scan) error {
 	analysis, err := s.engine.Plan(t.probe, decide.Options{Path: t.media.Path, IdetScan: scan})
 	if err != nil {
@@ -176,9 +171,8 @@ func (s *Service) replan(t *task, scan domain.Scan) error {
 	return nil
 }
 
-// prepare is everything between claiming the job and the first byte of output:
-// preflight, the bitrate probe of 8.1, the interlacing sample of 6.2, the
-// encoder choice of 10.2 and the estimate of 14.3.
+// Everything between claiming the job and the first byte of output: preflight,
+// 8.1, 6.2, 10.2 and 14.3.
 func (s *Service) prepare(ctx context.Context, t *task) error {
 	if err := s.preflight(t); err != nil {
 		return err
@@ -227,10 +221,8 @@ func (s *Service) preflight(t *task) error {
 	return nil
 }
 
-// resolveBitrate is plan.md 8.1 run as the first phase of the job rather than
-// at enqueue time, which is why 17.2 leaves after.video.bitrate_kbps null and
-// the UI shows "calculating" until here. A failed probe is not a failed job:
-// 8.2 is the fallback the formula exists for.
+// plan.md 8.1 runs here rather than at enqueue, which is why 17.2 leaves the
+// target null; a failed probe is not a failed job, 8.2 is the fallback.
 func (s *Service) resolveBitrate(ctx context.Context, t *task) error {
 	if t.plan.Kind != domain.KindFull {
 		return nil
@@ -267,9 +259,8 @@ func (s *Service) sampleBase(ctx context.Context, t *task) (int, error) {
 	return s.sampleProbe(ctx, t.settings.TempDir, strconv.FormatInt(t.job.ID, 10), t.media.Path, t.duration.Seconds())
 }
 
-// sampleProbe is plan.md 8.1's three fixed-quality encodes. They go into a
-// dotfile directory under the temp dir so the orphan sweep of 15.2 reclaims
-// them if the process dies mid-probe.
+// plan.md 8.1's three fixed-quality encodes, written into a dotfile directory so
+// the orphan sweep of 15.2 reclaims them if the process dies mid-probe.
 func (s *Service) sampleProbe(ctx context.Context, tempDir, name, path string, durationSec float64) (int, error) {
 	if tempDir == "" {
 		return 0, failf(domain.FailProbe, "no temp directory is configured, so the sample probe has nowhere to write")
@@ -295,9 +286,8 @@ func (s *Service) sampleProbe(ctx context.Context, tempDir, name, path string, d
 	return base, nil
 }
 
-// resolveScan answers decide.Analysis.NeedsIdetSample. The engine refuses to
-// shell out, so the short sample of 6.2 runs here and the file is re-planned
-// with the answer.
+// The decision engine refuses to shell out, so the idet sample of 6.2 runs here
+// and the file is re-planned with the answer.
 func (s *Service) resolveScan(ctx context.Context, t *task) error {
 	if !t.needsIdet {
 		return nil
@@ -324,10 +314,8 @@ func (s *Service) resolveScan(ctx context.Context, t *task) error {
 	return s.replan(t, scan)
 }
 
-// selectEncoder is plan.md 10.2's preference order. The capability set is read
-// for every job, not just the ones that encode: it also answers whether the
-// source decodes on the iGPU, which the probe confirms per driver rather than
-// per silicon (10.1).
+// plan.md 10.2's preference order; the capability set is read for every job
+// because it also answers whether the source decodes on the iGPU (10.1).
 func (s *Service) selectEncoder(ctx context.Context, t *task) error {
 	caps, err := s.hw.Capabilities(ctx)
 	if err != nil {
@@ -365,9 +353,8 @@ func (s *Service) logSelection(ctx context.Context, t *task) {
 		slog.String("reason", t.selection.Reason))
 }
 
-// writeTransform is 17.2's "fill it in when the job starts": the record was
-// written at enqueue with a null target bitrate, and by here the sample probe
-// has one and the estimate has been refined with the encoder actually chosen.
+// 17.2's "fill it in when the job starts": by here the sample probe has a target
+// and the estimate has been refined with the encoder actually chosen.
 func (s *Service) writeTransform(ctx context.Context, t *task) error {
 	t.transform = decide.NewTransform(t.probe, t.plan, t.estimate)
 
@@ -383,15 +370,8 @@ func (s *Service) writeTransform(ctx context.Context, t *task) error {
 	return nil
 }
 
-// encode runs the job, applying the two fallback chains of plan.md 10 in the
-// order that costs least. The software-decode retry comes first and only once
-// per encoder: it is one more attempt on the same silicon, while stepping the
-// encoder chain can mean libx265 and four hours. Neither chain is sniffed out
-// of ffmpeg's stderr, because driver error strings are not an API.
-//
-// These retries are not the domain.MaxAutoAttempts budget. That one counts
-// process deaths (19.2); this one counts encoder combinations inside a single
-// attempt.
+// The software-decode retry comes before stepping the encoder chain, which can mean
+// libx265 and four hours. Not the MaxAutoAttempts budget, which counts crashes (19.2).
 func (s *Service) encode(ctx context.Context, t *task) error {
 	var (
 		tried  []string
@@ -407,9 +387,8 @@ func (s *Service) encode(ctx context.Context, t *task) error {
 
 		res, runErr := s.attempt(ctx, t, cmd)
 		if runErr == nil {
-			// The final out_time is only known now, and 19.2 can resume this
-			// job in another process, so it goes on the row rather than staying
-			// in memory (14.3, 15.3).
+			// 19.2 can resume this job in another process, so the final out_time goes
+			// on the row rather than staying in memory (14.3, 15.3).
 			return s.recordExecution(ctx, t)
 		}
 
@@ -426,9 +405,8 @@ func (s *Service) encode(ctx context.Context, t *task) error {
 	}
 }
 
-// stepBack moves to the next thing worth trying and reports whether there was
-// one. Changing encoder re-arms the decode retry, because a different backend
-// fails differently.
+// stepBack moves to the next thing worth trying; changing encoder re-arms the
+// decode retry, because a different backend fails differently.
 func (s *Service) stepBack(ctx context.Context, t *task, cmd ffmpeg.Command, res ffmpeg.RunResult) bool {
 	if retry, ok := hardware.RetryInSoftware(cmd.DecodePath, t.decodeRetried); ok {
 		s.mx.decodeFallback()
@@ -484,9 +462,8 @@ func (s *Service) attempt(ctx context.Context, t *task, cmd ffmpeg.Command) (ffm
 	return res, nil
 }
 
-// runEncode wires ffmpeg's progress stream to the job row through the throttle
-// of 14.3: the live value stays in memory and reaches SQLite every five
-// seconds, never once per progress line.
+// The throttle of 14.3 keeps the live value in memory and reaches SQLite every
+// five seconds, never once per progress line.
 func (s *Service) runEncode(ctx context.Context, t *task, args []string) (ffmpeg.RunResult, error) {
 	writeCtx := context.WithoutCancel(ctx)
 
@@ -511,9 +488,8 @@ func (s *Service) runEncode(ctx context.Context, t *task, args []string) (ffmpeg
 func (s *Service) build(t *task, forceSoftwareDecode bool) (ffmpeg.Command, error) {
 	video, _ := t.probe.PrimaryVideo()
 
-	// 10.1: the hard-coded Gen 9.5 decode set is necessary but not sufficient.
-	// VP9 decode is in the silicon and not always in the driver, so the probe
-	// has the last word on whether -hwaccel is safe here.
+	// 10.1: VP9 decode is in the silicon but not always in the driver, so the probe
+	// has the last word on whether -hwaccel is safe.
 	if t.caps.DecodePath(t.selection.Encoder, video.CodecName) == domain.DecodeSoftware {
 		forceSoftwareDecode = true
 	}
@@ -560,10 +536,8 @@ func (s *Service) recordExecution(ctx context.Context, t *task) error {
 	return nil
 }
 
-// finalise is steps 3 to 10 of plan.md 15.2. The output is probed once here for
-// the measured half of the transform record; the promoter probes it again as
-// part of verification, which is the check that stands between a bad encode and
-// a destroyed source and is never skipped.
+// Steps 3 to 10 of plan.md 15.2; the probe here is for the transform record, and
+// the promoter's own verification probe is never skipped in its favour.
 func (s *Service) finalise(ctx context.Context, t *task) error {
 	if err := s.setState(ctx, t, domain.JobVerifying); err != nil {
 		return err
@@ -580,9 +554,8 @@ func (s *Service) finalise(ctx context.Context, t *task) error {
 
 	res, promoteErr := s.promoter.Promote(ctx, s.promoteRequest(ctx, t))
 
-	// plan.md 15.2 step 7 has happened: the source inode is gone. The identity
-	// has to be persisted even though the job failed, or provenance reads
-	// untouched forever on a file Codarr wrote (12, and decisions.md).
+	// Step 7 happened, so the source inode is gone: the identity has to be persisted
+	// even though the job failed, or provenance reads untouched forever (12).
 	if promoteErr != nil && !res.Renamed {
 		return fmt.Errorf("promoting %s: %w", t.media.Path, promoteErr)
 	}
@@ -635,9 +608,8 @@ func (s *Service) block(ctx context.Context, t *task, reason string) {
 	s.observe(ctx, domain.JobAwaitingStreamEnd, t.plan.Kind, t.job.Origin)
 }
 
-// settle writes the measured half of the transform record and the output
-// identity. It runs on a detached context: the rename already happened, so
-// abandoning this write would lose the only record of what Codarr produced.
+// Runs on a detached context: the rename already happened, so abandoning this
+// write would lose the only record of what Codarr produced.
 func (s *Service) settle(ctx context.Context, t *task, out *ffprobe.Result, res promote.Result) error {
 	ctx = context.WithoutCancel(ctx)
 	actual := s.elapsed(t.job)
@@ -786,10 +758,8 @@ func describeAttempt(t *task, cmd ffmpeg.Command) string {
 	return encoder + " with " + string(cmd.DecodePath) + " decode"
 }
 
-// encodeExhausted is the failure after every combination has been tried. The
-// runner's own error text repeats the whole stderr tail, so it is not folded
-// into the message: the message stays readable and stderr_tail holds the rest
-// (19.1).
+// The runner's error text repeats the whole stderr tail, so it is not folded into
+// the message: the message stays readable and stderr_tail holds the rest (19.1).
 func encodeExhausted(t *task, tried []string, res ffmpeg.RunResult, err error) *Error {
 	reason := lastLine(res.StderrTail)
 	if reason == "" {

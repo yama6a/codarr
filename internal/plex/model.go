@@ -1,8 +1,7 @@
 package plex
 
-// The wire types below are deliberately partial: Plex answers with far more
-// than this and the shape shifts between server versions, so only the fields
-// Codarr actually reads are declared.
+// The wire types are deliberately partial: Plex answers with far more and the shape
+// shifts between server versions, so only the fields Codarr reads are declared.
 //
 //nolint:tagliatelle // Plex speaks camelCase for attributes and PascalCase for child elements; the repo's snake_case rule cannot apply to a foreign schema.
 type (
@@ -63,9 +62,8 @@ type (
 		Part []part `json:"Part"`
 	}
 
-	// part is where the file path lives, and only on a direct-play session
-	// (plan.md 16.1). A transcoding session's Part carries no file attribute at
-	// all, which is why the guard resolves the path through the item instead.
+	// part carries the file path only on a direct-play session (plan.md 16.1), which
+	// is why the guard resolves a transcoding session through the item instead.
 	part struct {
 		File string `json:"file"`
 	}

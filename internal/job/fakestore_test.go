@@ -12,10 +12,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/store"
 )
 
-// fakeStore is an in-memory stand-in for the parts of the store the queue uses.
-// It is hand-written rather than generated because half these tests are about
-// what the queue does across several writes, and a mock that only records calls
-// cannot answer that.
+// Hand-written rather than generated: half these tests are about what the queue
+// does across several writes, which a call-recording mock cannot answer.
 type fakeStore struct {
 	mu sync.Mutex
 

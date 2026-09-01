@@ -2,13 +2,10 @@ package domain
 
 import "time"
 
-// TransformRecord is the before/after history for one job. It is written at
-// enqueue with "after" holding the plan, and updated at completion with "after"
-// holding what an ffprobe of the real output measured. One schema serves both,
-// which is what lets the UI render queued and completed items with the same
-// component.
+// TransformRecord is the before/after history for one job, never deleted.
 //
-// Never deleted. This is the history.
+// "after" holds the plan at enqueue and the probed output at completion, one schema
+// for both so the UI renders queued and completed items with the same component.
 type TransformRecord struct {
 	Container   BeforeAfterString   `json:"container"`
 	Video       VideoTransform      `json:"video"`
@@ -19,10 +16,8 @@ type TransformRecord struct {
 	Size        SizeTransform       `json:"size"`
 	Duration    DurationTransform   `json:"duration_seconds"`
 
-	// OutputIdentity is nil until promotion succeeds. It is the immutable
-	// record of what Codarr actually produced; the media row's copy is the
-	// mutable current-state view, and the two diverging is exactly the signal
-	// that something rewrote the file.
+	// Nil until promotion, then immutable. The media row's copy is the mutable
+	// view, and the two diverging is the signal that something rewrote the file.
 	OutputIdentity *OutputIdentity `json:"output_identity"`
 }
 

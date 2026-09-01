@@ -9,10 +9,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/pathmap"
 )
 
-// ListRoots returns every watch root with its owning instance, and every root
-// two enabled instances both claim. plan.md 18.4 wants the conflict shown as a
-// standing error rather than only after an import, and it is the same rows, so
-// it rides on this response instead of an endpoint of its own.
+// ListRoots carries the contested roots too, because plan.md 18.4 wants a conflict shown
+// as a standing error rather than only after an import, and it is the same rows.
 func (s *Server) ListRoots(ctx context.Context, _ gen.ListRootsRequestObject) (gen.ListRootsResponseObject, error) {
 	roots, err := s.store.ListRoots(ctx)
 	if err != nil {
@@ -32,8 +30,7 @@ func (s *Server) ListRoots(ctx context.Context, _ gen.ListRootsRequestObject) (g
 	return gen.ListRoots200JSONResponse{Roots: out, Conflicts: contestedRoots(roots, names)}, nil
 }
 
-// contestedRoots is pathmap.Conflicts rendered for the settings page. Only
-// enabled roots owned by an instance count, which is the same rule attribution
+// Only enabled roots owned by an instance count, which is the same rule attribution
 // uses (plan.md 16.2).
 func contestedRoots(roots []domain.Root, names map[int64]string) []gen.ContestedRoot {
 	conflicts := pathmap.Conflicts(roots)
@@ -52,9 +49,8 @@ func contestedRoots(roots []domain.Root, names map[int64]string) []gen.Contested
 	return out
 }
 
-// CreateRoot adds a root by hand. A root that nests inside an existing one is
-// refused: two roots covering the same file make attribution ambiguous, and
-// plan.md 16.2 says never to guess an owner.
+// CreateRoot refuses a root nesting inside an existing one, because two roots over one
+// file make attribution ambiguous and plan.md 16.2 says never to guess an owner.
 func (s *Server) CreateRoot(
 	ctx context.Context, req gen.CreateRootRequestObject,
 ) (gen.CreateRootResponseObject, error) {
@@ -102,9 +98,8 @@ func (s *Server) DeleteRoot(
 	return gen.DeleteRoot204Response{}, nil
 }
 
-// ScanRoot walks one root now. The walk runs in the background and the response
-// is 202: a full root takes minutes and the request would time out long before
-// it finished.
+// ScanRoot answers 202 and walks in the background, because a full root takes minutes
+// and the request would time out long before it finished.
 func (s *Server) ScanRoot(ctx context.Context, req gen.ScanRootRequestObject) (gen.ScanRootResponseObject, error) {
 	if _, err := s.store.GetRoot(ctx, req.Id); err != nil {
 		return gen.ScanRootdefaultJSONResponse(s.fail(ctx, err)), nil

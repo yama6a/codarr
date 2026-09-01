@@ -22,10 +22,8 @@ type Segment struct {
 	Duration float64
 }
 
-// SampleSegments picks the three windows of 8.1: skip the first and last 5%,
-// then take 60 seconds at 20%, 50% and 80% of what is left. Windows are pulled
-// back so they fit inside the file, and a file shorter than one window becomes
-// a single whole-file sample.
+// SampleSegments picks the three windows of 8.1, pulling them back to fit inside
+// the file and collapsing to a single whole-file sample when it is too short.
 func SampleSegments(durationSec float64) []Segment {
 	if durationSec <= 0 {
 		return nil
@@ -53,7 +51,7 @@ func SampleSegments(durationSec float64) []Segment {
 	return segs
 }
 
-// SampleArgs is the fixed-quality sample encode from 8.1. It writes a real file
+// SampleArgs is the fixed-quality sample encode from 8.1, writing a real file
 // because -f null - does not reliably report output size.
 func SampleArgs(src string, seg Segment, out string) []string {
 	return []string{
@@ -83,8 +81,7 @@ func SampleBitrate(sizeBytes int64, durationSec float64) int {
 	return int(float64(sizeBytes) * 8 / durationSec)
 }
 
-// SampleFS is the two filesystem calls the sample probe makes. fsx.FS
-// satisfies it.
+// SampleFS is the two filesystem calls the sample probe makes.
 type SampleFS interface {
 	Stat(path string) (fsx.FileInfo, error)
 	Remove(path string) error
@@ -102,10 +99,8 @@ func NewSampleProbe(enc Encoder, fs SampleFS, dir string) *SampleProbe {
 	return &SampleProbe{enc: enc, fs: fs, dir: dir}
 }
 
-// Base runs the samples and returns the median of their bitrates, which is the
-// base the hardware correction and clamps of 8.1 are applied to. The samples run
-// concurrently: they are independent, and this is not a transcode, so the
-// one-job-at-a-time rule does not apply.
+// Base is the median sample bitrate the corrections of 8.1 apply to; the samples
+// run concurrently because this is not a transcode, so one-job-at-a-time does not apply.
 func (p *SampleProbe) Base(ctx context.Context, src string, durationSec float64) (int, error) {
 	segs := SampleSegments(durationSec)
 	if len(segs) == 0 {

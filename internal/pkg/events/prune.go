@@ -8,9 +8,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/clock"
 )
 
-// PruneInterval is how often the retention bounds of plan.md 24 are applied.
-// The bounds themselves live in internal/pkg/store, which owns the two
-// statements; 30 days or 100k rows, whichever bites harder.
+// PruneInterval is how often the retention bounds of plan.md 24 are applied; the
+// bounds themselves live in internal/pkg/store, which owns the statements.
 const PruneInterval = time.Hour
 
 // PruneStore is the retention half of the events table.

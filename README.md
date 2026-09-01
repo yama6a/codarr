@@ -7,8 +7,9 @@ transcoding, and rewrites only what needs rewriting.
 One owner, one Plex server, one machine. The encoding policy is hard-coded and
 not configurable. Deployment wiring lives in SQLite and is edited through the UI.
 
-Full specification: [`plan.md`](plan.md). Judgement calls made while building it:
-[`decisions.md`](decisions.md). Live-system checks: [`VERIFY.md`](VERIFY.md).
+- [`plan.md`](plan.md) is the full specification
+- [`decisions.md`](decisions.md) records the judgement calls made while building it
+- [`VERIFY.md`](VERIFY.md) records the live-system checks
 
 ## What it does
 
@@ -37,8 +38,8 @@ Three things carry that weight instead:
 - **Anything touching more than one file dry-runs first**, shows the exact count
   and plan breakdown, and says plainly that it cannot be undone.
 - **The *arrs are the recovery mechanism.** If a transcode ruins a file, Radarr
-  or Sonarr can fetch it again. That is why trash is expendable here in a way it
-  would not be for irreplaceable data: the library is reproducible.
+  or Sonarr can fetch it again. The library is reproducible, which is why trash
+  is expendable here in a way it would not be for irreplaceable data.
 
 ## Running it
 
@@ -73,17 +74,16 @@ The image is `ghcr.io/yama6a/codarr:<N>`, integer-tagged, one release per merge
 to `main`, amd64 only.
 
 This repo ships no Kubernetes manifests. The wiring for the target cluster is
-documented below; paste it into `offgrid-private` following that repo's own
-conventions.
+below; paste it into `offgrid-private` following that repo's own conventions.
 
-### It belongs in the media chart, not a new one
+### Chart placement
 
 `argo_apps/workloads/charts/media/templates/codarr.yaml`, with a `codarr:` block
 in that chart's `values.yaml`. Not a standalone chart: a PVC cannot be mounted
 across namespaces, and both `media-library` and the config volumes live in
 `media`.
 
-### The GPU request is the placement
+### GPU
 
 ```yaml
 resources:
@@ -97,7 +97,11 @@ the node carrying `extensions.talos.dev/i915`, so requesting it is what pins the
 pod to `tc-w1`. See that repo's `docs/14_igpu.md`.
 
 `sharedDevNum` is 2 and Plex already holds one slot, so Codarr takes the last
-one. A third claimant would sit `Pending`.
+one. A third claimant would sit `Pending` on `Insufficient gpu.intel.com/i915`.
+
+Verified on the node: QSV and VAAPI both encode HEVC Main and Main10, VP9
+hardware decode works, and the driver is the jellyfin-bundled Intel iHD 25.4.6.
+See `VERIFY.md`.
 
 ### Volumes
 
@@ -122,15 +126,6 @@ sibling of the target on the NAS, so `rename()` is a single atomic server-side
 operation. That was verified on the real mount: renaming from a local volume into
 `/media` returns EXDEV.
 
-### The GPU slot is the last one
-
-`sharedDevNum` is 2. Plex holds one and Codarr takes the other, so a third
-claimant would sit `Pending` on `Insufficient gpu.intel.com/i915`.
-
-Verified on the node: QSV and VAAPI both encode HEVC Main and Main10, VP9
-hardware decode works, and the driver is the jellyfin-bundled Intel iHD 25.4.6.
-See `VERIFY.md`.
-
 ### Security context
 
 ```yaml
@@ -146,7 +141,7 @@ securityContext:
 uid 568 is what owns the NAS dataset. `fsGroup` does not apply to the NFS mount
 at all; it is there for the RWO config volume.
 
-### The three-place ingress edit
+### Ingress
 
 Adding a host means all three, or the SecurityPolicy attaches to nothing and the
 app is served unauthenticated:
@@ -157,7 +152,7 @@ app is served unauthenticated:
 
 Plus a `CiliumNetworkPolicy` entry in `media/templates/networkpolicy.yaml`.
 
-### Other
+### Chart details
 
 - Image pin with `# renovate: datasource=docker depName=ghcr.io/yama6a/codarr`
   on the preceding line. Tags stay pinned: a floating tag would deploy on its
@@ -167,7 +162,7 @@ Plus a `CiliumNetworkPolicy` entry in `media/templates/networkpolicy.yaml`.
 - Pod labels: `app: codarr`, `alert-criticality: warning`,
   `longhorn-replica-affinity/enabled: "true"`.
 
-### Two changes outside Codarr
+### Changes outside Codarr
 
 **A Plex client profile for HEVC in browsers.** Without it, Plex Media Server
 transcodes HEVC to browser clients regardless of what the browser can decode,

@@ -12,9 +12,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/fsx"
 )
 
-// TestProber_ProbeAgainstRealFfmpeg is the only test here that can tell working
-// from compiled-in (plan.md 10.1). It needs both a binary and a render node, so
-// it skips everywhere except the verification pod.
+// The only test here that can tell working from compiled-in (plan.md 10.1); it needs a
+// binary and a render node, so it skips outside the verification pod.
 func TestProber_ProbeAgainstRealFfmpeg(t *testing.T) {
 	t.Parallel()
 

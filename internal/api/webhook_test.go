@@ -12,9 +12,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/store"
 )
 
-// plan.md 13.1: the receiver dispatches by webhook id, so nothing has to guess
-// which instance sent an event, and a Test must answer 200 with a body because
-// that is the only feedback the operator gets when pasting the URL.
+// The receiver dispatches by webhook id, so nothing guesses which instance sent an
+// event, and a Test answers 200 with a body, the operator's only feedback (plan.md 13.1).
 
 func withWebhookInstance(h *harness, flavour domain.Flavour) {
 	h.store.GetArrInstanceByWebhookIDFunc = func(_ context.Context, id string) (domain.ArrInstance, error) {
@@ -83,9 +82,8 @@ func TestReceiveArrWebhook_DownloadCarriesThePathsAndEntityID(t *testing.T) {
 	require.Equal(t, int64(77), *seen.EntityID)
 }
 
-// plan.md 13.1's field list is wrong for Rename: Radarr sends renamedMovieFiles
-// with previousPath and no movieFile at all. The unknown fields survive the
-// strict server's decode, so both sides of the rename reach ingest.
+// plan.md 13.1's field list is wrong for Rename: Radarr sends renamedMovieFiles with
+// previousPath and no movieFile, and the unknown fields survive the strict decode.
 func TestReceiveArrWebhook_RenameCarriesBothSidesOfThePath(t *testing.T) {
 	t.Parallel()
 

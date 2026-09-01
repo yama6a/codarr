@@ -27,9 +27,8 @@ type duration struct {
 	Seconds float64
 }
 
-// fakeMetrics accumulates what the worker recorded. It is hand-written rather
-// than generated for the same reason fakeStore is: these tests assert the
-// series that came out, not that a method was reached.
+// Hand-written rather than generated for the same reason fakeStore is: these
+// tests assert the series that came out, not that a method was reached.
 type fakeMetrics struct {
 	mu sync.Mutex
 

@@ -10,8 +10,7 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/store/storetest"
 )
 
-// TestJobStore_EnqueueIsIdempotent covers the partial unique index in
-// 001_schema.sql: a webhook and a manual trigger racing on the same file give
+// The partial unique index of 001_schema.sql: a webhook racing a manual trigger gives
 // one job, and the loser is a no-op rather than an error.
 func TestJobStore_EnqueueIsIdempotent(t *testing.T) {
 	t.Parallel()
@@ -40,9 +39,8 @@ func TestJobStore_EnqueueIsIdempotent(t *testing.T) {
 	require.Equal(t, domain.OriginIngest, jobs[0].Origin)
 }
 
-// TestJobStore_EnqueueAfterTerminalStateCreatesANewJob is the other half of the
-// index: only the active states block, so a re-encode after a failure is a new
-// job rather than a silent no-op.
+// The other half of the index: only the active states block, so a re-encode after a
+// failure is a new job rather than a silent no-op.
 func TestJobStore_EnqueueAfterTerminalStateCreatesANewJob(t *testing.T) {
 	t.Parallel()
 
@@ -118,9 +116,8 @@ func TestJobStore_ClaimNextJobMarksMediaProcessing(t *testing.T) {
 	require.Equal(t, domain.MediaProcessing, reloaded.Status)
 }
 
-// TestJobStore_ConcurrentClaimsNeverReturnTheSameJob is the queue's safety
-// property: the select and the transition share one transaction, so two
-// callers racing on one queued row cannot both come away with it.
+// The queue's safety property: the select and the transition share one transaction, so
+// two callers racing on one queued row cannot both come away with it.
 func TestJobStore_ConcurrentClaimsNeverReturnTheSameJob(t *testing.T) {
 	t.Parallel()
 
@@ -283,8 +280,7 @@ func TestJobStore_SweepStopsShortOfTheCap(t *testing.T) {
 	require.Equal(t, domain.MaxAutoAttempts, results[0].Attempt)
 }
 
-// TestJobStore_SweepLeavesPromotingForTheCaller: promoting and
-// awaiting_stream_end need the destination file and the staging file to decide,
+// promoting and awaiting_stream_end need the destination and staging files to decide,
 // which the store has no business touching (plan.md 19.2).
 func TestJobStore_SweepLeavesPromotingForTheCaller(t *testing.T) {
 	t.Parallel()
@@ -467,9 +463,8 @@ func TestJobStore_ExecutionAndProgressUpdates(t *testing.T) {
 	require.InEpsilon(t, 23.98, reloaded.ProgressFPS, 0.0001)
 	require.Equal(t, 180, reloaded.EstimatedSeconds)
 
-	// plan.md 15.3 needs ffmpeg's own out_time for a legacy container, and 19.2
-	// resumes a promotion in another process, so it has to survive the round
-	// trip rather than living in the worker's memory.
+	// plan.md 15.3 needs ffmpeg's own out_time and 19.2 resumes in another process,
+	// so it has to survive the round trip rather than live in the worker's memory.
 	require.Equal(t, int64(7_200_000_000), reloaded.FinalOutTimeUS)
 }
 

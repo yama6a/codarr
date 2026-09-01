@@ -1,9 +1,7 @@
 // Package api implements the generated StrictServerInterface by hand.
 //
-// Handlers are thin: they validate, map and delegate. Everything that decides
-// anything lives in the package being called. Nothing in here is generated, and
-// nothing generated lives here, so regenerating api/ can never overwrite handler
-// logic.
+// Handlers validate, map and delegate; everything that decides anything lives in the
+// package being called. Nothing generated lives here, so regenerating api/ is safe.
 package api
 
 import (
@@ -24,9 +22,8 @@ import (
 
 //go:generate go run -mod=mod github.com/matryer/moq -out mock/api_mock.go -pkg mock . Store Queue Analyzer Scanner Webhooks Hardware Fingerprinter FS Pinger PlexAuth PlexClient ArrClient Metrics
 
-// Store is the persistence the API reads and writes, split by concern so no
-// handler depends on the 74-method store.Store. The same concrete store
-// satisfies all of it.
+// Store is the persistence the API reads and writes, split by concern so no handler
+// depends on the whole of store.Store.
 type Store interface {
 	SettingsStore
 	PlexStore
@@ -170,18 +167,15 @@ type ArrClient interface {
 	RootFolders(ctx context.Context) ([]arr.RootFolder, error)
 }
 
-// PlexFactory builds a client from the stored configuration. It is a factory
-// rather than a value because the base URL and token are edited at runtime and
-// a cached client would keep talking to the old server.
+// PlexFactory is a factory rather than a value because the base URL and token are edited
+// at runtime and a cached client would keep talking to the old server.
 type PlexFactory func(ctx context.Context) (PlexClient, error)
 
 // ArrFactory builds a client for one instance, for the same reason.
 type ArrFactory func(ctx context.Context, instance domain.ArrInstance) (ArrClient, error)
 
-// Metrics is the subset of the Prometheus surface the API touches: the errors
-// it answers with. Every job state transition, including the ones an API call
-// causes, is recorded inside internal/job, which is the only place that knows
-// the job's kind and origin and the only place that sees them all.
+// Metrics is only the errors the API answers with; job state transitions are recorded
+// inside internal/job, the one place that knows every job's kind and origin.
 type Metrics interface {
 	Error(category string)
 }

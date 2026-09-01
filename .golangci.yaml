@@ -129,7 +129,17 @@ linters:
         text: var-naming
       # A constructor returning its own package's interface is the boundary
       # pattern plan.md 2.2 asks for, not an accident.
-      - path: internal/pkg/(clock|fsx)/
+      - path: internal/pkg/(clock|fsx|events)/
+        linters:
+          - ireturn
+      # Every method of the generated StrictServerInterface returns a response
+      # interface. The signatures come out of api/openapi.yaml, so the only way
+      # to satisfy the linter would be to stop implementing the interface.
+      - path: internal/api/
+        linters:
+          - ireturn
+      # The factories in cmd hand the API layer the interfaces it declares.
+      - path: cmd/codarr/
         linters:
           - ireturn
       # Table-driven decision tests are long by construction; that is the point.

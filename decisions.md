@@ -568,6 +568,28 @@ actually executes consistent with the policy in force at run time rather than at
 enqueue time. A job whose plan has become `skip` between enqueue and execution
 fails with a specific message rather than silently doing nothing.
 
+## Wave 4
+
+### The library table's "title" is the filename without its extension
+
+18.2 lists "title" as a column, but the unit Codarr works in is a file and
+nothing in the data model carries a title: the *arrs own that, and Codarr
+deliberately never asks them for metadata it does not need. Derived from the
+filename.
+
+### The Plex PIN card is the one thing on a settings page that polls
+
+18.6 says settings pages do not poll at all. The plex.tv PIN handshake has no
+other shape: you create a PIN, the user authorises it in a browser, and you poll
+until a token appears. It polls at 3 seconds while its card is open and stops the
+moment a token is stored. Every other settings page still polls nothing.
+
+### `TransformRecord.video` is always present, with nullable before and after
+
+Raised as a possible problem for a file with no video stream. It is not: the
+transform builder always emits the object and leaves `before`/`after` null, so
+the schema requiring the key is satisfied.
+
 ## Known spec conflicts, implemented as written
 
 Both are recorded rather than fixed, because the plan is explicit and the

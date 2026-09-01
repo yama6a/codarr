@@ -36,3 +36,24 @@ const reportFailures: Middleware = {
 
 export const api = createClient<paths>({ baseUrl: BASE_URL });
 api.use(reportFailures);
+
+interface Result<T> {
+  data?: T;
+  error?: unknown;
+}
+
+/**
+ * unwrap turns openapi-fetch's `{ data, error }` into a promise that rejects, so `usePolling` can
+ * hold an error state. The middleware above has already toasted the detail.
+ */
+export async function unwrap<T>(promise: Promise<Result<T>>): Promise<T> {
+  const { data, error } = await promise;
+  if (data === undefined) {
+    const message =
+      error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+        ? error.message
+        : 'Request failed';
+    throw new Error(message);
+  }
+  return data;
+}

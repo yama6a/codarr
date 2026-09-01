@@ -124,7 +124,7 @@ func Build(req Request) (Command, error) {
 	args = append(args, "-map_metadata", "0", "-map_chapters", "0")
 
 	if req.Plan.OutputContainer == domain.ContainerMP4 {
-		args = append(args, "-movflags", "+faststart+use_metadata_tags")
+		args = append(args, "-movflags", strings.Join(MP4Movflags(), ""))
 	}
 
 	args = append(args,
@@ -388,8 +388,8 @@ func softwarePixFmt(p domain.Plan) string {
 func rateControlArgs(target int) []string {
 	return []string{
 		"-b:v", strconv.Itoa(target),
-		"-maxrate", strconv.Itoa(target * 8 / 5),
-		"-bufsize", strconv.Itoa(target * 2),
+		"-maxrate", strconv.Itoa(target * maxrateNum / maxrateDen),
+		"-bufsize", strconv.Itoa(target * bufsizeNum / bufsizeDen),
 	}
 }
 

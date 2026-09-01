@@ -62,9 +62,9 @@ func SampleArgs(src string, seg Segment, out string) []string {
 		"-t", formatSeconds(seg.Duration),
 		"-i", src,
 		"-an", "-sn",
-		"-c:v", "libx265",
-		"-crf", "21",
-		"-preset", "veryfast",
+		"-c:v", SampleEncoder,
+		"-crf", strconv.Itoa(SampleCRF),
+		"-preset", SamplePreset,
 		"-x265-params", "log-level=none",
 		out,
 	}

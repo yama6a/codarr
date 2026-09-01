@@ -156,11 +156,36 @@ Audio language is the only field it takes from the *arr, and no setting acts on
 it. Setting `parse_embedded_audio_track: true` removes even that, at no extra
 I/O, since Bazarr already reads those files.
 
-`ignore_pgs_subs: false` is worth noting for a different reason: Bazarr counts
-an embedded PGS track as "subtitles present" for that language. Codarr drops
-every PGS track (6.4), so Bazarr will then see the language as missing and fetch
-a real text subtitle. That is the desired outcome, and it means a burst of
-Bazarr downloads the first time Codarr sweeps a populated library.
+`use_embedded_subs: false` on BOTH instances is the master switch, and it makes
+`ignore_pgs_subs`, `ignore_vobsub_subs` and `ignore_ass_subs` inert: they only
+apply when embedded subtitles are being counted. So Bazarr never treats an
+embedded track as satisfying a language, and already fetches an external
+subtitle for every wanted language whatever is inside the file. Codarr dropping
+PGS tracks (6.4) therefore changes nothing about Bazarr's behaviour.
+
+The `embeddedsubtitles` provider is separately enabled with
+`included_codecs: []`, meaning all codecs. Worth pinning to text formats so it
+never tries to extract a PGS or VobSub track, which cannot become a useful
+sidecar without OCR.
+
+### Bazarr writes sidecars, so section 12's central scenario does not apply here (2026-09-01)
+
+```
+subfolder: current      # sidecar .srt beside the video, on both instances
+```
+
+`plan.md` 12 builds the skip rule around one specific case: Bazarr embedding a
+subtitle track via mkvmerge, which carries global tags through, leaving a file
+that still wears a valid CODARR tag and a matching policy hash but now contains
+a PGS track Codarr would have stripped. Trusting the tag alone would make that
+file invisible forever.
+
+As configured, Bazarr never rewrites a video file. A sidecar changes the
+directory, not the file, so it does not move the fingerprint.
+
+The tag-plus-fingerprint conjunction stays implemented regardless: it costs
+nothing, and it is one settings change away from mattering. But
+`modified_since_transcode` should be rare here rather than routine.
 
 Bazarr also runs its own per-instance path mapping (`/media/` to `/media/tv/`),
 which is the same remapping Codarr needs and independently confirms the root

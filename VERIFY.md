@@ -300,6 +300,17 @@ The default `subrip` encoder leaks `{\an8}` positioning as visible text, leaks
 `-c:s text -f srt` is clean but drops italics. 6.4 already accepts losing
 styling; this says the default encoder loses it *messily* rather than cleanly.
 
+### The full image builds and runs, 2026-09-01
+
+`docker buildx build --platform linux/amd64 -f .build/Dockerfile` succeeds. The
+resulting 441 MB image starts, applies all five migrations, serves `/healthz`,
+the SPA, `/api/policy` (hash `914f0f87`), `/api/dashboard` and 27 Prometheus
+series, running as uid 568 with `ffmpeg 7.1.4-Jellyfin` on the PATH.
+
+With no GPU passed through, the hardware probe correctly failed over and logged
+`software_fallback: true` with `encoder: libx265`, which is 10.2's loud
+reporting doing its job.
+
 ## The one finding that contradicts the plan
 
 ### The Dolby Vision configuration record does not survive `-c:v copy`

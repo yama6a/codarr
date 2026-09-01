@@ -195,25 +195,26 @@ folder finding above.
 
 | # | Claim | Status |
 |---|---|---|
-| 1 | HDR10 metadata survives a `hevc_qsv` round trip | TODO, verification pod |
+| 1 | HDR10 metadata survives a `hevc_qsv` round trip | **CONFIRMED** |
 | 2 | Plex `analyze` verb and path on the running PMS | TODO, blocked: no items in any library |
-| 3 | ffprobe JSON path for the Dolby Vision profile, and DOVI record survival on copy | TODO, blocked: no DV source exists and an RPU cannot be synthesised |
+| 3 | ffprobe JSON path for the Dolby Vision profile | **CONFIRMED**, but the record does NOT survive a copy. See below |
 | 4 | Chrome client profile produces Direct Stream for 8-bit and 10-bit HEVC | TODO, needs a browser and a real file |
-| 5 | *arr renaming is off on all four instances | **FAILED**, see above. Renaming is on and the formats use MediaInfo tokens |
-| 6 | Current jellyfin-ffmpeg Debian package name and repo path | **CONFIRMED**, see below |
-| 7 | `vainfo` inside the container, and which driver loaded | PARTIAL: vainfo present and the image builds; which driver loads needs the pod |
-| 8 | 7.1 to 5.1 downmix produces a sensible channel layout | TODO, verification pod |
-| 9 | ASS to SRT conversion is readable on a real sample | TODO, verification pod |
-| 10 | `rename()` atomicity and same device number on the NFS mount | TODO, verification pod |
-| 11 | Whether `chown` succeeds on the NFS mount | TODO, verification pod |
-| 12 | CODARR tag survives a round trip into MP4 | TODO, verification pod |
+| 5 | *arr renaming is off on all four instances | Deviation accepted by the user, see decisions.md |
+| 6 | Current jellyfin-ffmpeg Debian package name and repo path | **CONFIRMED** |
+| 7 | `vainfo` inside the container, and which driver loaded | **CONFIRMED**, Intel iHD 25.4.6, jellyfin-bundled |
+| 8 | 7.1 to 5.1 downmix produces a sensible channel layout | **CONFIRMED** |
+| 9 | ASS to SRT conversion is readable on a real sample | **CONFIRMED**, with caveats |
+| 10 | `rename()` atomicity and same device number on the NFS mount | **CONFIRMED** |
+| 11 | Whether `chown` succeeds on the NFS mount | **FAILS**, expected and tolerated |
+| 12 | CODARR tag survives a round trip into MP4 | **CONFIRMED**, MP4 output is not gated |
 | 13 | VMAF spot-check, tuning the 1.35 hardware correction | TODO, needs real content |
-| 14 | VP9 hardware decode on this Gen 9.5 driver stack | TODO, verification pod |
-| 15 | A level-rewritten file plays on the pickiest client | TODO, needs a television |
-| 16 | Whether Bazarr preserves the CODARR global tag | TODO, needs a real subtitle run |
+| 14 | VP9 hardware decode on this Gen 9.5 driver stack | **CONFIRMED**, stays in the hardware set |
+| 15 | A level-rewritten file plays on the pickiest client | Bitstream rewrite **CONFIRMED**; playback still needs a television |
+| 16 | Whether Bazarr preserves the CODARR global tag | Moot, Bazarr writes sidecars here |
 | - | Upgrades disabled on all four instances (23.2) | **CONFIRMED** |
 | - | *arr root folders all report `/media` | **CONFIRMED**, mappings mandatory |
 | - | Plex path mapping not needed | **CONFIRMED** |
+| - | QSV and VAAPI, HEVC Main and Main10 encode (10.1) | **CONFIRMED**, all four pass |
 
 ## Method for the pod-based items
 
@@ -221,3 +222,129 @@ A short-lived pod in the `media` namespace on `tc-w1`, requesting the free
 `gpu.intel.com/i915` slot (Plex holds the other of two), running as uid 568 with
 `media-library` mounted and an `emptyDir` for scratch. Sleep entrypoint,
 `kubectl exec` per check, deleted afterwards. Nothing existing is touched.
+
+
+---
+
+## Verification pod run, 2026-09-01
+
+One `codarr-verify` pod in `media` on `tc-w1`, holding the free `gpu.intel.com/i915`
+slot, `jellyfin/jellyfin:latest` (the same jellyfin-ffmpeg7 7.1.4 our Dockerfile
+installs), uid 568, library mounted, all test media synthesised with
+`ffmpeg -f lavfi`. Pod deleted afterwards and confirmed gone; the namespace is
+back to its original 12 pods and the i915 allocation back to Plex only. The one
+scratch directory on the NAS, `/media/.codarr-verify-tmp/`, was removed.
+
+### The hardware works, completely
+
+Driver is the jellyfin-bundled **Intel iHD 25.4.6**, libva 2.23 / VA-API 1.23.
+There is no distro driver in the image at all. `vainfo` reports HEVC Main and
+Main10 EncSlice, and VLD for MPEG-2, H.264, VC-1, HEVC Main/Main10, VP8 and VP9
+profiles 0 and 2. No AV1 VLD, exactly as 6.2 predicts for Gen 9.5.
+
+All four 10.1 probes pass, `{qsv, vaapi}` x `{Main 8-bit, Main10 10-bit}`, and
+re-running them to real files rather than `-f null` confirms the pixel formats.
+**Main10 does not fail**, so 10.1's "the cause is almost certainly the driver
+stack" caveat does not apply here.
+
+VP9 hardware decode works on both profile 0 and profile 2, including a full
+GPU-to-GPU `vp9_qsv` to `hevc_qsv` chain. `vp9` stays in the hardware-decode set.
+
+### The level rewrite works end to end
+
+`h264_metadata=level=4.2` rewrote 51 to 42 in both MKV and MP4, the SPS is
+changed in the raw bitstream, and `framemd5` is identical before and after. So
+6.2's central claim holds: the flag changes and not one decoded pixel does.
+
+### HDR10 survives, and more thoroughly than asked
+
+Mastering display and MaxCLL/MaxFALL both survive a `hevc_qsv` round trip, in
+the raw HEVC elementary stream rather than only in the container. Verified by
+stripping to a bare `.265` and reprobing.
+
+### The CODARR tag survives into MP4, and `use_metadata_tags` is load-bearing
+
+All three keys read back from `-show_format`. MP4 output is not gated.
+
+Worth knowing: **without `-movflags use_metadata_tags` all three vanish and
+ffmpeg still exits 0.** A silent success that produces an untagged output is
+exactly the loop section 12 exists to prevent, so that flag is not optional
+polish.
+
+### NFS behaves as 15.6 assumes
+
+- A real `rename(2)` over an existing file in the same directory succeeds and
+  swaps the inode. No EXDEV. The positive control, renaming from the container's
+  emptyDir into `/media`, correctly returns EXDEV(18), so the test discriminates.
+  **This confirms staging must stay on the NFS mount**; if 15.1's staging ever
+  moves to local scratch, promotion silently stops being atomic.
+- Device number `1048591` is identical across `/media`, the scratch dotdir, the
+  dotfile and its target. The 15.4 device comparison is meaningful.
+- `chown` fails EPERM for any uid or gid change; `chmod` and `touch -d` both
+  succeed. 15.6 already requires tolerating this. Note that EPERM here is **not**
+  evidence of `root_squash`: uid 568 is unprivileged, so POSIX forbids it either
+  way. Moot, since the library is uniformly 568:568 and Codarr writes as 568.
+- Mount options in effect:
+  `nfs4 rw,noatime,vers=4.2,rsize=1048576,wsize=1048576,softerr,softreval,fatal_neterrors=none,proto=tcp,timeo=600,retrans=5,sec=sys`
+
+### 7.1 to 5.1 downmix is correct
+
+`5.1(side)` for AC-3 and E-AC-3, `5.1` for FLAC; the label difference is the
+codec's, not ffmpeg's. A per-channel tone energy check shows BL and SL folding
+into Ls at -4.65 dB and -7.66 dB. Nothing dropped, nothing misrouted.
+
+### ASS to SRT is readable, with defects worth knowing
+
+The default `subrip` encoder leaks `{\an8}` positioning as visible text, leaks
+`\h` hard spaces, and turns `{\p1}` vector drawings into garbage lines.
+`-c:s text -f srt` is clean but drops italics. 6.4 already accepts losing
+styling; this says the default encoder loses it *messily* rather than cleanly.
+
+## The one finding that contradicts the plan
+
+### The Dolby Vision configuration record does not survive `-c:v copy`
+
+Neither into MKV nor into MP4, at any `-strict` level including `unofficial`.
+MP4 warns `Not writing 'dvcC'/'dvvC' box. Requires -strict unofficial.` and then
+declines anyway; MKV drops it silently. Confirmed three ways: unchanged file
+size, no box in a full MP4 box walk, and `side_data_list: null` on reprobe.
+Verbose logs show the record reaching the muxer intact, so the muxer is dropping
+it.
+
+The profile number's location IS confirmed, which closes half of 27.3:
+
+```
+.streams[].side_data_list[]
+  | select(.side_data_type == "DOVI configuration record")
+  | .dv_profile          # integer, at stream level
+```
+
+**Caveat, and it matters.** The test record was hand-injected with no real RPU
+behind it, so the muxers may be refusing a configuration record the bitstream
+does not actually back up. This is not proof that a genuine Dolby Vision file
+loses it. It does mean the necessary condition 9 assumes is unproven rather than
+established.
+
+Consequence if it holds for real files: 9's profile 5 gate makes verification a
+hard failure whenever the record is missing from the output, so **every profile 5
+file would fail verification permanently** and never be processed. That fails
+safe, since the source is untouched and the staging file is kept, but those files
+would sit in a failing state forever rather than being skipped cleanly.
+
+No policy change has been made on the strength of a synthetic test. Resolving it
+needs one real Dolby Vision profile 5 file.
+
+## Smaller findings
+
+- **The native `eac3` encoder refuses 7.1** and downmixes to `5.1(side)` without
+  being asked. Codarr never encodes to E-AC-3 (6.3's targets are AAC and AC-3),
+  so nothing depends on this, but any future branch assuming E-AC-3 carries eight
+  channels on this build would be wrong.
+- **6.2's `refs <= 4` guard reads the SPS `max_num_ref_frames`, which encoders
+  clamp downward.** `x264 -refs 3` produced `refs=1`. The guard is still correct;
+  it just reads lower than the nominal encoder setting, which makes it more
+  conservative rather than less.
+- **The mount is `softerr`, not `hard`.** A write can fail mid-promotion with EIO
+  after roughly five minutes of retries if the NAS hiccups. 15.6 discusses
+  `softerr` as a node-wedging tradeoff but says nothing about that failure
+  landing mid-job. Verification catches a truncated output, so it fails safe.

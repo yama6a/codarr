@@ -8,7 +8,7 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Panel } from '../../components/ui/Panel';
 import { toast } from '../../components/ui/Toast';
 import { formatDateTime } from '../../lib/format';
-import type { Hardware } from '../../api/types';
+import type { Hardware, HWCapability } from '../../api/types';
 
 export default function SettingsHardware() {
   const [hardware, setHardware] = useState<Hardware | null>(null);
@@ -40,6 +40,13 @@ export default function SettingsHardware() {
 
   const failing = hardware.capabilities.filter((capability) => !capability.works);
   const softwareOnly = hardware.selected_encoder === 'libx265';
+
+  // Severity follows the consequence, not the fact of a failure. plan.md 10.2 wants a software ENCODER
+  // fallback shown loudly, because it turns a 20-minute job into a 4-hour one. A decode that falls back
+  // costs some CPU on one source format, so rendering the two alike trains the operator to ignore both.
+  const actionable = (capability: HWCapability) =>
+    capability.direction === 'encode' ? softwareOnly : false;
+  const needsAction = failing.some(actionable);
 
   return (
     <div className="space-y-6 p-8">
@@ -83,8 +90,12 @@ export default function SettingsHardware() {
       </Panel>
 
       {hardware.remediation && failing.length > 0 && (
-        <Panel title="Remediation" icon="shield">
-          <p className="text-sm whitespace-pre-wrap text-amber-200">{hardware.remediation}</p>
+        <Panel title={needsAction ? 'Remediation' : 'Notes'} icon="shield">
+          <p
+            className={`text-sm whitespace-pre-wrap ${needsAction ? 'text-amber-200' : 'text-slate-400'}`}
+          >
+            {hardware.remediation}
+          </p>
         </Panel>
       )}
 
@@ -113,11 +124,20 @@ export default function SettingsHardware() {
                     {capability.works ? (
                       <Badge tone="success">works</Badge>
                     ) : (
-                      <Badge tone="danger" title={capability.error}>
-                        failed
+                      <Badge tone={actionable(capability) ? 'danger' : 'neutral'} title={capability.error}>
+                        {actionable(capability) ? 'failed' : 'unavailable'}
                       </Badge>
                     )}
-                    {capability.error && <p className="mt-1 text-xs text-red-300">{capability.error}</p>}
+                    {capability.error && (
+                      <details className="mt-1">
+                        <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-300">
+                          driver message
+                        </summary>
+                        <p className="mt-1 max-w-prose text-xs break-words whitespace-pre-wrap text-slate-400">
+                          {capability.error}
+                        </p>
+                      </details>
+                    )}
                   </td>
                   <td className="py-2 pr-3 text-xs text-slate-500">{capability.ffmpeg_version ?? ''}</td>
                   <td className="py-2 text-xs text-slate-500">{formatDateTime(capability.probed_at)}</td>

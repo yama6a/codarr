@@ -274,7 +274,7 @@ func TestCapabilities_RemediationShoutsWhenNothingWorks(t *testing.T) {
 
 	got := caps.Remediation()
 	require.Contains(t, got, "the render node")
-	require.Contains(t, got, "VP9 sources will decode in software")
+	require.Contains(t, got, "VP9 sources decode in software")
 	require.True(t, strings.HasSuffix(got,
 		"No hardware encoder works, so every full job runs on libx265. "+
 			"Expect several times the wall-clock time per file."), got)

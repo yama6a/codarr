@@ -302,10 +302,12 @@ func (c Capabilities) backendRemediation(b Backend) []string {
 			", which is backwards and points at the driver stack.")
 	}
 
+	// No errSuffix, unlike the encode lines above: this one needs no action, and
+	// the driver's own message is already on the capability row. VP9 decode is
+	// the only failure here with a working fallback (10.1).
 	if !c.DecodesVP9(b) {
-		lines = append(lines, string(b)+" did not decode VP9"+
-			c.errSuffix(b, DirectionDecode, CodecVP9, "")+
-			". VP9 sources will decode in software, which costs CPU but is otherwise correct.")
+		lines = append(lines, string(b)+" did not decode VP9, so VP9 sources decode in software. "+
+			"That costs CPU on a rare source format and is otherwise correct; nothing to fix.")
 	}
 
 	return lines

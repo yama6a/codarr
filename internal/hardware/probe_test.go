@@ -169,7 +169,9 @@ func TestProber_ProbeRecordsAFailedVP9Decode(t *testing.T) {
 
 	require.False(t, caps.DecodesVP9(hardware.BackendQSV))
 	require.True(t, caps.DecodesVP9(hardware.BackendVAAPI))
-	require.Contains(t, caps.Remediation(), "qsv did not decode VP9: decode failed")
+	require.Contains(t, caps.Remediation(), "qsv did not decode VP9, so VP9 sources decode in software")
+	// The driver message stays on the capability row: this line is informational.
+	require.NotContains(t, caps.Remediation(), "decode failed")
 }
 
 func TestProber_ProbeFailsWhenFfmpegIsNotRunnable(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 
 const (
 	eventColumns = `id, level, category, message, media_file_id, job_id, created_at`
-	// plan.md 24: keep the smaller of 30 days or 100k rows.
+	// Whichever of the two bites harder wins. See plan.md 24.
 	eventRetention = 30 * 24 * time.Hour
 	eventMaxRows   = 100_000
 )

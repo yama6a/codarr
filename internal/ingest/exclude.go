@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// MinSizeBytes is the 50 MB floor of plan.md 13.3. Below it a file is artwork,
-// a theme tune or a stray extra, never something worth an encode.
+// MinSizeBytes is the floor of plan.md 13.3: below it a file is artwork, a theme
+// tune or a stray extra, never something worth an encode.
 const MinSizeBytes int64 = 50 << 20
 
 // Exclusion is why a path is not a file Codarr processes. The empty value means

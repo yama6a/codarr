@@ -1,0 +1,12 @@
+{
+  "id": 987654321,
+  "code": "ABCD",
+  "product": "Codarr",
+  "trusted": true,
+  "clientIdentifier": "00000000-0000-4000-8000-000000000000",
+  "expiresIn": 780,
+  "createdAt": "2026-09-01T10:00:00Z",
+  "expiresAt": "2026-09-01T10:15:00Z",
+  "authToken": "PLACEHOLDER-PLEX-TOKEN",
+  "newRegistration": null
+}

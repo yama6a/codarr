@@ -1,0 +1,11 @@
+{
+  "name": "RescanSeries",
+  "commandName": "Rescan Series",
+  "message": "Scanning disk for Severance",
+  "body": { "seriesId": 77, "name": "RescanSeries", "trigger": "manual" },
+  "priority": "normal",
+  "status": "queued",
+  "queued": "2026-09-01T10:00:00Z",
+  "trigger": "manual",
+  "id": 77104
+}

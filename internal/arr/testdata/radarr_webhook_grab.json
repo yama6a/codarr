@@ -1,0 +1,7 @@
+{
+  "movie": { "id": 412, "title": "Arrival", "year": 2016, "folderPath": "/media/movies/Arrival (2016)" },
+  "release": { "quality": "Bluray-1080p", "releaseTitle": "Arrival.2016.1080p.BluRay.x264-GROUP", "size": 9876543210 },
+  "eventType": "Grab",
+  "instanceName": "Radarr-Yama",
+  "applicationUrl": ""
+}

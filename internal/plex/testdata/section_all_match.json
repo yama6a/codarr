@@ -1,0 +1,26 @@
+{
+  "MediaContainer": {
+    "size": 1,
+    "librarySectionID": 1,
+    "librarySectionTitle": "Movies-Yama",
+    "Metadata": [
+      {
+        "ratingKey": "1201",
+        "key": "/library/metadata/1201",
+        "title": "Arrival",
+        "type": "movie",
+        "Media": [
+          {
+            "id": 4501,
+            "Part": [
+              {
+                "id": 5501,
+                "file": "/media/yama/movies/Arrival (2016)/Arrival (2016) Bluray-1080p.mkv"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

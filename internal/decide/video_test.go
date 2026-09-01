@@ -633,3 +633,94 @@ func TestEngine_NilProbe(t *testing.T) {
 	_, err := decide.New().Plan(nil, decide.Options{Path: mkvPath})
 	require.ErrorIs(t, err, decide.ErrNoProbe)
 }
+
+func TestForceVideoEncode_TurnsACopiedStreamIntoTheEncodeTarget(t *testing.T) {
+	t.Parallel()
+
+	probe := fixture(t, "audio_only_mkv.json")
+
+	analysis, err := decide.New().Plan(probe, decide.Options{Path: "/media/a.mkv"})
+	require.NoError(t, err)
+	require.Equal(t, domain.KindAudioOnly, analysis.Plan.Kind)
+
+	video, ok := analysis.Plan.VideoStream()
+	require.True(t, ok)
+	require.Equal(t, domain.DecisionCopy, video.Decision)
+
+	forced, ok := decide.ForceVideoEncode(analysis.Plan, "space reclaim sweep")
+	require.True(t, ok)
+	require.Equal(t, domain.KindFull, forced.Kind)
+	require.False(t, forced.LevelRewrite)
+
+	forcedVideo, ok := forced.VideoStream()
+	require.True(t, ok)
+	require.Equal(t, domain.DecisionEncode, forcedVideo.Decision)
+	require.Equal(t, "hevc", forcedVideo.TargetCodec)
+	require.Equal(t, "space reclaim sweep", forcedVideo.Reason)
+
+	// The block is rewritten, not appended to: exactly one video line and one
+	// plan line, both describing what will now happen.
+	require.Equal(t, []string{
+		"video: ENCODE - space reclaim sweep",
+		"audio 0 (eng, 5.1): ENCODE - dts not in copy list for 3+ channels",
+		"audio 1 (ger, 2.0): COPY - aac, stereo",
+		"subtitle 0 (eng, hdmv_pgs_subtitle): DROP - image-based, forced",
+		"subtitle 1 (eng, subrip): COPY",
+		"subtitle 2 (swe, ass): CONVERT - ass to srt",
+		"container: matroska -> matroska",
+		"plan: FULL - video re-encoded to HEVC MAIN, 1 audio stream re-encoded, 1 subtitle stream converted, 1 subtitle stream dropped",
+	}, forced.Reasons)
+
+	// The caller's plan is untouched: the streams are copied, not aliased.
+	require.Equal(t, domain.DecisionCopy, video.Decision)
+	require.Equal(t, domain.KindAudioOnly, analysis.Plan.Kind)
+}
+
+// plan.md 9: profile 5 has no HDR10 base layer, so no saving justifies
+// re-encoding it.
+func TestForceVideoEncode_RefusesDolbyVisionProfile5(t *testing.T) {
+	t.Parallel()
+
+	probe := fixture(t, "audio_only_mkv.json")
+
+	analysis, err := decide.New().Plan(probe, decide.Options{Path: "/media/a.mkv"})
+	require.NoError(t, err)
+
+	p := analysis.Plan
+	p.DolbyVision = true
+	p.DolbyVisionProfile = 5
+
+	_, ok := decide.ForceVideoEncode(p, "space reclaim sweep")
+	require.False(t, ok)
+}
+
+func TestForceVideoEncode_RefusesAPlanWithNoVideoStream(t *testing.T) {
+	t.Parallel()
+
+	_, ok := decide.ForceVideoEncode(domain.Plan{
+		Streams: []domain.StreamPlan{
+			{Type: domain.StreamVideo, Decision: domain.DecisionDrop},
+			{Type: domain.StreamAudio, Decision: domain.DecisionCopy},
+		},
+	}, "space reclaim sweep")
+	require.False(t, ok)
+}
+
+// A stream already on the encode path keeps the same target rather than
+// changing meaning.
+func TestForceVideoEncode_IsAnIdentityForAPlanThatAlreadyEncodes(t *testing.T) {
+	t.Parallel()
+
+	probe := fixture(t, "audio_only_mkv.json")
+
+	analysis, err := decide.New().Plan(probe, decide.Options{Path: "/media/a.mkv"})
+	require.NoError(t, err)
+
+	once, ok := decide.ForceVideoEncode(analysis.Plan, "space reclaim sweep")
+	require.True(t, ok)
+
+	twice, ok := decide.ForceVideoEncode(once, "space reclaim sweep")
+	require.True(t, ok)
+
+	require.Equal(t, once, twice)
+}

@@ -1,0 +1,50 @@
+{
+  "MediaContainer": {
+    "size": 1,
+    "Metadata": [
+      {
+        "ratingKey": "1477",
+        "key": "/library/metadata/1477",
+        "sessionKey": "9",
+        "librarySectionID": "2",
+        "librarySectionTitle": "TV-Yama",
+        "grandparentTitle": "Severance",
+        "parentTitle": "Season 1",
+        "title": "Good News About Hell",
+        "type": "episode",
+        "index": 1,
+        "parentIndex": 1,
+        "Media": [
+          {
+            "id": 4711,
+            "videoResolution": "4k",
+            "Part": [
+              {
+                "id": 5711,
+                "key": "/library/parts/5711/1600000000/file.mkv",
+                "container": "mkv",
+                "decision": "transcode"
+              }
+            ]
+          }
+        ],
+        "User": { "id": "2", "title": "kostas" },
+        "Player": {
+          "address": "192.168.10.51",
+          "device": "AppleTV",
+          "machineIdentifier": "0000000000000000000000000000000000000002",
+          "platform": "tvOS",
+          "product": "Plex for Apple TV",
+          "state": "playing",
+          "title": "Living Room"
+        },
+        "TranscodeSession": {
+          "key": "/transcode/sessions/transcode-bbb",
+          "videoDecision": "transcode",
+          "audioDecision": "copy",
+          "progress": 12.5
+        }
+      }
+    ]
+  }
+}

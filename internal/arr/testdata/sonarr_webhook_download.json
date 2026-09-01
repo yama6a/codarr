@@ -1,0 +1,47 @@
+{
+  "series": {
+    "id": 77,
+    "title": "Severance",
+    "titleSlug": "severance",
+    "path": "/media/Severance",
+    "tvdbId": 371980,
+    "tvMazeId": 53667,
+    "imdbId": "tt11280740",
+    "type": "standard",
+    "year": 2022,
+    "tags": []
+  },
+  "episodes": [
+    {
+      "id": 5501,
+      "episodeNumber": 1,
+      "seasonNumber": 1,
+      "title": "Good News About Hell",
+      "airDate": "2022-02-18",
+      "airDateUtc": "2022-02-18T05:00:00Z",
+      "seriesId": 77,
+      "tvdbId": 8365001
+    }
+  ],
+  "episodeFile": {
+    "id": 9001,
+    "relativePath": "Season 01/Severance - S01E01 - Good News About Hell WEBDL-1080p.mkv",
+    "path": "/media/Severance/Season 01/Severance - S01E01 - Good News About Hell WEBDL-1080p.mkv",
+    "quality": "WEBDL-1080p",
+    "qualityVersion": 1,
+    "releaseGroup": "GROUP",
+    "sceneName": "Severance.S01E01.1080p.WEB.H264-GROUP",
+    "size": 3210987654,
+    "dateAdded": "2026-09-01T09:20:00Z",
+    "languages": [{ "id": 1, "name": "English" }],
+    "mediaInfo": { "audioChannels": 5.1, "audioCodec": "EAC3", "videoCodec": "h264" }
+  },
+  "isUpgrade": false,
+  "downloadClient": "qBittorrent",
+  "downloadClientType": "qBittorrent",
+  "downloadId": "FEDCBA9876543210",
+  "customFormatInfo": { "customFormats": [], "customFormatScore": 0 },
+  "eventType": "Download",
+  "instanceName": "Sonarr-Yama",
+  "applicationUrl": ""
+}

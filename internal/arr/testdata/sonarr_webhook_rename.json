@@ -1,0 +1,17 @@
+{
+  "series": { "id": 77, "title": "Severance", "path": "/media/Severance", "tvdbId": 371980, "year": 2022 },
+  "renamedEpisodeFiles": [
+    {
+      "id": 9001,
+      "relativePath": "Season 01/Severance - S01E01 - Good News About Hell WEBDL-1080p x265 EAC3.mkv",
+      "path": "/media/Severance/Season 01/Severance - S01E01 - Good News About Hell WEBDL-1080p x265 EAC3.mkv",
+      "previousRelativePath": "Season 01/Severance - S01E01 - Good News About Hell WEBDL-1080p x264 EAC3.mkv",
+      "previousPath": "/media/Severance/Season 01/Severance - S01E01 - Good News About Hell WEBDL-1080p x264 EAC3.mkv",
+      "quality": "WEBDL-1080p",
+      "size": 3210987654
+    }
+  ],
+  "eventType": "Rename",
+  "instanceName": "Sonarr-Yama",
+  "applicationUrl": ""
+}

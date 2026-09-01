@@ -1,0 +1,41 @@
+{
+  "movie": {
+    "id": 412,
+    "title": "Arrival",
+    "year": 2016,
+    "releaseDate": "2016-11-11",
+    "filePath": "/media/movies/Arrival (2016)/Arrival (2016) Bluray-1080p.mkv",
+    "folderPath": "/media/movies/Arrival (2016)",
+    "tmdbId": 329865,
+    "imdbId": "tt2543164",
+    "tags": []
+  },
+  "remoteMovie": { "tmdbId": 329865, "imdbId": "tt2543164", "title": "Arrival", "year": 2016 },
+  "movieFile": {
+    "id": 901,
+    "relativePath": "Arrival (2016) Bluray-1080p.mkv",
+    "path": "/media/movies/Arrival (2016)/Arrival (2016) Bluray-1080p.mkv",
+    "quality": "Bluray-1080p",
+    "qualityVersion": 1,
+    "releaseGroup": "GROUP",
+    "sceneName": "Arrival.2016.1080p.BluRay.x264-GROUP",
+    "indexerFlags": "0",
+    "size": 9876543210,
+    "dateAdded": "2026-09-01T09:12:00Z",
+    "languages": [{ "id": 1, "name": "English" }],
+    "mediaInfo": {
+      "audioChannels": 5.1,
+      "audioCodec": "DTS",
+      "videoCodec": "x264",
+      "videoDynamicRangeType": ""
+    }
+  },
+  "isUpgrade": false,
+  "downloadClient": "qBittorrent",
+  "downloadClientType": "qBittorrent",
+  "downloadId": "0123456789ABCDEF",
+  "customFormatInfo": { "customFormats": [], "customFormatScore": 0 },
+  "eventType": "Download",
+  "instanceName": "Radarr-Yama",
+  "applicationUrl": ""
+}

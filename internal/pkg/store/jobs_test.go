@@ -450,6 +450,7 @@ func TestJobStore_ExecutionAndProgressUpdates(t *testing.T) {
 		FallbackReason:   "qsv init failed",
 		SourceSize:       9_871_234_567,
 		EstimatedSeconds: 240,
+		FinalOutTimeUS:   7_200_000_000,
 	}))
 	require.NoError(t, s.UpdateJobProgress(t.Context(), job.ID, 42.5, 3.75, 180))
 
@@ -464,6 +465,11 @@ func TestJobStore_ExecutionAndProgressUpdates(t *testing.T) {
 	require.InEpsilon(t, 42.5, reloaded.ProgressPct, 0.0001)
 	require.InEpsilon(t, 3.75, reloaded.ProgressSpeed, 0.0001)
 	require.Equal(t, 180, reloaded.EstimatedSeconds)
+
+	// plan.md 15.3 needs ffmpeg's own out_time for a legacy container, and 19.2
+	// resumes a promotion in another process, so it has to survive the round
+	// trip rather than living in the worker's memory.
+	require.Equal(t, int64(7_200_000_000), reloaded.FinalOutTimeUS)
 }
 
 func TestJobStore_GetJobNotFound(t *testing.T) {

@@ -1,0 +1,22 @@
+{
+  "id": 412,
+  "title": "Arrival",
+  "originalTitle": "Arrival",
+  "year": 2016,
+  "tmdbId": 329865,
+  "imdbId": "tt2543164",
+  "path": "/media/Arrival (2016)",
+  "rootFolderPath": "/media",
+  "qualityProfileId": 4,
+  "monitored": true,
+  "minimumAvailability": "released",
+  "hasFile": true,
+  "movieFileId": 901,
+  "runtime": 116,
+  "sizeOnDisk": 9876543210,
+  "status": "released",
+  "titleSlug": "arrival-329865",
+  "added": "2026-08-30T22:20:41Z",
+  "tags": [],
+  "addOptions": { "searchForMovie": false }
+}

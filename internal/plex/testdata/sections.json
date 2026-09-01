@@ -1,0 +1,113 @@
+{
+  "MediaContainer": {
+    "size": 4,
+    "allowSync": false,
+    "title1": "Plex Library",
+    "Directory": [
+      {
+        "allowSync": true,
+        "filters": true,
+        "refreshing": false,
+        "key": "3",
+        "type": "movie",
+        "title": "Movies-Kostas",
+        "agent": "tv.plex.agents.movie",
+        "scanner": "Plex Movie",
+        "language": "en-US",
+        "metadataAgentProviderGroupId": 1,
+        "uuid": "00000000-0000-0000-0000-00000000c003",
+        "updatedAt": 1788198926,
+        "createdAt": 1788187129,
+        "scannedAt": 1788198926,
+        "content": true,
+        "directory": true,
+        "contentChangedAt": -1,
+        "hidden": 0,
+        "Location": [
+          {
+            "id": 3,
+            "path": "/media/kostas/movies"
+          }
+        ]
+      },
+      {
+        "allowSync": true,
+        "filters": true,
+        "refreshing": false,
+        "key": "1",
+        "type": "movie",
+        "title": "Movies-Yama",
+        "agent": "tv.plex.agents.movie",
+        "scanner": "Plex Movie",
+        "language": "en-US",
+        "metadataAgentProviderGroupId": 1,
+        "uuid": "00000000-0000-0000-0000-00000000c001",
+        "updatedAt": 1788198591,
+        "createdAt": 1788184278,
+        "scannedAt": 1788198591,
+        "content": true,
+        "directory": true,
+        "contentChangedAt": -1,
+        "hidden": 0,
+        "Location": [
+          {
+            "id": 1,
+            "path": "/media/yama/movies"
+          }
+        ]
+      },
+      {
+        "allowSync": true,
+        "filters": true,
+        "refreshing": false,
+        "key": "4",
+        "type": "show",
+        "title": "TV-Kostas",
+        "agent": "tv.plex.agents.series",
+        "scanner": "Plex TV Series",
+        "language": "en-US",
+        "metadataAgentProviderGroupId": 2,
+        "uuid": "00000000-0000-0000-0000-00000000c004",
+        "updatedAt": 1788198919,
+        "createdAt": 1788187187,
+        "scannedAt": 1788198919,
+        "content": true,
+        "directory": true,
+        "contentChangedAt": -1,
+        "hidden": 0,
+        "Location": [
+          {
+            "id": 4,
+            "path": "/media/kostas/tv"
+          }
+        ]
+      },
+      {
+        "allowSync": true,
+        "filters": true,
+        "refreshing": false,
+        "key": "2",
+        "type": "show",
+        "title": "TV-Yama",
+        "agent": "tv.plex.agents.series",
+        "scanner": "Plex TV Series",
+        "language": "en-US",
+        "metadataAgentProviderGroupId": 2,
+        "uuid": "00000000-0000-0000-0000-00000000c002",
+        "updatedAt": 1788198913,
+        "createdAt": 1788184291,
+        "scannedAt": 1788198913,
+        "content": true,
+        "directory": true,
+        "contentChangedAt": -1,
+        "hidden": 0,
+        "Location": [
+          {
+            "id": 2,
+            "path": "/media/yama/tv"
+          }
+        ]
+      }
+    ]
+  }
+}

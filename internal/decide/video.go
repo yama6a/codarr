@@ -214,3 +214,82 @@ func joinFailures(fails []copyFailure) string {
 
 	return strings.Join(texts, ", ")
 }
+
+// ForceVideoEncode returns p with its primary video stream re-encoded to the
+// policy's target codec, and reports whether that is allowed. It exists for the
+// space reclaim sweep of plan.md 11, which is the one caller that re-encodes
+// video the copy test of 6.2 passed; reason is what the sweep wants recorded
+// against the stream.
+//
+// It reports false when there is no video stream to force, and when plan.md 9
+// forbids re-encoding this one: Dolby Vision profile 5 has no HDR10 base layer,
+// so no saving justifies it.
+func ForceVideoEncode(p domain.Plan, reason string) (domain.Plan, bool) {
+	if p.DolbyVision && p.DolbyVisionProfile == dolbyVisionNoEncodeProfile {
+		return domain.Plan{}, false
+	}
+
+	streams := slices.Clone(p.Streams)
+	forced := false
+
+	for i := range streams {
+		if streams[i].Type != domain.StreamVideo || streams[i].Decision == domain.DecisionDrop {
+			continue
+		}
+
+		streams[i].Decision = domain.DecisionEncode
+		streams[i].TargetCodec = videoEncodeCodec
+		streams[i].Reason = reason
+		forced = true
+
+		break
+	}
+
+	if !forced {
+		return domain.Plan{}, false
+	}
+
+	p.Streams = streams
+	p.Kind = domain.KindFull
+
+	// The stream is being re-encoded, so there is no level flag left to rewrite.
+	p.LevelRewrite = false
+	// The reason block is rewritten in place rather than appended to: leaving
+	// the original "video: COPY" line next to a new "video: ENCODE" one puts two
+	// contradictory statements in front of the user (plan.md 7).
+	p.Reasons = rewriteReasons(p.Reasons,
+		"video: "+strings.ToUpper(string(domain.DecisionEncode))+" - "+reason,
+		"plan: "+strings.ToUpper(string(domain.KindFull))+" - "+summarise(p))
+
+	return p, true
+}
+
+// rewriteReasons replaces the primary video line and the plan line of a reason
+// block, which are the only two ForceVideoEncode changes.
+func rewriteReasons(reasons []string, videoLine, planLine string) []string {
+	out := slices.Clone(reasons)
+	video, plan := -1, -1
+
+	for i, line := range out {
+		switch {
+		case video < 0 && strings.HasPrefix(line, "video: "):
+			video = i
+		case strings.HasPrefix(line, "plan: "):
+			plan = i
+		}
+	}
+
+	if video < 0 {
+		out = append(out, videoLine)
+	} else {
+		out[video] = videoLine
+	}
+
+	if plan < 0 {
+		return append(out, planLine)
+	}
+
+	out[plan] = planLine
+
+	return out
+}

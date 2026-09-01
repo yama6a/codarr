@@ -1,0 +1,47 @@
+{
+  "MediaContainer": {
+    "size": 1,
+    "Metadata": [
+      {
+        "ratingKey": "1201",
+        "key": "/library/metadata/1201",
+        "sessionKey": "7",
+        "librarySectionID": "1",
+        "librarySectionTitle": "Movies-Yama",
+        "title": "Arrival",
+        "type": "movie",
+        "year": 2016,
+        "duration": 6960000,
+        "viewOffset": 812345,
+        "Media": [
+          {
+            "id": 4501,
+            "videoResolution": "1080",
+            "container": "mkv",
+            "Part": [
+              {
+                "id": 5501,
+                "key": "/library/parts/5501/1600000000/file.mkv",
+                "file": "/media/yama/movies/Arrival (2016)/Arrival (2016) Bluray-1080p.mkv",
+                "container": "mkv",
+                "decision": "directplay",
+                "size": 9876543210
+              }
+            ]
+          }
+        ],
+        "User": { "id": "1", "title": "yama" },
+        "Player": {
+          "address": "192.168.10.44",
+          "device": "Windows",
+          "machineIdentifier": "0000000000000000000000000000000000000001",
+          "platform": "Chrome",
+          "product": "Plex Web",
+          "state": "playing",
+          "title": "Chrome"
+        },
+        "Session": { "id": "session-aaa", "bandwidth": 12000, "location": "lan" }
+      }
+    ]
+  }
+}

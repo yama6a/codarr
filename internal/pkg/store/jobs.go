@@ -12,7 +12,7 @@ import (
 
 const jobColumns = `id, media_file_id, kind, origin, priority, state, attempt, transform_json,
 	staging_path, used_temp_dir, ffmpeg_argv, progress_pct, progress_speed, estimated_seconds,
-	actual_seconds, encoder_used, decode_path, fell_back, fallback_reason, source_size,
+	actual_seconds, final_out_time_us, encoder_used, decode_path, fell_back, fallback_reason, source_size,
 	output_size, output_fingerprint, output_full_hash, blocked_by, failure_code,
 	failure_message, stderr_tail, queued_at, started_at, finished_at`
 
@@ -242,13 +242,13 @@ func (s *store) UpdateJobExecution(ctx context.Context, u ExecutionUpdate) error
 		UPDATE jobs SET
 			staging_path = ?, used_temp_dir = ?, ffmpeg_argv = ?, encoder_used = ?,
 			decode_path = ?, fell_back = ?, fallback_reason = ?, source_size = ?,
-			estimated_seconds = ?
+			estimated_seconds = ?, final_out_time_us = ?
 		WHERE id = ?`
 
 	return s.execOne(ctx, query, nullString(u.StagingPath), u.UsedTempDir, argv,
 		nullString(string(u.EncoderUsed)), nullString(string(u.DecodePath)), u.FellBack,
 		nullString(u.FallbackReason), nullInt64(u.SourceSize),
-		nullInt64(int64(u.EstimatedSeconds)), u.JobID)
+		nullInt64(int64(u.EstimatedSeconds)), nullInt64(u.FinalOutTimeUS), u.JobID)
 }
 
 func (s *store) UpdateJobProgress(ctx context.Context, id int64, pct, speed float64, estimatedSeconds int) error {
@@ -641,6 +641,7 @@ func scanJob(row rowScanner) (domain.Job, error) {
 		progressSpeed  sql.NullFloat64
 		estimated      sql.NullInt64
 		actual         sql.NullInt64
+		finalOutTime   sql.NullInt64
 		encoderUsed    sql.NullString
 		decodePath     sql.NullString
 		fallbackReason sql.NullString
@@ -659,7 +660,7 @@ func scanJob(row rowScanner) (domain.Job, error) {
 
 	err := row.Scan(&j.ID, &j.MediaFileID, &kind, &origin, &j.Priority, &state, &j.Attempt,
 		&transform, &stagingPath, &j.UsedTempDir, &ffmpegArgv, &progressPct, &progressSpeed,
-		&estimated, &actual, &encoderUsed, &decodePath, &j.FellBack, &fallbackReason,
+		&estimated, &actual, &finalOutTime, &encoderUsed, &decodePath, &j.FellBack, &fallbackReason,
 		&sourceSize, &outputSize, &outFingerprint, &outFullHash, &blockedBy, &failureCode,
 		&failureMessage, &stderrTail, &queuedAt, &startedAt, &finishedAt)
 	if err != nil {
@@ -674,6 +675,7 @@ func scanJob(row rowScanner) (domain.Job, error) {
 	j.ProgressSpeed = progressSpeed.Float64
 	j.EstimatedSeconds = int(estimated.Int64)
 	j.ActualSeconds = int(actual.Int64)
+	j.FinalOutTimeUS = finalOutTime.Int64
 	j.EncoderUsed = domain.Encoder(encoderUsed.String)
 	j.DecodePath = domain.DecodePath(decodePath.String)
 	j.FallbackReason = fallbackReason.String

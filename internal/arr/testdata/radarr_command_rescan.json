@@ -1,0 +1,11 @@
+{
+  "name": "RescanMovie",
+  "commandName": "Rescan Movie",
+  "message": "Scanning disk for Arrival",
+  "body": { "movieId": 412, "name": "RescanMovie", "trigger": "manual" },
+  "priority": "normal",
+  "status": "queued",
+  "queued": "2026-09-01T10:00:00Z",
+  "trigger": "manual",
+  "id": 55021
+}

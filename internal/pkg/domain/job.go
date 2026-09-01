@@ -88,6 +88,12 @@ type Job struct {
 	EstimatedSeconds int
 	ActualSeconds    int
 
+	// FinalOutTimeUS is ffmpeg's own last out_time for the run (14.3). It is a
+	// column rather than in-memory state because 19.2 resumes
+	// awaiting_stream_end across a restart, and 15.3's legacy-container
+	// fallback has nothing to compare against without it.
+	FinalOutTimeUS int64
+
 	EncoderUsed    Encoder
 	DecodePath     DecodePath
 	FellBack       bool

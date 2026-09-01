@@ -1,0 +1,18 @@
+{
+  "MediaContainer": {
+    "size": 0,
+    "allowSync": true,
+    "art": "/:/resources/movie-fanart.jpg",
+    "identifier": "com.plexapp.plugins.library",
+    "librarySectionID": 1,
+    "librarySectionTitle": "Movies-Yama",
+    "librarySectionUUID": "00000000-0000-0000-0000-00000000c001",
+    "mediaTagPrefix": "/system/bundle/media/flags/",
+    "mediaTagVersion": 1786540085,
+    "thumb": "/:/resources/movie.png",
+    "title1": "Movies-Yama",
+    "title2": "All Movies-Yama",
+    "viewGroup": "movie",
+    "viewMode": 65592
+  }
+}

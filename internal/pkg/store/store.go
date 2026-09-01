@@ -135,6 +135,11 @@ type ExecutionUpdate struct {
 	FallbackReason   string
 	SourceSize       int64
 	EstimatedSeconds int
+
+	// FinalOutTimeUS is ffmpeg's own last out_time, known only once the run
+	// ends. Verification needs it for a legacy container whose header lies
+	// about duration (plan.md 14.3, 15.3), including after a restart.
+	FinalOutTimeUS int64
 }
 
 // MediaStat is the cheap projection the scheduled scan diffs against the

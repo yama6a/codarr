@@ -427,6 +427,147 @@ it, `codarr_output_fingerprint` stays NULL on a file Codarr wrote and provenance
 reads `untouched` forever. Not a safety problem, since the decision engine plans
 a compliant file as `skip` regardless, but wrong in the UI.
 
+## Wave 3
+
+### 13.1's list of webhook fields is wrong for Rename events
+
+`plan.md` 13.1 says the fields read are `movieFile.{id,relativePath,path}` and
+`episodeFile.{...}`. A **Rename** payload carries neither. Radarr sends
+`renamedMovieFiles[]` and Sonarr `renamedEpisodeFiles[]`, each entry adding
+`previousPath` and `previousRelativePath`.
+
+A parser following 13.1 literally would read a rename as an event with zero
+files and leave the stored path pointing at a file that no longer exists. The
+parser handles both shapes.
+
+This matters more here than it would elsewhere: renaming is on with MediaInfo
+tokens on all four instances (see `VERIFY.md`), so Rename is the event most
+likely to fire after a `full` job changes a file's codec.
+
+### The Plex rating-key lookup happens before the refresh, not after
+
+16.1 lists the partial refresh first and `analyze` second. The refresh is
+asynchronous, so a rating-key lookup immediately after it can race the scan and
+miss. The lookup runs first, which normally works because Codarr keeps the path
+stable (16.2), with a second lookup after the refresh for the one case where the
+path does change: a legacy container becoming MKV (6.1).
+
+### The session listing is never cached, only the rating-key resolution
+
+16.1 says to "cache briefly" when checking for active streams. Caching the
+`/status/sessions` listing would be wrong: `promote` re-checks immediately before
+the rename specifically to close 15.6's ESTALE window, and a cached answer there
+reopens the race the check exists to close.
+
+What is cached is the `ratingKey` to `Media[].Part[].file` resolution, 30 second
+TTL, kept short because a `full` job can change a file's extension. Same call
+volume in steady state, no correctness hole.
+
+### Radarr's unmonitor PUT round-trips the whole movie as raw JSON
+
+16.2's `PUT /api/v3/movie` replaces the entire resource. Unmarshalling into a
+typed struct and marshalling it back would blank every field Radarr has added
+since this code was written, so the movie is carried as
+`map[string]json.RawMessage` with only `monitored` altered.
+
+### The scan refuses to prune when a root does not stat as a directory
+
+13.2 says any `media_files` row whose path no longer exists is marked `missing`.
+Taken literally that is dangerous here: an unmounted or unreachable NFS export
+stats as an error and walks as an empty tree, so a single bad mount would retire
+the entire library in one pass and wreck the dashboard's compatibility summary.
+
+Two guards, neither in the plan: a root that does not stat as a directory is
+skipped whole with no pruning at all, and every prune candidate is stat-confirmed
+individually before being marked missing. The `softerr` mount option confirmed in
+`VERIFY.md` makes the unreachable-export case realistic rather than theoretical.
+
+### The hardware probe serves the cache at startup and only forces on demand
+
+10.1 says to probe "at startup and on demand" but also to cache in SQLite and
+re-probe when the ffmpeg version changes. Taken literally every restart burns six
+ffmpeg invocations for an answer already stored. Startup serves the cache when
+every row carries the current ffmpeg version; the UI button forces a fresh probe.
+
+### Migration 003 adds a device column to hw_capabilities
+
+17.1's `hw_capabilities` is keyed on the ffmpeg version alone, so changing
+`qsv_device` in the UI leaves a stale answer about a device no longer in use.
+The probe now records the device it ran against.
+
+### The decode retry runs before the encoder chain
+
+10.1 gives one software-decode retry and 10.2 gives a three-step encoder chain,
+with no statement of which runs first or how they share an attempt budget.
+
+Decode retry first, once, on the same encoder: it is far cheaper than dropping to
+libx265, and 6.2's software-decode sources go through dav1d comfortably faster
+than realtime. Then step the encoder chain, resetting the decode-retry flag at
+each step because a different backend fails differently.
+
+ffmpeg's stderr is never parsed to classify the failure. Driver error strings are
+not a stable API, so the cheap retry is simply tried before the expensive one.
+
+These are in-job retries and are deliberately NOT part of `domain.MaxAutoAttempts`,
+which counts process-death interruptions (19.2).
+
+### `scan_cron` is five numeric fields
+
+13.2 names the column but no dialect. Implemented in-package as five fields with
+`*`, ranges, lists and steps. No `@daily`, no `MON`. A richer dialect would mean
+taking a cron dependency, which is not worth it for one scheduled sweep.
+
+### A webhook Test succeeds even for an instance disabled in Codarr
+
+The operator is pasting the URL and clicking Test at that moment; answering 500
+because the instance is not enabled yet would be actively unhelpful. Non-Test
+events for a disabled instance are acknowledged and ignored.
+
+### The `promoting` consistency check tests the fingerprint before the tag
+
+19.2 says to detect whether the rename landed "by checking the destination file
+for the CODARR tag with the current policy hash". That is not sufficient on its
+own, for exactly the reason section 12 gives: mkvmerge preserves global tags, so
+a file promoted by an earlier run and modified since carries a valid tag and a
+matching policy hash.
+
+The sparse fingerprint is checked first, against what analysis recorded, which
+proves the file is still the source rather than an output. The tag is checked
+second. The case 19.2 says cannot happen (neither matches) fails with
+`promote_failed` naming both, rather than guessing.
+
+The same check now also covers `awaiting_stream_end` when the staging file has
+gone, instead of 19.2's literal "delete and re-queue".
+
+### Migration 004 persists ffmpeg's final out_time
+
+15.3's legacy-container fallback compares the output against ffmpeg's own
+`out_time` rather than the source's header, because VOB and AVI headers lie. 14.3
+keeps that value in memory, but 19.2 resumes `awaiting_stream_end` across a
+process restart, at which point the in-memory value is gone and a resumed job on
+a legacy container has no fallback. Now a column.
+
+### A failed bitrate sample probe falls back rather than failing the job
+
+19.1 lists `probe_failed` for "ffprobe or the bitrate sample probe errored", but
+8.2 exists precisely to give the sample probe a fallback. Followed 8.2: warn and
+use the formula. `probe_failed` is reserved for a real ffprobe failure, where
+there is genuinely nothing to go on.
+
+### Section 11's 35% threshold is applied to file size, not video bitrate
+
+The table in 11 quotes video-bitrate ratios but the confirmation shows a total
+projected saving in bytes. Applying the threshold to the projected file size is
+strictly more conservative, since audio and subtitles do not shrink. Sweep
+candidates carry both numbers so the UI can show either.
+
+### The worker re-plans from the stored probe rather than trusting `jobs.kind`
+
+It is the only way to surface `NeedsIdetSample`, and it keeps the plan that
+actually executes consistent with the policy in force at run time rather than at
+enqueue time. A job whose plan has become `skip` between enqueue and execution
+fails with a specific message rather than silently doing nothing.
+
 ## Known spec conflicts, implemented as written
 
 Both are recorded rather than fixed, because the plan is explicit and the

@@ -1,0 +1,25 @@
+{
+  "movie": {
+    "id": 412,
+    "title": "Arrival",
+    "year": 2016,
+    "folderPath": "/media/movies/Arrival (2016)",
+    "tmdbId": 329865
+  },
+  "renamedMovieFiles": [
+    {
+      "id": 901,
+      "relativePath": "Arrival (2016) Bluray-1080p x265 DTS.mkv",
+      "path": "/media/movies/Arrival (2016)/Arrival (2016) Bluray-1080p x265 DTS.mkv",
+      "previousRelativePath": "Arrival (2016) Bluray-1080p x264 DTS.mkv",
+      "previousPath": "/media/movies/Arrival (2016)/Arrival (2016) Bluray-1080p x264 DTS.mkv",
+      "quality": "Bluray-1080p",
+      "qualityVersion": 1,
+      "size": 9876543210,
+      "dateAdded": "2026-09-01T09:12:00Z"
+    }
+  ],
+  "eventType": "Rename",
+  "instanceName": "Radarr-Yama",
+  "applicationUrl": ""
+}

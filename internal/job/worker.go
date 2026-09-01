@@ -1,0 +1,241 @@
+package job
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"os"
+
+	"github.com/yama6a/codarr/internal/pkg/domain"
+	"github.com/yama6a/codarr/internal/pkg/store"
+)
+
+// Run consumes the queue until ctx is cancelled. plan.md 19: one goroutine, one
+// transcode at a time. It returns nil on shutdown, leaving whatever was in
+// flight for the interrupted-job sweep of 19.2 to pick up on the next start.
+func (s *Service) Run(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
+		ran, err := s.RunOnce(ctx)
+		if err != nil {
+			s.log.ErrorContext(ctx, "the worker could not take the next job", slog.Any("error", err))
+		}
+
+		if ran {
+			continue
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-s.wake:
+		case <-s.clk.After(s.idlePoll):
+		}
+	}
+}
+
+// RunOnce takes at most one piece of work and reports whether it found any. A
+// promotion resumed from a crash (19.2) comes first: its expensive half is
+// already done and it is holding a verified output on the destination.
+func (s *Service) RunOnce(ctx context.Context) (bool, error) {
+	if id, ok := s.nextPending(); ok {
+		return true, s.resume(ctx, id)
+	}
+
+	paused, err := s.Paused(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	if paused {
+		return false, nil
+	}
+
+	j, ok, err := s.store.ClaimNextJob(ctx)
+	if err != nil {
+		return false, fmt.Errorf("claiming the next job: %w", err)
+	}
+
+	if !ok {
+		return false, nil
+	}
+
+	return true, s.execute(ctx, j)
+}
+
+// Paused reports whether the queue is accepting new work. A running job is
+// unaffected (19).
+func (s *Service) Paused(ctx context.Context) (bool, error) {
+	settings, err := s.store.GetSettings(ctx)
+	if err != nil {
+		return false, fmt.Errorf("reading the queue settings: %w", err)
+	}
+
+	return settings.QueuePaused, nil
+}
+
+// Pause stops new jobs starting. Whatever is running continues to completion.
+func (s *Service) Pause(ctx context.Context) error { return s.setPaused(ctx, true) }
+
+// Resume starts consuming the queue again.
+func (s *Service) Resume(ctx context.Context) error {
+	if err := s.setPaused(ctx, false); err != nil {
+		return err
+	}
+
+	s.notify()
+
+	return nil
+}
+
+func (s *Service) setPaused(ctx context.Context, paused bool) error {
+	settings, err := s.store.GetSettings(ctx)
+	if err != nil {
+		return fmt.Errorf("reading the queue settings: %w", err)
+	}
+
+	if settings.QueuePaused == paused {
+		return nil
+	}
+
+	settings.QueuePaused = paused
+	settings.UpdatedAt = s.clk.Now()
+
+	if err := s.store.UpdateSettings(ctx, settings); err != nil {
+		return fmt.Errorf("storing the queue settings: %w", err)
+	}
+
+	s.log.InfoContext(ctx, "queue pause changed", slog.Bool("paused", paused))
+
+	return nil
+}
+
+// Cancel stops a job. A running one gets SIGTERM, the grace period and then
+// SIGKILL from the runner, its staging file is deleted and it ends in
+// cancelled, where it stays visible; a queued one simply moves to cancelled
+// (19). It blocks until the running job has actually stopped, so the caller's
+// next read of the job row sees the final state.
+func (s *Service) Cancel(ctx context.Context, jobID int64) error {
+	if done, ok := s.requestCancel(jobID); ok {
+		select {
+		case <-done:
+			return nil
+		case <-ctx.Done():
+			return fmt.Errorf("waiting for job %d to stop: %w", jobID, ctx.Err())
+		}
+	}
+
+	j, err := s.store.GetJob(ctx, jobID)
+	if err != nil {
+		return fmt.Errorf("loading job %d: %w", jobID, err)
+	}
+
+	if err := s.store.CancelJob(ctx, jobID); err != nil {
+		return fmt.Errorf("cancelling job %d: %w", jobID, err)
+	}
+
+	s.releaseMedia(ctx, j.MediaFileID)
+	s.removeStaging(ctx, j.StagingPath)
+
+	return nil
+}
+
+// requestCancel signals the in-flight job if jobID names it, returning the
+// channel that closes once the worker has finished the transition.
+func (s *Service) requestCancel(jobID int64) (<-chan struct{}, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.current == nil || s.current.id != jobID {
+		return nil, false
+	}
+
+	s.current.requested = true
+	s.current.cancel()
+
+	return s.current.done, true
+}
+
+// Restart re-queues a cancelled or failed job ahead of everything already
+// queued and resets the automatic-interruption counter (19, 19.2).
+func (s *Service) Restart(ctx context.Context, jobID int64) (domain.Job, error) {
+	j, err := s.store.RestartJob(ctx, jobID)
+	if err != nil {
+		return domain.Job{}, fmt.Errorf("restarting job %d: %w", jobID, err)
+	}
+
+	s.notify()
+
+	return j, nil
+}
+
+// finishCancelled is the terminal transition for a job someone stopped. It runs
+// on a context detached from the cancelled one, because that context is exactly
+// what was just cancelled.
+func (s *Service) finishCancelled(ctx context.Context, j domain.Job, stagingPath string) error {
+	ctx = context.WithoutCancel(ctx)
+
+	s.removeStaging(ctx, stagingPath)
+
+	if err := s.store.CancelJob(ctx, j.ID); err != nil && !errors.Is(err, store.ErrNotFound) {
+		return fmt.Errorf("cancelling job %d: %w", j.ID, err)
+	}
+
+	s.releaseMedia(ctx, j.MediaFileID)
+	s.log.InfoContext(ctx, "job cancelled", slog.Int64("job_id", j.ID))
+
+	return nil
+}
+
+// finishFailed writes both halves of plan.md 19.1 and cleans up after the
+// attempt. The staging file survives a verification failure and only that:
+// 15.3 keeps it for inspection, while a half-written encode is gigabytes of
+// nothing.
+func (s *Service) finishFailed(ctx context.Context, j domain.Job, f *Error, stagingPath string) error {
+	ctx = context.WithoutCancel(ctx)
+
+	if f.Code != domain.FailVerification {
+		s.removeStaging(ctx, stagingPath)
+	}
+
+	if err := s.store.FailJob(ctx, j.ID, f.Code, f.Error(), f.StderrTail); err != nil {
+		return fmt.Errorf("failing job %d: %w", j.ID, err)
+	}
+
+	s.log.ErrorContext(ctx, "job failed",
+		slog.Int64("job_id", j.ID),
+		slog.String("failure_code", string(f.Code)),
+		slog.String("failure_message", f.Error()))
+
+	return nil
+}
+
+// releaseMedia takes a file back out of processing. Nothing was written, so it
+// returns to the state analysis left it in.
+func (s *Service) releaseMedia(ctx context.Context, mediaFileID int64) {
+	if err := s.store.SetMediaStatus(ctx, mediaFileID, domain.MediaAnalyzed, ""); err != nil {
+		s.log.WarnContext(ctx, "resetting the media status failed",
+			slog.Int64("media_file_id", mediaFileID), slog.Any("error", err))
+	}
+}
+
+func (s *Service) removeStaging(ctx context.Context, path string) {
+	if path == "" {
+		return
+	}
+
+	if err := s.fs.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		s.log.WarnContext(ctx, "removing a staging file failed",
+			slog.String("path", path), slog.Any("error", err))
+
+		return
+	}
+
+	s.log.InfoContext(ctx, "staging file removed", slog.String("path", path))
+}

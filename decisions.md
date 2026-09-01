@@ -134,11 +134,24 @@ build serves both architectures. Here `go:embed` needs `dist` present at Go
 build time, and there is only one architecture, so the node stage moves into the
 Dockerfile.
 
-### No `deploy` job in `build-push.yaml`
+### `build-push` deploys, the same way bolan does
 
-bolan's build-push clones `offgrid-private`, seds the image tag and opens a PR.
-The user chose to keep Kubernetes out of this repo, so the workflow stops after
-the release and the README documents the wiring to paste by hand.
+It clones `offgrid-private`, substring-replaces the image tag, opens a PR and
+arms an auto-merge behind that repo's required checks.
+
+Initially omitted, because the manifests were to be written by hand. Once codarr
+was actually in the media chart, a released image nobody pinned was just a tag
+drifting away from the cluster, so the job went in.
+
+Two details differ from bolan. `VALUES` points at the shared media chart rather
+than a chart of codarr's own, because a PVC cannot be mounted across namespaces
+and `media-library` lives in `media`. And the tag is matched on the quoted image
+reference rather than a values key, so the unquoted `# renovate: depName=` line
+directly above it is not a candidate and the entry in `check_multiarch.sh`,
+which carries no tag, cannot match either.
+
+Needs a `DEPLOY_TOKEN` secret. `GITHUB_TOKEN` cannot reach another repo, and a
+PR opened with it gets no CI run, so the auto-merge would never arm.
 
 ### CI adds two drift checks bolan lacks
 

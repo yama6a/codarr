@@ -17,6 +17,8 @@ permissions:
 jobs:
   build-push:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }} # the deploy job below pins this tag in the cluster
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -62,3 +64,65 @@ jobs:
             --target "${{ github.sha }}" \
             --title "${{ steps.version.outputs.version }}" \
             --notes "Image: ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}"
+
+  deploy:
+    needs: build-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 10 # it does not wait for the target's CI, so this is only a hang guard
+    permissions: {} # nothing from THIS repo is needed; DEPLOY_TOKEN carries the rights
+    steps:
+      - name: Bump the image tag in offgrid-private
+        env:
+          # Not GITHUB_TOKEN: it cannot reach another repo at all, and a PR opened with it gets no CI
+          # run, so the merge below would never be armed.
+          GH_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+          IMAGE: ghcr.io/${{ github.repository }}
+          TAG: ${{ needs.build-push.outputs.version }}
+          TARGET: yama6a/offgrid-private
+          # codarr is a template in the shared media chart rather than a chart of its own, because a PVC
+          # cannot be mounted across namespaces and media-library lives in `media`.
+          VALUES: argo_apps/workloads/charts/media/values.yaml
+        run: |
+          set -euo pipefail
+          name="${GITHUB_REPOSITORY##*/}"
+          branch="deploy/${name}-${TAG}"
+
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${TARGET}.git" gitops
+          cd gitops
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+
+          # Substring-replace the tag rather than rewriting the YAML: `yq -i` reformats the whole file
+          # and would bury a one-line bump in noise. Anchored on the surrounding quotes and matched on
+          # the image name, so renaming a values key cannot silently break this, and the unquoted
+          # `# renovate: depName=` line above the image is not a candidate.
+          esc="${IMAGE//./\\.}"
+          sed -i -E "s|\"${esc}:[^\"]*\"|\"${IMAGE}:${TAG}\"|g" "$VALUES"
+
+          # Without this, a chart move would report a successful deploy while the cluster kept the old
+          # image, which looks identical to a healthy deploy from the outside.
+          if git diff --quiet -- "$VALUES"; then
+            echo "::error::nothing in $VALUES pointed at ${IMAGE} (already ${TAG}, or the chart moved)"
+            exit 1
+          fi
+
+          git commit -qam "Deploy ${name}:${TAG}"
+          git push -q --force origin "$branch" # force so re-running a failed deploy is idempotent
+
+          pr=$(gh pr list --repo "$TARGET" --head "$branch" --state open --json url --jq '.[0].url // empty')
+          if [ -z "$pr" ]; then
+            pr=$(gh pr create --repo "$TARGET" --base main --head "$branch" \
+                   --title "Deploy ${name}:${TAG}" \
+                   --body "Automated from ${GITHUB_REPOSITORY}@${GITHUB_SHA}. Image: \`${IMAGE}:${TAG}\`")
+          fi
+          echo "PR: $pr"
+
+          # Queue the merge behind the target's required checks and stop, rather than burning runner
+          # minutes watching them. The trade: this job goes green as soon as the merge is armed, so a
+          # failure there leaves the PR open and silent. A forgotten open PR is a tag pinned at an old
+          # version, so watch for them.
+          # On a re-run the checks may already be green, and GitHub rejects --auto when there is nothing
+          # left to wait for, so fall back to merging outright. Protection still blocks a red PR.
+          gh pr merge "$pr" --repo "$TARGET" --auto --squash --delete-branch \
+            || gh pr merge "$pr" --repo "$TARGET" --squash --delete-branch

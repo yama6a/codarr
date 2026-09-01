@@ -73,8 +73,16 @@ make image     # amd64 image
 The image is `ghcr.io/yama6a/codarr:<N>`, integer-tagged, one release per merge
 to `main`, amd64 only.
 
-This repo ships no Kubernetes manifests. The wiring for the target cluster is
-below; paste it into `offgrid-private` following that repo's own conventions.
+This repo ships no Kubernetes manifests, but it does bump its own tag: on a push
+to `main`, `build-push` opens a PR against `offgrid-private` pinning the new
+image in the media chart and arms an auto-merge behind that repo's checks. It
+needs a `DEPLOY_TOKEN` secret.
+
+A failed check there leaves the PR open and silent, and a forgotten open PR is a
+tag pinned at an old version. Watch for them.
+
+The wiring below is what that chart already contains, kept here because the
+cluster repo is where it lives but this is where the reasoning belongs.
 
 ### Chart placement
 

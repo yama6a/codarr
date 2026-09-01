@@ -85,6 +85,11 @@ Follows `bolan-api`.
 - Compile-time interface checks: `var _ Prober = &prober{}`.
 - Errors wrapped with `%w`. Sentinel errors per package.
 - Interfaces are small and defined by the consumer. `Prober` has one method.
+- **`store.Store` is the exception, and only at its own boundary.** It publishes
+  every query as one wide interface because `plan.md` 2.2 asks for exactly that.
+  Consumers must NOT depend on it: declare the three or four methods you
+  actually use as a local interface, satisfied by the same concrete value, and
+  mock that. A 74-method mock in a unit test is a smell, not a convention.
 
 ### Comments
 

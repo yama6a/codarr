@@ -102,6 +102,21 @@ reverse-mapping step before comparing a session's file path is a no-op here.
 Keep the mechanism anyway; it costs nothing and the assumption is one mount
 change away from breaking.
 
+### jellyfin-ffmpeg7 is the right package, and it is new enough (2026-09-01)
+
+```
+curl -fsSL https://repo.jellyfin.org/debian/dists/bookworm/main/binary-amd64/Packages.gz \
+  | gunzip | awk '/^Package: jellyfin-ffmpeg7$/{p=1} p&&/^Version:/{print; p=0}'
+Version: 7.1.4-3-bookworm
+```
+
+The package name in `plan.md` 22 is current, and `deb https://repo.jellyfin.org/debian bookworm main`
+resolves. Version 7.1.4 matters for one thing beyond currency: `plan.md` 9 notes
+that Matroska Dolby Vision support landed in ffmpeg 6.1, so a DOVI configuration
+record can survive `-c:v copy` into MKV on this build. That is a necessary
+condition for the profile 5 gate, not a sufficient one; it still needs a real
+file to prove.
+
 ## Section 27 checklist
 
 | # | Claim | Status |
@@ -111,7 +126,7 @@ change away from breaking.
 | 3 | ffprobe JSON path for the Dolby Vision profile, and DOVI record survival on copy | TODO, blocked: no DV source exists and an RPU cannot be synthesised |
 | 4 | Chrome client profile produces Direct Stream for 8-bit and 10-bit HEVC | TODO, needs a browser and a real file |
 | 5 | *arr renaming is off on all four instances | **FAILED**, see above. Renaming is on and the formats use MediaInfo tokens |
-| 6 | Current jellyfin-ffmpeg Debian package name and repo path | TODO, image build |
+| 6 | Current jellyfin-ffmpeg Debian package name and repo path | **CONFIRMED**, see below |
 | 7 | `vainfo` inside the container, and which driver loaded | TODO, verification pod |
 | 8 | 7.1 to 5.1 downmix produces a sensible channel layout | TODO, verification pod |
 | 9 | ASS to SRT conversion is readable on a real sample | TODO, verification pod |

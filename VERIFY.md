@@ -452,23 +452,35 @@ showing both owners' trees and writable.
 
 ### VP9 QSV decode fails, which reverses item 14
 
+Tested exhaustively in the running pod, against samples of several resolutions,
+two libvpx speed settings and two containers. The result never varied:
+
 ```
-qsv    vp9   decode  FAIL
-vaapi  vp9   decode  OK
+-hwaccel qsv (what the probe uses)      FAIL
+-c:v vp9_qsv (explicit decoder)         FAIL
+-hwaccel qsv, no output_format          FAIL
+-hwaccel vaapi, then hevc_qsv encode    FAIL
+software decode, hwupload, hevc_qsv     OK
+-hwaccel vaapi, decode only             OK
 ```
 
 `vp9_qsv` returns `Decoding error: Internal bug, should not have happened`,
-error `-1145393733`, on the sample the probe generates. The verification pod
-reported VP9 decode working, but it was testing a clip built to different
-settings. The honest reading is that `vp9_qsv` is unreliable on this driver
-rather than absent, since VAAPI decodes the same content without complaint.
+error `-1145393733`. **No QSV path decodes VP9 on this driver.** VAAPI decodes
+it to system memory, but feeding those frames to `hevc_qsv` fails too, so there
+is no hardware route from a VP9 source to an HEVC output.
 
-This is the case 10.1 anticipates, and the handling worked with no intervention:
-the probe recorded `works: false`, wrote remediation text saying VP9 will decode
-in software, and the capability cache now overrides ffmpeg's own hardware-decode
-guess for VP9. The cost is CPU on VP9 sources, which are rare, and nothing is
-incorrect.
+**The earlier verification pod was simply wrong about this.** It reported
+`vp9_qsv` working, including a full GPU-to-GPU chain. Nothing reproduces that.
+The evidence above came from the shipping binary on the real device, so it is
+the reading to trust.
 
-No code change. `vp9` stays in the hard-coded Gen 9.5 decode set because the
-silicon does have the decoder; the probe decides whether it is used, and it
-decided correctly.
+The handling is correct and needed no intervention. The probe recorded
+`works: false`, wrote remediation text, and the capability cache overrides
+ffmpeg's own hardware-decode guess so VP9 sources take the software-decode plus
+`hwupload` path, which is the last line above and does work. The cost is CPU on
+VP9 sources, which are rare in a film and TV library.
+
+No code change. `vp9` stays in the hard-coded Gen 9.5 set from 10.1 because the
+silicon does have the decoder; the runtime probe is what decides whether it gets
+used, and it decided correctly. This is exactly the case 10.1 anticipates when it
+says to confirm the driver delivers VP9 rather than trusting the hardware list.

@@ -279,6 +279,89 @@ protection is that a compliant file plans to nothing.
 Upgrades are off on every instance, which is the load-bearing half of 23.2 and
 is confirmed. See `VERIFY.md`.
 
+## Wave 2
+
+### HLG is stamped as HLG, not as PQ
+
+`plan.md` 9 defines a stream as HDR when `color_transfer` is `smpte2084` (PQ)
+**or** `arib-std-b67` (HLG), then prescribes `-color_trc smpte2084`
+unconditionally for an HDR encode. Those contradict: an HLG source re-encoded
+with a PQ transfer flag renders visibly wrong.
+
+`domain.Plan` now carries `HDRTransfer` and the argv builder emits it, empty
+meaning PQ. Deviation from the letter of section 9, in favour of its intent.
+Rare in practice, since HDR sources are almost always HEVC Main 10 and get
+copied, but silent and visible when it fires.
+
+### `-bsf:v` rather than `-bsf:v:0` for the level rewrite
+
+`plan.md` 14.2 lists `-bsf:v:N` among the output-indexed options; 14.1's worked
+example writes `-bsf:v`. Followed 14.1, which is internally consistent: every
+video option uses the bare `:v` spec (`-c:v`, `-b:v`, `-profile:v`, `-tag:v`)
+because there is exactly one video output stream. Only audio and subtitles carry
+indices, plus dispositions and per-stream metadata, whose specs require one.
+
+### `-y` is on every invocation
+
+Not in the plan's argv listings. A staging file can survive a crash, and with
+`-nostdin` the overwrite prompt becomes a hard failure rather than a hang.
+
+### Resolution tiering is by width, not height
+
+For both the BPP table (8.2) and the floors and ceilings (8.3). Letterboxing
+shrinks height, not width, so tiering by height drops a 1280x536 scope transfer
+into the 576p tier, whose 2.5 Mbps ceiling would visibly wreck it.
+
+### The 1.35 hardware correction applies to the sample probe only
+
+`plan.md` 8.1 applies it to the probe result. 8.2's fallback table is labelled
+"BPP (HEVC)", so it is already a target for this encoder rather than an x265
+measurement; correcting it too would double-count.
+
+### The 8.1 clamps also apply to the 8.2 fallback
+
+8.2 does not say to. Without it the formula returns 12.9 Mbps for 1080p60,
+well past the 8 Mbps ceiling in 8.3.
+
+### Sample segments are pulled back to fit short sources
+
+8.1 assumes a feature-length file. On a 45-minute episode the 80% window runs
+past EOF and the measured bitrate is wrong by the truncation ratio. Windows are
+clamped inside the source, duplicates collapsing on the same start are dropped,
+and anything under 60 seconds falls back to a single whole-file sample.
+
+### The 0.85 source clamp is skipped when the source bitrate is unresolved
+
+Rung 5 of 8.4 leaves it at zero, and clamping against zero would floor every
+target to nothing.
+
+## Known spec conflicts, implemented as written
+
+Both are recorded rather than fixed, because the plan is explicit and the
+consequences are bounded.
+
+### 8.2's frame-rate term double-counts
+
+The formula is `width * height * fps * BPP`, already linear in frame rate. 8.2
+then says to additionally "scale by fps/24, capped at 1.6" for 50/60 fps. At
+60 fps that compounds to roughly 4x a 24 fps target. The 8.3 ceilings bound the
+damage, so in practice every affected file lands on its ceiling.
+
+### 8.1's floor can exceed the source bitrate, which 15.3 then rejects
+
+The clamps run in the order 8.1 gives: the 0.85 source clamp first, then the
+resolution floor, then the ceiling. So a 1 Mbps 1080p source gets a 2.5 Mbps
+target, above its own bitrate.
+
+That is harmless for a copy, but a `full` plan on such a file will very likely
+produce an output larger than its source, and 15.3 fails a `full` plan for
+exactly that. The job fails with `verification_failed`, the staging file is
+kept, the source is untouched. Safe, but the job can never succeed.
+
+It needs a real low-bitrate source that also fails the video copy test, so a
+1 Mbps 1080p VP9 or interlaced file. Rare, and it fails safe. Worth resolving
+before the space sweep runs on a large library.
+
 ## Open items
 
 Recorded in `VERIFY.md` rather than here: everything `plan.md` section 27 asks

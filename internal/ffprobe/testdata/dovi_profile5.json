@@ -1,0 +1,55 @@
+{
+  "streams": [
+    {
+      "index": 0,
+      "codec_name": "hevc",
+      "profile": "Main 10",
+      "codec_type": "video",
+      "width": 3840,
+      "height": 2160,
+      "pix_fmt": "yuv420p10le",
+      "level": 153,
+      "color_space": "bt2020nc",
+      "color_transfer": "smpte2084",
+      "color_primaries": "bt2020",
+      "refs": 1,
+      "r_frame_rate": "24000/1001",
+      "avg_frame_rate": "24000/1001",
+      "disposition": {"default": 1, "forced": 0, "comment": 0, "hearing_impaired": 0, "visual_impaired": 0, "attached_pic": 0},
+      "tags": {"language": "und"},
+      "side_data_list": [
+        {
+          "side_data_type": "DOVI configuration record",
+          "dv_version_major": 1,
+          "dv_version_minor": 0,
+          "dv_profile": 5,
+          "dv_level": 6,
+          "rpu_present_flag": 1,
+          "el_present_flag": 0,
+          "bl_present_flag": 1,
+          "dv_bl_signal_compatibility_id": 0
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "codec_name": "truehd",
+      "profile": "Dolby TrueHD + Dolby Atmos",
+      "codec_type": "audio",
+      "sample_rate": "48000",
+      "channels": 8,
+      "channel_layout": "7.1",
+      "disposition": {"default": 1, "forced": 0, "comment": 0, "hearing_impaired": 0, "visual_impaired": 0, "attached_pic": 0},
+      "tags": {"language": "eng", "BPS-eng": "4200000"}
+    }
+  ],
+  "chapters": [],
+  "format": {
+    "filename": "/media/movies/Dolby (2018)/Dolby (2018) Bluray-2160p.mkv",
+    "nb_streams": 2,
+    "format_name": "matroska,webm",
+    "duration": "6000.000000",
+    "size": "48318382080",
+    "bit_rate": "64424509"
+  }
+}

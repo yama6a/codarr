@@ -1,0 +1,102 @@
+{
+  "streams": [
+    {
+      "index": 0,
+      "codec_name": "h264",
+      "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+      "profile": "High",
+      "codec_type": "video",
+      "codec_tag_string": "[0][0][0][0]",
+      "width": 1920,
+      "height": 1080,
+      "coded_width": 1920,
+      "coded_height": 1088,
+      "has_b_frames": 2,
+      "pix_fmt": "yuv420p",
+      "level": 40,
+      "color_range": "tv",
+      "refs": 3,
+      "r_frame_rate": "24000/1001",
+      "avg_frame_rate": "24000/1001",
+      "time_base": "1/1000",
+      "disposition": {"default": 1, "forced": 0, "comment": 0, "hearing_impaired": 0, "visual_impaired": 0, "attached_pic": 0},
+      "tags": {"BPS-eng": "8420000", "language": "eng", "title": "AVC"}
+    },
+    {
+      "index": 1,
+      "codec_name": "dts",
+      "codec_long_name": "DCA (DTS Coherent Acoustics)",
+      "profile": "DTS-HD MA",
+      "codec_type": "audio",
+      "sample_fmt": "s32p",
+      "sample_rate": "48000",
+      "channels": 6,
+      "channel_layout": "5.1(side)",
+      "bits_per_raw_sample": "24",
+      "disposition": {"default": 1, "forced": 0, "comment": 0, "hearing_impaired": 0, "visual_impaired": 0, "attached_pic": 0},
+      "tags": {"language": "eng", "title": "Surround 5.1", "BPS-eng": "1509000"}
+    },
+    {
+      "index": 2,
+      "codec_name": "aac",
+      "codec_long_name": "AAC (Advanced Audio Coding)",
+      "profile": "LC",
+      "codec_type": "audio",
+      "sample_rate": "48000",
+      "channels": 2,
+      "channel_layout": "stereo",
+      "bit_rate": "192000",
+      "disposition": {"default": 0, "forced": 0, "comment": 0, "hearing_impaired": 0, "visual_impaired": 0, "attached_pic": 0},
+      "tags": {"language": "ger"}
+    },
+    {
+      "index": 3,
+      "codec_name": "hdmv_pgs_subtitle",
+      "codec_long_name": "HDMV Presentation Graphic Stream subtitles",
+      "codec_type": "subtitle",
+      "disposition": {"default": 0, "forced": 1, "comment": 0, "hearing_impaired": 0, "visual_impaired": 0, "attached_pic": 0},
+      "tags": {"language": "eng"}
+    },
+    {
+      "index": 4,
+      "codec_name": "subrip",
+      "codec_long_name": "SubRip subtitle",
+      "codec_type": "subtitle",
+      "disposition": {"default": 1, "forced": 0, "comment": 0, "hearing_impaired": 0, "visual_impaired": 0, "attached_pic": 0},
+      "tags": {"language": "eng"}
+    },
+    {
+      "index": 5,
+      "codec_name": "ass",
+      "codec_long_name": "ASS (Advanced SSA) subtitle",
+      "codec_type": "subtitle",
+      "disposition": {"default": 0, "forced": 0, "comment": 0, "hearing_impaired": 0, "visual_impaired": 0, "attached_pic": 0},
+      "tags": {"language": "swe"}
+    },
+    {
+      "index": 6,
+      "codec_name": "ttf",
+      "codec_long_name": "binary data",
+      "codec_type": "attachment",
+      "disposition": {"default": 0, "forced": 0, "comment": 0, "hearing_impaired": 0, "visual_impaired": 0, "attached_pic": 0},
+      "tags": {"filename": "OpenSans.ttf", "mimetype": "application/x-truetype-font"}
+    }
+  ],
+  "chapters": [
+    {"id": 0, "time_base": "1/1000000000", "start": 0, "start_time": "0.000000", "end": 600000000000, "end_time": "600.000000", "tags": {"title": "Chapter 01"}},
+    {"id": 1, "time_base": "1/1000000000", "start": 600000000000, "start_time": "600.000000", "end": 1200000000000, "end_time": "1200.000000", "tags": {"title": "Chapter 02"}}
+  ],
+  "format": {
+    "filename": "/media/movies/Example (2019)/Example (2019) Bluray-1080p.mkv",
+    "nb_streams": 7,
+    "nb_programs": 0,
+    "format_name": "matroska,webm",
+    "format_long_name": "Matroska / WebM",
+    "start_time": "0.000000",
+    "duration": "7200.000000",
+    "size": "9871234567",
+    "bit_rate": "10968038",
+    "probe_score": 100,
+    "tags": {"title": "Example", "ENCODER": "Lavf60.16.100"}
+  }
+}

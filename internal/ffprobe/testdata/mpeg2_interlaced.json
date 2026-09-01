@@ -1,0 +1,51 @@
+{
+  "streams": [
+    {
+      "index": 0,
+      "codec_name": "mpeg2video",
+      "codec_long_name": "MPEG-2 video",
+      "profile": "Main",
+      "codec_type": "video",
+      "width": 720,
+      "height": 576,
+      "pix_fmt": "yuv420p",
+      "level": 8,
+      "field_order": "tt",
+      "refs": 1,
+      "r_frame_rate": "25/1",
+      "avg_frame_rate": "25/1",
+      "bit_rate": "6000000",
+      "disposition": {"default": 1, "forced": 0, "comment": 0, "hearing_impaired": 0, "visual_impaired": 0, "attached_pic": 0}
+    },
+    {
+      "index": 1,
+      "codec_name": "ac3",
+      "codec_type": "audio",
+      "sample_rate": "48000",
+      "channels": 6,
+      "channel_layout": "5.1(side)",
+      "bit_rate": "448000",
+      "disposition": {"default": 1, "forced": 0, "comment": 0, "hearing_impaired": 0, "visual_impaired": 0, "attached_pic": 0},
+      "tags": {"language": "deu"}
+    },
+    {
+      "index": 2,
+      "codec_name": "dvd_subtitle",
+      "codec_type": "subtitle",
+      "width": 720,
+      "height": 576,
+      "disposition": {"default": 0, "forced": 0, "comment": 0, "hearing_impaired": 0, "visual_impaired": 0, "attached_pic": 0},
+      "tags": {"language": "deu"}
+    }
+  ],
+  "chapters": [],
+  "format": {
+    "filename": "/media/movies/Old (1988)/Old (1988) DVD.vob",
+    "nb_streams": 3,
+    "format_name": "mpeg",
+    "format_long_name": "MPEG-PS (MPEG-2 Program Stream)",
+    "duration": "5820.000000",
+    "size": "4700000000",
+    "bit_rate": "6460481"
+  }
+}

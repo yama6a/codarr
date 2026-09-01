@@ -44,9 +44,16 @@ type Plan struct {
 	// codecs where the idet sample said so.
 	Deinterlace bool `json:"deinterlace"`
 
-	HDR                bool `json:"hdr"`
-	DolbyVision        bool `json:"dolby_vision"`
-	DolbyVisionProfile int  `json:"dolby_vision_profile,omitempty"`
+	HDR bool `json:"hdr"`
+
+	// HDRTransfer is the source stream's color_transfer, kept because plan.md 9
+	// calls a stream HDR on either smpte2084 (PQ) or arib-std-b67 (HLG) but then
+	// prescribes -color_trc smpte2084 unconditionally. Re-encoding an HLG source
+	// with a PQ transfer flag renders it wrong, so the encoder emits this rather
+	// than a constant. Empty means PQ.
+	HDRTransfer        string `json:"hdr_transfer,omitempty"`
+	DolbyVision        bool   `json:"dolby_vision"`
+	DolbyVisionProfile int    `json:"dolby_vision_profile,omitempty"`
 
 	// TargetVideoBitrate is zero until the sample probe has run, which happens
 	// as the first phase of a full job rather than at enqueue time.

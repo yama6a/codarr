@@ -240,15 +240,15 @@ func (s Stream) LevelValue() (float64, bool) {
 	}
 }
 
-// LevelString is the level for display and for the transform record, empty
-// when the codec has none.
+// LevelString is the level for display and for the transform record, always
+// one decimal place ("4.0", "5.1"), empty when the codec has no level.
 func (s Stream) LevelString() string {
 	v, ok := s.LevelValue()
 	if !ok {
 		return ""
 	}
 
-	return strconv.FormatFloat(v, 'f', -1, 64)
+	return strconv.FormatFloat(v, 'f', 1, 64)
 }
 
 // Interlaced reports an explicitly interlaced field_order. Unknown and absent

@@ -504,6 +504,12 @@ type ArrInstanceCreate struct {
 	UnmonitorAfter *bool          `json:"unmonitor_after,omitempty"`
 }
 
+// ArrInstanceRef defines model for ArrInstanceRef.
+type ArrInstanceRef struct {
+	Id   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
 // ArrInstanceUpdate defines model for ArrInstanceUpdate.
 type ArrInstanceUpdate struct {
 	// ApiKey Send the masked placeholder `********` to keep the stored key. Any
@@ -689,6 +695,12 @@ type CompatibilitySummary struct {
 
 // ContainerFamily The output muxer family. Codarr only ever writes these two.
 type ContainerFamily string
+
+// ContestedRoot defines model for ContestedRoot.
+type ContestedRoot struct {
+	Instances []ArrInstanceRef `json:"instances"`
+	Path      string           `json:"path"`
+}
 
 // Dashboard defines model for Dashboard.
 type Dashboard struct {
@@ -904,7 +916,10 @@ type Job struct {
 	Priority          int       `json:"priority"`
 
 	// ProbeResult Raw ffprobe output of the staged result, when one was taken.
-	ProbeResult   *string    `json:"probe_result,omitempty"`
+	ProbeResult *string `json:"probe_result,omitempty"`
+
+	// ProgressFps Frames per second ffmpeg is currently writing (plan.md 18.1).
+	ProgressFps   *float64   `json:"progress_fps,omitempty"`
 	ProgressPct   *float64   `json:"progress_pct,omitempty"`
 	ProgressSpeed *float64   `json:"progress_speed,omitempty"`
 	QueuedAt      time.Time  `json:"queued_at"`
@@ -973,7 +988,10 @@ type JobSummary struct {
 	OutputSize    *int64    `json:"output_size,omitempty"`
 
 	// Priority Lower runs first.
-	Priority    int      `json:"priority"`
+	Priority int `json:"priority"`
+
+	// ProgressFps Frames per second ffmpeg is currently writing (plan.md 18.1).
+	ProgressFps *float64 `json:"progress_fps,omitempty"`
 	ProgressPct *float64 `json:"progress_pct,omitempty"`
 
 	// ProgressSpeed ffmpeg's speed multiplier relative to realtime.
@@ -1628,6 +1646,15 @@ type RootCreate struct {
 	ArrInstanceId *int64 `json:"arr_instance_id,omitempty"`
 	Enabled       *bool  `json:"enabled,omitempty"`
 	Path          string `json:"path"`
+}
+
+// RootList defines model for RootList.
+type RootList struct {
+	// Conflicts Roots claimed by two or more enabled instances. Codarr never guesses
+	// an owner: files under a contested root are processed and nothing is
+	// notified (plan.md 16.2).
+	Conflicts []ContestedRoot `json:"conflicts"`
+	Roots     []Root          `json:"roots"`
 }
 
 // ScanStarted defines model for ScanStarted.

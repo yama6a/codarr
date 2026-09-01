@@ -55,6 +55,7 @@ type harness struct {
 	hw       *mock.HardwareMock
 	analyzer *mock.AnalyzerMock
 	clk      *clock.Fake
+	metrics  *fakeMetrics
 	svc      *job.Service
 
 	mu      sync.Mutex
@@ -63,15 +64,31 @@ type harness struct {
 	runs    [][]string
 }
 
+// newHarness wires the queue with no metrics at all, which is the shape most of
+// these tests want and which keeps a nil Deps.Metrics under test everywhere.
 func newHarness(t *testing.T) *harness {
+	t.Helper()
+
+	return newHarnessWith(t, nil)
+}
+
+// newMeteredHarness is the same wiring with the Prometheus surface attached.
+func newMeteredHarness(t *testing.T) *harness {
+	t.Helper()
+
+	return newHarnessWith(t, &fakeMetrics{})
+}
+
+func newHarnessWith(t *testing.T, mx *fakeMetrics) *harness {
 	t.Helper()
 
 	clk := clock.NewFake(time.Unix(1700009999, 0).UTC())
 	h := &harness{
-		t:     t,
-		store: newFakeStore(clk.Now),
-		clk:   clk,
-		files: map[string]fsx.FileInfo{},
+		t:       t,
+		store:   newFakeStore(clk.Now),
+		clk:     clk,
+		metrics: mx,
+		files:   map[string]fsx.FileInfo{},
 	}
 
 	h.store.settings = domain.Settings{TempDir: tempDir, PrioritiseQuickJobs: true}
@@ -135,7 +152,7 @@ func newHarness(t *testing.T) *harness {
 		return m, nil
 	}}
 
-	h.svc = job.New(job.Deps{
+	deps := job.Deps{
 		Store:         h.store,
 		Prober:        h.prober,
 		Promoter:      h.promoter,
@@ -149,7 +166,16 @@ func newHarness(t *testing.T) *harness {
 		Logger:        slog.New(slog.DiscardHandler),
 		Version:       "1.2.3",
 		IdlePoll:      time.Millisecond,
-	})
+	}
+
+	// Assigned rather than passed, so an absent fake leaves Deps.Metrics a true
+	// nil. A typed nil in the interface is a different thing, and the absent
+	// case is the one every other test here relies on.
+	if mx != nil {
+		deps.Metrics = mx
+	}
+
+	h.svc = job.New(deps)
 
 	return h
 }

@@ -30,6 +30,7 @@ var mediaSortColumns = map[MediaSort]string{
 	SortVideoCodec: "video_codec",
 	SortBitrate:    "video_bitrate",
 	SortUpdatedAt:  "updated_at",
+	SortProvenance: "provenance",
 }
 
 // UpsertMediaFile inserts a file seen by a scan or webhook, or refreshes the

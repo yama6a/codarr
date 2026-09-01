@@ -115,6 +115,7 @@ func (s *Service) insert(
 	res.Reason = "queued as " + string(plan.Kind)
 
 	s.notify()
+	s.observe(ctx, domain.JobQueued, created.Kind, created.Origin)
 
 	return res, nil
 }

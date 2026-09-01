@@ -24,6 +24,7 @@ func (s *Service) Run(ctx context.Context) error {
 
 		ran, err := s.RunOnce(ctx)
 		if err != nil {
+			s.mx.error(errorWorker)
 			s.log.ErrorContext(ctx, "the worker could not take the next job", slog.Any("error", err))
 		}
 
@@ -142,6 +143,7 @@ func (s *Service) Cancel(ctx context.Context, jobID int64) error {
 
 	s.releaseMedia(ctx, j.MediaFileID)
 	s.removeStaging(ctx, j.StagingPath)
+	s.observe(ctx, domain.JobCancelled, j.Kind, j.Origin)
 
 	return nil
 }
@@ -171,6 +173,7 @@ func (s *Service) Restart(ctx context.Context, jobID int64) (domain.Job, error) 
 	}
 
 	s.notify()
+	s.observe(ctx, domain.JobQueued, j.Kind, j.Origin)
 
 	return j, nil
 }
@@ -188,6 +191,7 @@ func (s *Service) finishCancelled(ctx context.Context, j domain.Job, stagingPath
 	}
 
 	s.releaseMedia(ctx, j.MediaFileID)
+	s.observe(ctx, domain.JobCancelled, j.Kind, j.Origin)
 	s.log.InfoContext(ctx, "job cancelled", slog.Int64("job_id", j.ID))
 
 	return nil
@@ -208,6 +212,9 @@ func (s *Service) finishFailed(ctx context.Context, j domain.Job, f *Error, stag
 		return fmt.Errorf("failing job %d: %w", j.ID, err)
 	}
 
+	s.mx.jobFailed(f.Code)
+	s.observe(ctx, domain.JobFailed, j.Kind, j.Origin)
+
 	s.log.ErrorContext(ctx, "job failed",
 		slog.Int64("job_id", j.ID),
 		slog.String("failure_code", string(f.Code)),
@@ -220,6 +227,7 @@ func (s *Service) finishFailed(ctx context.Context, j domain.Job, f *Error, stag
 // returns to the state analysis left it in.
 func (s *Service) releaseMedia(ctx context.Context, mediaFileID int64) {
 	if err := s.store.SetMediaStatus(ctx, mediaFileID, domain.MediaAnalyzed, ""); err != nil {
+		s.mx.error(errorState)
 		s.log.WarnContext(ctx, "resetting the media status failed",
 			slog.Int64("media_file_id", mediaFileID), slog.Any("error", err))
 	}
@@ -231,6 +239,7 @@ func (s *Service) removeStaging(ctx context.Context, path string) {
 	}
 
 	if err := s.fs.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		s.mx.error(errorStaging)
 		s.log.WarnContext(ctx, "removing a staging file failed",
 			slog.String("path", path), slog.Any("error", err))
 

@@ -417,16 +417,18 @@ paths:
     get:
       operationId: listRoots
       tags: [roots]
-      summary: Every watch root.
+      summary: Every watch root, and any root two enabled instances both claim.
+      description: |
+        conflicts carries the standing configuration error of plan.md 18.4. It
+        rides on this response rather than its own endpoint because it is the
+        same data, derived from the same rows the settings page already loads.
       responses:
         '200':
-          description: All roots with their owning instance.
+          description: All roots with their owning instance, plus contested roots.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Root'
+                $ref: '#/components/schemas/RootList'
         default:
           $ref: '#/components/responses/Error'
     post:
@@ -1656,6 +1658,44 @@ components:
           items:
             $ref: '#/components/schemas/RootConflict'
 
+    RootList:
+      type: object
+      required: [roots, conflicts]
+      properties:
+        roots:
+          type: array
+          items:
+            $ref: '#/components/schemas/Root'
+        conflicts:
+          type: array
+          description: |
+            Roots claimed by two or more enabled instances. Codarr never guesses
+            an owner: files under a contested root are processed and nothing is
+            notified (plan.md 16.2).
+          items:
+            $ref: '#/components/schemas/ContestedRoot'
+
+    ContestedRoot:
+      type: object
+      required: [path, instances]
+      properties:
+        path:
+          type: string
+        instances:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArrInstanceRef'
+
+    ArrInstanceRef:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+
     RootConflict:
       type: object
       required: [path, owning_arr_instance_id, owning_arr_instance_name]
@@ -2412,6 +2452,10 @@ components:
           type: number
           format: double
           description: ffmpeg's speed multiplier relative to realtime.
+        progress_fps:
+          type: number
+          format: double
+          description: Frames per second ffmpeg is currently writing (plan.md 18.1).
         estimated_seconds:
           type: integer
         actual_seconds:
@@ -2515,6 +2559,10 @@ components:
         progress_speed:
           type: number
           format: double
+        progress_fps:
+          type: number
+          format: double
+          description: Frames per second ffmpeg is currently writing (plan.md 18.1).
         estimated_seconds:
           type: integer
         actual_seconds:

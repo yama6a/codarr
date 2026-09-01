@@ -3179,9 +3179,6 @@ var _ api.Metrics = &MetricsMock{}
 //			ErrorFunc: func(category string)  {
 //				panic("mock out the Error method")
 //			},
-//			JobObservedFunc: func(state domain.JobState, kind domain.Kind, origin domain.JobOrigin)  {
-//				panic("mock out the JobObserved method")
-//			},
 //		}
 //
 //		// use mockedMetrics in code that requires api.Metrics
@@ -3192,9 +3189,6 @@ type MetricsMock struct {
 	// ErrorFunc mocks the Error method.
 	ErrorFunc func(category string)
 
-	// JobObservedFunc mocks the JobObserved method.
-	JobObservedFunc func(state domain.JobState, kind domain.Kind, origin domain.JobOrigin)
-
 	// calls tracks calls to the methods.
 	calls struct {
 		// Error holds details about calls to the Error method.
@@ -3202,18 +3196,8 @@ type MetricsMock struct {
 			// Category is the category argument value.
 			Category string
 		}
-		// JobObserved holds details about calls to the JobObserved method.
-		JobObserved []struct {
-			// State is the state argument value.
-			State domain.JobState
-			// Kind is the kind argument value.
-			Kind domain.Kind
-			// Origin is the origin argument value.
-			Origin domain.JobOrigin
-		}
 	}
-	lockError       sync.RWMutex
-	lockJobObserved sync.RWMutex
+	lockError sync.RWMutex
 }
 
 // Error calls ErrorFunc.
@@ -3245,45 +3229,5 @@ func (mock *MetricsMock) ErrorCalls() []struct {
 	mock.lockError.RLock()
 	calls = mock.calls.Error
 	mock.lockError.RUnlock()
-	return calls
-}
-
-// JobObserved calls JobObservedFunc.
-func (mock *MetricsMock) JobObserved(state domain.JobState, kind domain.Kind, origin domain.JobOrigin) {
-	if mock.JobObservedFunc == nil {
-		panic("MetricsMock.JobObservedFunc: method is nil but Metrics.JobObserved was just called")
-	}
-	callInfo := struct {
-		State  domain.JobState
-		Kind   domain.Kind
-		Origin domain.JobOrigin
-	}{
-		State:  state,
-		Kind:   kind,
-		Origin: origin,
-	}
-	mock.lockJobObserved.Lock()
-	mock.calls.JobObserved = append(mock.calls.JobObserved, callInfo)
-	mock.lockJobObserved.Unlock()
-	mock.JobObservedFunc(state, kind, origin)
-}
-
-// JobObservedCalls gets all the calls that were made to JobObserved.
-// Check the length with:
-//
-//	len(mockedMetrics.JobObservedCalls())
-func (mock *MetricsMock) JobObservedCalls() []struct {
-	State  domain.JobState
-	Kind   domain.Kind
-	Origin domain.JobOrigin
-} {
-	var calls []struct {
-		State  domain.JobState
-		Kind   domain.Kind
-		Origin domain.JobOrigin
-	}
-	mock.lockJobObserved.RLock()
-	calls = mock.calls.JobObserved
-	mock.lockJobObserved.RUnlock()
 	return calls
 }

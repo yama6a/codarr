@@ -178,10 +178,11 @@ type PlexFactory func(ctx context.Context) (PlexClient, error)
 // ArrFactory builds a client for one instance, for the same reason.
 type ArrFactory func(ctx context.Context, instance domain.ArrInstance) (ArrClient, error)
 
-// Metrics is the subset of the Prometheus surface the API touches. The worker's
-// own transitions are recorded by the worker.
+// Metrics is the subset of the Prometheus surface the API touches: the errors
+// it answers with. Every job state transition, including the ones an API call
+// causes, is recorded inside internal/job, which is the only place that knows
+// the job's kind and origin and the only place that sees them all.
 type Metrics interface {
-	JobObserved(state domain.JobState, kind domain.Kind, origin domain.JobOrigin)
 	Error(category string)
 }
 

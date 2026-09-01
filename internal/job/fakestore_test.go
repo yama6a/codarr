@@ -39,6 +39,7 @@ type progressWrite struct {
 	JobID     int64
 	Pct       float64
 	Speed     float64
+	FPS       float64
 	Estimated int
 }
 
@@ -243,7 +244,7 @@ func (f *fakeStore) UpdateJobExecution(_ context.Context, u store.ExecutionUpdat
 	return nil
 }
 
-func (f *fakeStore) UpdateJobProgress(_ context.Context, id int64, pct, speed float64, estimatedSeconds int) error {
+func (f *fakeStore) UpdateJobProgress(_ context.Context, id int64, pct, speed, fps float64, estimatedSeconds int) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -254,9 +255,24 @@ func (f *fakeStore) UpdateJobProgress(_ context.Context, id int64, pct, speed fl
 
 	j.ProgressPct = pct
 	j.ProgressSpeed = speed
-	f.progress = append(f.progress, progressWrite{JobID: id, Pct: pct, Speed: speed, Estimated: estimatedSeconds})
+	j.ProgressFPS = fps
+	f.progress = append(f.progress, progressWrite{JobID: id, Pct: pct, Speed: speed, FPS: fps, Estimated: estimatedSeconds})
 
 	return nil
+}
+
+func (f *fakeStore) CountJobsByState(context.Context) (map[domain.JobState]int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.record("CountJobsByState")
+
+	counts := map[domain.JobState]int{}
+	for _, j := range f.jobs {
+		counts[j.State]++
+	}
+
+	return counts, nil
 }
 
 func (f *fakeStore) UpdateJobTransform(_ context.Context, id int64, t domain.TransformRecord) error {

@@ -88,6 +88,7 @@ export function CurrentJobPanel({ job, paused, onCancel, onOpen, cancelling }: C
           <KeyValue label="Speed">
             {job.progress_speed ? `${job.progress_speed.toFixed(2)}x realtime` : 'n/a'}
           </KeyValue>
+          <KeyValue label="FPS">{job.progress_fps ? job.progress_fps.toFixed(1) : 'n/a'}</KeyValue>
           <KeyValue label="Encoder">
             <span className={job.fell_back ? 'font-semibold text-red-400' : ''}>
               {job.encoder_used ?? 'not started'}

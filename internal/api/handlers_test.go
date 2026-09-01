@@ -307,11 +307,12 @@ func TestListRootsAndDeleteRoot(t *testing.T) {
 	}
 	h.store.DeleteRootFunc = func(context.Context, int64) error { return nil }
 
-	roots := decodeInto[[]gen.Root](t, h.do(t, "GET", "/api/roots", nil), 200)
-	require.Len(t, roots, 1)
-	require.NotNil(t, roots[0].ArrInstanceName)
-	require.Equal(t, "radarr-4k", *roots[0].ArrInstanceName)
-	require.True(t, roots[0].Imported)
+	list := decodeInto[gen.RootList](t, h.do(t, "GET", "/api/roots", nil), 200)
+	require.Len(t, list.Roots, 1)
+	require.NotNil(t, list.Roots[0].ArrInstanceName)
+	require.Equal(t, "radarr-4k", *list.Roots[0].ArrInstanceName)
+	require.True(t, list.Roots[0].Imported)
+	require.Empty(t, list.Conflicts)
 
 	require.Equal(t, 204, h.do(t, "DELETE", "/api/roots/3", nil).Code)
 	require.Len(t, h.store.DeleteRootCalls(), 1)
@@ -478,4 +479,68 @@ func TestImportArrRoots_RefusesAnUnmappedRootFolder(t *testing.T) {
 
 	require.Equal(t, "missing_path_mapping", body.Error)
 	require.Empty(t, h.store.CreateRootCalls())
+}
+
+// TestListRoots_ReportsARootTwoEnabledInstancesBothClaim is the standing error
+// of plan.md 18.4. It rides on the roots listing rather than an endpoint of its
+// own, so the settings page has it on every poll rather than only after an
+// import.
+func TestListRoots_ReportsARootTwoEnabledInstancesBothClaim(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+
+	radarr := int64(1)
+	sonarr := int64(2)
+
+	h.store.ListArrInstancesFunc = func(context.Context) ([]domain.ArrInstance, error) {
+		return []domain.ArrInstance{
+			{ID: radarr, Name: "radarr-4k", Flavour: domain.FlavourRadarr, Enabled: true},
+			{ID: sonarr, Name: "sonarr-hd", Flavour: domain.FlavourSonarr, Enabled: true},
+		}, nil
+	}
+	h.store.ListRootsFunc = func(context.Context) ([]domain.Root, error) {
+		return []domain.Root{
+			{ID: 3, Path: "/media/shared", ArrInstanceID: &radarr, Enabled: true},
+			{ID: 4, Path: "/media/shared", ArrInstanceID: &sonarr, Enabled: true},
+			{ID: 5, Path: "/media/movies", ArrInstanceID: &radarr, Enabled: true},
+		}, nil
+	}
+
+	list := decodeInto[gen.RootList](t, h.do(t, "GET", "/api/roots", nil), 200)
+	require.Len(t, list.Roots, 3)
+	require.Equal(t, []gen.ContestedRoot{{
+		Path: "/media/shared",
+		Instances: []gen.ArrInstanceRef{
+			{Id: radarr, Name: "radarr-4k"},
+			{Id: sonarr, Name: "sonarr-hd"},
+		},
+	}}, list.Conflicts)
+}
+
+// A disabled instance is not a conflict: plan.md 16.2 attributes on enabled
+// roots only, so a root the operator has parked claims nothing.
+func TestListRoots_IgnoresARootWhoseSecondClaimIsDisabled(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+
+	radarr := int64(1)
+	sonarr := int64(2)
+
+	h.store.ListArrInstancesFunc = func(context.Context) ([]domain.ArrInstance, error) {
+		return []domain.ArrInstance{
+			{ID: radarr, Name: "radarr-4k", Flavour: domain.FlavourRadarr, Enabled: true},
+			{ID: sonarr, Name: "sonarr-hd", Flavour: domain.FlavourSonarr, Enabled: false},
+		}, nil
+	}
+	h.store.ListRootsFunc = func(context.Context) ([]domain.Root, error) {
+		return []domain.Root{
+			{ID: 3, Path: "/media/shared", ArrInstanceID: &radarr, Enabled: true},
+			{ID: 4, Path: "/media/shared", ArrInstanceID: &sonarr, Enabled: false},
+		}, nil
+	}
+
+	list := decodeInto[gen.RootList](t, h.do(t, "GET", "/api/roots", nil), 200)
+	require.Empty(t, list.Conflicts)
 }

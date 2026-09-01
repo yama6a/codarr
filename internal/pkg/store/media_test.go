@@ -434,3 +434,69 @@ func TestMediaStore_CountsForTheDashboard(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, map[domain.Kind]int{domain.KindFull: 2}, byKind)
 }
+
+// TestMediaStore_SortsByProvenanceInBothDirections covers the column plan.md
+// 18.2 makes first-class alongside the plan kind. Before it was in the
+// whitelist the store silently fell back to path, so "show me everything that
+// changed after Codarr wrote it" sorted by filename instead.
+func TestMediaStore_SortsByProvenanceInBothDirections(t *testing.T) {
+	t.Parallel()
+
+	s := storetest.NewDB(t)
+
+	untouched := seedMedia(t, s, "/library/aaa-untouched.mkv")
+	output := seedMedia(t, s, "/library/mmm-output.mkv")
+	modified := seedMedia(t, s, "/library/zzz-modified.mkv")
+
+	for _, m := range []domain.MediaFile{output, modified} {
+		job := seedJob(t, s, m.ID, domain.KindFull, domain.PriorityFull)
+
+		require.NoError(t, s.RecordPromotion(t.Context(), store.PromotionUpdate{
+			JobID:             job.ID,
+			MediaFileID:       m.ID,
+			OutputFingerprint: "xxh3-128:output",
+			OutputSize:        10,
+			OutputMTime:       2,
+			PolicyHash:        "policy-abc",
+			PromotedAt:        testTime(),
+		}))
+	}
+
+	// A third party rewrote the file after Codarr produced it, which is exactly
+	// the view this sort exists to surface.
+	_, err := s.UpsertMediaFile(t.Context(), domain.MediaFile{
+		Path: modified.Path, SizeBytes: 11, MTime: 3, Fingerprint: "xxh3-128:rewritten",
+		Status: domain.MediaAnalyzed, CreatedAt: testTime(), UpdatedAt: testTime(),
+	})
+	require.NoError(t, err)
+
+	ascending, total, err := s.ListMediaFiles(t.Context(), store.MediaFilter{Sort: store.SortProvenance})
+	require.NoError(t, err)
+	require.Equal(t, 3, total)
+	require.Equal(t, []domain.Provenance{
+		domain.ProvenanceCodarrOutput,
+		domain.ProvenanceModified,
+		domain.ProvenanceUntouched,
+	}, provenances(ascending))
+	require.Equal(t, output.Path, ascending[0].Path)
+
+	descending, _, err := s.ListMediaFiles(t.Context(), store.MediaFilter{
+		Sort: store.SortProvenance, Descending: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, []domain.Provenance{
+		domain.ProvenanceUntouched,
+		domain.ProvenanceModified,
+		domain.ProvenanceCodarrOutput,
+	}, provenances(descending))
+	require.Equal(t, untouched.Path, descending[0].Path)
+}
+
+func provenances(files []domain.MediaFile) []domain.Provenance {
+	out := make([]domain.Provenance, 0, len(files))
+	for _, f := range files {
+		out = append(out, f.Provenance)
+	}
+
+	return out
+}

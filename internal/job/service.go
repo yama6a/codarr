@@ -30,6 +30,9 @@ type Deps struct {
 	Clock         clock.Clock
 	Logger        *slog.Logger
 
+	// Metrics is optional. A nil value records nothing and is safe everywhere.
+	Metrics Metrics
+
 	// Version is stamped into every output as CODARR_VERSION (12).
 	Version string
 
@@ -51,6 +54,7 @@ type Service struct {
 	newEnc   NewEncoder
 	clk      clock.Clock
 	log      *slog.Logger
+	mx       recorder
 	version  string
 	idlePoll time.Duration
 
@@ -98,6 +102,7 @@ func New(d Deps) *Service {
 		newEnc:   d.NewEncoder,
 		clk:      d.Clock,
 		log:      log,
+		mx:       recorder{m: d.Metrics},
 		version:  d.Version,
 		idlePoll: d.IdlePoll,
 		engine:   decide.New(),

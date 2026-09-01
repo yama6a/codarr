@@ -27,8 +27,6 @@ func (s *Server) RecheckAllMedia(
 		return gen.RecheckAllMediadefaultJSONResponse(s.fail(ctx, err)), nil
 	}
 
-	s.countQueued(res)
-
 	return gen.RecheckAllMedia200JSONResponse(recheckResult(res)), nil
 }
 
@@ -53,8 +51,6 @@ func (s *Server) RecheckSelectedMedia(
 	if err != nil {
 		return gen.RecheckSelectedMediadefaultJSONResponse(s.fail(ctx, err)), nil
 	}
-
-	s.countQueued(res)
 
 	return gen.RecheckSelectedMedia200JSONResponse(recheckResult(res)), nil
 }
@@ -169,12 +165,6 @@ func (s *Server) RunSpaceSweep(
 		return gen.RunSpaceSweepdefaultJSONResponse(s.fail(ctx, err)), nil
 	}
 
-	if s.metrics != nil {
-		for range res.QueuedJobIDs {
-			s.metrics.JobObserved(domain.JobQueued, domain.KindFull, domain.OriginSpaceSweep)
-		}
-	}
-
 	return gen.RunSpaceSweep200JSONResponse{
 		ByPlanKind:           breakdown(res.ByPlanKind),
 		Count:                res.Count,
@@ -228,14 +218,4 @@ func nonNilInt64s(in []int64) []int64 {
 	}
 
 	return in
-}
-
-func (s *Server) countQueued(r job.RecheckResult) {
-	if s.metrics == nil {
-		return
-	}
-
-	for range r.QueuedJobIDs {
-		s.metrics.JobObserved(domain.JobQueued, "", domain.OriginRecheck)
-	}
 }

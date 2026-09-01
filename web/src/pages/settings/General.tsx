@@ -90,6 +90,10 @@ export default function SettingsGeneral() {
 
       <Panel title="Paths and device" icon="hardware">
         <div className="space-y-5">
+          <p className="rounded-lg border border-amber-800 bg-amber-950/40 px-3 py-2 text-xs text-amber-200">
+            Both of these are read once at startup. Saving stores the new value, but promotion and the
+            hardware probe keep using the old one until Codarr is restarted.
+          </p>
           <FormField
             label="Temp directory"
             hint="Staging fallback for when the destination filesystem cannot hold the output alongside the source."

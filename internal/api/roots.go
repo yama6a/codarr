@@ -6,9 +6,13 @@ import (
 
 	gen "github.com/yama6a/codarr/api"
 	"github.com/yama6a/codarr/internal/pkg/domain"
+	"github.com/yama6a/codarr/internal/pkg/pathmap"
 )
 
-// ListRoots returns every watch root with its owning instance.
+// ListRoots returns every watch root with its owning instance, and every root
+// two enabled instances both claim. plan.md 18.4 wants the conflict shown as a
+// standing error rather than only after an import, and it is the same rows, so
+// it rides on this response instead of an endpoint of its own.
 func (s *Server) ListRoots(ctx context.Context, _ gen.ListRootsRequestObject) (gen.ListRootsResponseObject, error) {
 	roots, err := s.store.ListRoots(ctx)
 	if err != nil {
@@ -25,7 +29,27 @@ func (s *Server) ListRoots(ctx context.Context, _ gen.ListRootsRequestObject) (g
 		out = append(out, root(r, instanceName(names, r.ArrInstanceID), nil))
 	}
 
-	return gen.ListRoots200JSONResponse(out), nil
+	return gen.ListRoots200JSONResponse{Roots: out, Conflicts: contestedRoots(roots, names)}, nil
+}
+
+// contestedRoots is pathmap.Conflicts rendered for the settings page. Only
+// enabled roots owned by an instance count, which is the same rule attribution
+// uses (plan.md 16.2).
+func contestedRoots(roots []domain.Root, names map[int64]string) []gen.ContestedRoot {
+	conflicts := pathmap.Conflicts(roots)
+
+	out := make([]gen.ContestedRoot, 0, len(conflicts))
+
+	for _, c := range conflicts {
+		instances := make([]gen.ArrInstanceRef, 0, len(c.InstanceIDs))
+		for _, id := range c.InstanceIDs {
+			instances = append(instances, gen.ArrInstanceRef{Id: id, Name: names[id]})
+		}
+
+		out = append(out, gen.ContestedRoot{Path: c.Path, Instances: instances})
+	}
+
+	return out
 }
 
 // CreateRoot adds a root by hand. A root that nests inside an existing one is

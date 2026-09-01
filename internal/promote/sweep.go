@@ -37,6 +37,10 @@ func (p *Promoter) Sweep(ctx context.Context, roots, claimed []string) ([]string
 	s.temp()
 	sort.Strings(s.removed)
 
+	if len(s.errs) > 0 {
+		p.mx.error(ErrorOrphanSweep)
+	}
+
 	return s.removed, errors.Join(s.errs...)
 }
 

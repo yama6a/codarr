@@ -26,7 +26,7 @@ export default function SettingsRoots() {
       unwrap(api.GET('/api/roots')),
       unwrap(api.GET('/api/arr')),
     ]);
-    setRoots(nextRoots);
+    setRoots(nextRoots.roots);
     setInstances(nextInstances);
   }, []);
 

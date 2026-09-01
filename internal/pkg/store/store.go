@@ -35,6 +35,7 @@ const (
 	SortVideoCodec MediaSort = "video_codec"
 	SortBitrate    MediaSort = "bitrate"
 	SortUpdatedAt  MediaSort = "updated_at"
+	SortProvenance MediaSort = "provenance"
 )
 
 // MediaFilter is the server-side filter, sort and pagination of plan.md 18.2.
@@ -249,7 +250,7 @@ type Store interface { //nolint:interfacebloat // one database, one mock; splitt
 	SetJobState(ctx context.Context, id int64, state domain.JobState) error
 	SetJobBlockedBy(ctx context.Context, id int64, blockedBy string) error
 	UpdateJobExecution(ctx context.Context, u ExecutionUpdate) error
-	UpdateJobProgress(ctx context.Context, id int64, pct, speed float64, estimatedSeconds int) error
+	UpdateJobProgress(ctx context.Context, id int64, pct, speed, fps float64, estimatedSeconds int) error
 	UpdateJobTransform(ctx context.Context, id int64, t domain.TransformRecord) error
 	FailJob(ctx context.Context, id int64, code domain.FailureCode, message, stderrTail string) error
 	CancelJob(ctx context.Context, id int64) error

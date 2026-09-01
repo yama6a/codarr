@@ -127,6 +127,7 @@ func build(ctx context.Context, cfg config) (*app, error) {
 		Copier:        promote.NewFSCopier(fs),
 		Logger:        logger,
 		TempDir:       settings.TempDir,
+		Metrics:       mx,
 	})
 
 	ingestAnalyzer := ingest.NewAnalyzer(fs, fp, probe, st, clk, logger)
@@ -144,6 +145,7 @@ func build(ctx context.Context, cfg config) (*app, error) {
 		NewEncoder:    newEncoder(cfg.ffmpeg),
 		Clock:         clk,
 		Logger:        logger,
+		Metrics:       mx,
 		Version:       info.Version,
 	})
 

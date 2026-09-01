@@ -25,6 +25,7 @@ export function jobSummary(overrides: Partial<JobSummary> = {}): JobSummary {
     started_at: '2026-08-01T10:01:00.000000000Z',
     progress_pct: 42.5,
     progress_speed: 3.2,
+    progress_fps: 118.5,
     estimated_seconds: 1800,
     encoder_used: 'hevc_qsv',
     decode_path: 'hardware',

@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import SettingsArr from '../Arr';
 import { arrInstance } from '../../../../test/fixtures';
-import type { Root } from '../../../api/types';
+import type { ContestedRoot, Root, RootList } from '../../../api/types';
 
 const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), del: vi.fn() }));
 
@@ -28,9 +28,10 @@ function root(id: number, arrInstanceId: number): Root {
   };
 }
 
-function stub(instances = [arrInstance()], roots: Root[] = []) {
+function stub(instances = [arrInstance()], roots: Root[] = [], conflicts: ContestedRoot[] = []) {
+  const list: RootList = { roots, conflicts };
   mocks.get.mockImplementation((path: string) =>
-    Promise.resolve({ data: path === '/api/arr' ? instances : roots }),
+    Promise.resolve({ data: path === '/api/arr' ? instances : list }),
   );
 }
 
@@ -71,16 +72,26 @@ describe('Settings, Radarr and Sonarr', () => {
     stub(
       [arrInstance({ id: 1, name: 'radarr' }), arrInstance({ id: 2, name: 'radarr-4k' })],
       [root(1, 1), root(2, 2)],
+      [
+        {
+          path: '/media/movies',
+          instances: [
+            { id: 1, name: 'radarr' },
+            { id: 2, name: 'radarr-4k' },
+          ],
+        },
+      ],
     );
     renderArr();
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Two enabled instances claim the same tree');
-    expect(alert).toHaveTextContent('radarr-4k');
+    expect(alert).toHaveTextContent('Two enabled instances claim the same root');
+    expect(alert).toHaveTextContent('radarr and radarr-4k');
     expect(alert).toHaveTextContent('Codarr never guesses an owner');
+    expect(alert).toHaveTextContent('no instance is notified');
   });
 
-  it('does not warn when one instance owns the tree', async () => {
+  it('does not warn when one instance owns the root', async () => {
     stub([arrInstance()], [root(1, 1)]);
     renderArr();
 

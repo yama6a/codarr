@@ -85,6 +85,7 @@ type Job struct {
 	FfmpegArgv       []string
 	ProgressPct      float64
 	ProgressSpeed    float64
+	ProgressFPS      float64
 	EstimatedSeconds int
 	ActualSeconds    int
 

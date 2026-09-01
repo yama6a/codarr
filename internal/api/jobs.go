@@ -58,10 +58,6 @@ func (s *Server) CancelJob(ctx context.Context, req gen.CancelJobRequestObject) 
 		return gen.CancelJobdefaultJSONResponse(s.fail(ctx, err)), nil
 	}
 
-	if s.metrics != nil {
-		s.metrics.JobObserved(domain.JobCancelled, domain.Kind(out.Kind), domain.JobOrigin(out.Origin))
-	}
-
 	return gen.CancelJob200JSONResponse(out), nil
 }
 
@@ -70,13 +66,9 @@ func (s *Server) CancelJob(ctx context.Context, req gen.CancelJobRequestObject) 
 func (s *Server) RestartJob(
 	ctx context.Context, req gen.RestartJobRequestObject,
 ) (gen.RestartJobResponseObject, error) {
-	restarted, err := s.queue.Restart(ctx, req.Id)
+	_, err := s.queue.Restart(ctx, req.Id)
 	if err != nil {
 		return gen.RestartJobdefaultJSONResponse(s.fail(ctx, err)), nil
-	}
-
-	if s.metrics != nil {
-		s.metrics.JobObserved(domain.JobQueued, restarted.Kind, restarted.Origin)
 	}
 
 	out, err := s.jobView(ctx, req.Id)
@@ -315,6 +307,7 @@ func jobSummary(j domain.Job, path string) gen.JobSummary {
 		Origin:           gen.JobOrigin(j.Origin),
 		OutputSize:       int64Ptr(j.OutputSize),
 		Priority:         j.Priority,
+		ProgressFps:      floatPtr(j.ProgressFPS),
 		ProgressPct:      floatPtr(j.ProgressPct),
 		ProgressSpeed:    floatPtr(j.ProgressSpeed),
 		QueuedAt:         j.QueuedAt,
@@ -350,6 +343,7 @@ func jobDetail(j domain.Job, media domain.MediaFile, instance string) gen.Job {
 		OutputSize:        int64Ptr(j.OutputSize),
 		Priority:          j.Priority,
 		ProbeResult:       strPtr(media.ProbeJSON),
+		ProgressFps:       floatPtr(j.ProgressFPS),
 		ProgressPct:       floatPtr(j.ProgressPct),
 		ProgressSpeed:     floatPtr(j.ProgressSpeed),
 		QueuedAt:          j.QueuedAt,

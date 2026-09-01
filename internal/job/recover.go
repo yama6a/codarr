@@ -52,8 +52,11 @@ func (s *Service) Recover(ctx context.Context) error {
 			slog.String("action", string(r.Action)),
 			slog.Int("attempt", r.Attempt))
 
+		s.observeSweep(r.Action)
+
 		keep, err := s.recoverOne(ctx, r)
 		if err != nil {
+			s.mx.error(errorRecovery)
 			s.log.ErrorContext(ctx, "deciding what an interrupted job did failed",
 				slog.Int64("job_id", r.JobID), slog.Any("error", err))
 
@@ -67,8 +70,23 @@ func (s *Service) Recover(ctx context.Context) error {
 
 	s.sweepOrphans(ctx, claimed)
 	s.notify()
+	s.syncQueueGauges(ctx)
 
 	return nil
+}
+
+// observeSweep records what the store already did with an interrupted job.
+// jobs_total is not touched here: the sweep result carries no kind or origin,
+// and plan.md 24 names jobs_requeued_total and jobs_failed_total for exactly
+// these two outcomes.
+func (s *Service) observeSweep(action store.SweepAction) {
+	switch action {
+	case store.SweepRequeued:
+		s.mx.jobRequeued()
+	case store.SweepFailed:
+		s.mx.jobFailed(domain.FailInterrupted)
+	case store.SweepNeedsCheck:
+	}
 }
 
 // recoverOne returns the staging path the orphan sweep must leave alone, if any.
@@ -213,10 +231,14 @@ func (s *Service) markPromoted(
 		return fmt.Errorf("recording the recovered promotion of job %d: %w", j.ID, err)
 	}
 
+	s.observe(ctx, domain.JobDone, j.Kind, j.Origin)
+	s.mx.transcodeDuration(j.Kind, j.EncoderUsed, float64(actual))
+
 	s.log.InfoContext(ctx, "an interrupted promotion had already completed, finishing it",
 		slog.Int64("job_id", j.ID), slog.String("path", media.Path))
 
 	if err := s.notifier.NotifyPromoted(ctx, media.Path); err != nil {
+		s.mx.error(errorNotify)
 		s.log.WarnContext(ctx, "the deferred post-promotion notification failed",
 			slog.Int64("job_id", j.ID), slog.String("path", media.Path), slog.Any("error", err))
 	}
@@ -234,6 +256,8 @@ func (s *Service) failUndecidable(ctx context.Context, r store.SweepResult, medi
 	if err := s.store.FailJob(ctx, r.JobID, domain.FailPromote, message, ""); err != nil {
 		return fmt.Errorf("failing undecidable job %d: %w", r.JobID, err)
 	}
+
+	s.mx.jobFailed(domain.FailPromote)
 
 	s.log.ErrorContext(ctx, "an interrupted promotion could not be decided",
 		slog.Int64("job_id", r.JobID), slog.String("path", media.Path), slog.String("detail", detail))
@@ -315,6 +339,8 @@ func (s *Service) requeue(ctx context.Context, r store.SweepResult) error {
 		return fmt.Errorf("re-queueing interrupted job %d: %w", r.JobID, err)
 	}
 
+	s.observeSweep(res.Action)
+
 	s.log.InfoContext(ctx, "interrupted job resolved",
 		slog.Int64("job_id", r.JobID),
 		slog.String("action", string(res.Action)),
@@ -326,6 +352,7 @@ func (s *Service) requeue(ctx context.Context, r store.SweepResult) error {
 func (s *Service) sweepOrphans(ctx context.Context, claimed []string) {
 	roots, err := s.store.ListRoots(ctx)
 	if err != nil {
+		s.mx.error(errorOrphanSweep)
 		s.log.WarnContext(ctx, "the roots could not be read, skipping the orphan sweep", slog.Any("error", err))
 
 		return
@@ -338,6 +365,7 @@ func (s *Service) sweepOrphans(ctx context.Context, claimed []string) {
 
 	removed, err := s.promoter.Sweep(ctx, paths, claimed)
 	if err != nil {
+		s.mx.error(errorOrphanSweep)
 		s.log.WarnContext(ctx, "the orphan sweep did not complete cleanly", slog.Any("error", err))
 	}
 

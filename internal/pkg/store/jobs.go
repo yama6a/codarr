@@ -11,7 +11,7 @@ import (
 )
 
 const jobColumns = `id, media_file_id, kind, origin, priority, state, attempt, transform_json,
-	staging_path, used_temp_dir, ffmpeg_argv, progress_pct, progress_speed, estimated_seconds,
+	staging_path, used_temp_dir, ffmpeg_argv, progress_pct, progress_speed, progress_fps, estimated_seconds,
 	actual_seconds, final_out_time_us, encoder_used, decode_path, fell_back, fallback_reason, source_size,
 	output_size, output_fingerprint, output_full_hash, blocked_by, failure_code,
 	failure_message, stderr_tail, queued_at, started_at, finished_at`
@@ -251,12 +251,14 @@ func (s *store) UpdateJobExecution(ctx context.Context, u ExecutionUpdate) error
 		nullInt64(int64(u.EstimatedSeconds)), nullInt64(u.FinalOutTimeUS), u.JobID)
 }
 
-func (s *store) UpdateJobProgress(ctx context.Context, id int64, pct, speed float64, estimatedSeconds int) error {
+// UpdateJobProgress is the throttled five-second flush of plan.md 14.3. Every
+// live field goes in one statement; there is deliberately no second write.
+func (s *store) UpdateJobProgress(ctx context.Context, id int64, pct, speed, fps float64, estimatedSeconds int) error {
 	const query = `
-		UPDATE jobs SET progress_pct = ?, progress_speed = ?, estimated_seconds = ?
+		UPDATE jobs SET progress_pct = ?, progress_speed = ?, progress_fps = ?, estimated_seconds = ?
 		WHERE id = ?`
 
-	return s.execOne(ctx, query, pct, speed, nullInt64(int64(estimatedSeconds)), id)
+	return s.execOne(ctx, query, pct, speed, fps, nullInt64(int64(estimatedSeconds)), id)
 }
 
 func (s *store) UpdateJobTransform(ctx context.Context, id int64, t domain.TransformRecord) error {
@@ -303,7 +305,7 @@ func (s *store) RestartJob(ctx context.Context, id int64) (domain.Job, error) {
 		const query = `
 			UPDATE jobs SET
 				state = ?, priority = ?, attempt = 0, progress_pct = NULL,
-				progress_speed = NULL, started_at = NULL, finished_at = NULL,
+				progress_speed = NULL, progress_fps = NULL, started_at = NULL, finished_at = NULL,
 				failure_code = NULL, failure_message = NULL, stderr_tail = NULL,
 				blocked_by = NULL, staging_path = NULL, queued_at = ?
 			WHERE id = ? AND state IN (?, ?)`
@@ -552,7 +554,7 @@ func requeueOrFail(ctx context.Context, tx *sql.Tx, j interruptedJob) (SweepResu
 	const query = `
 		UPDATE jobs SET
 			state = ?, priority = ?, attempt = attempt + 1, progress_pct = NULL,
-			progress_speed = NULL, started_at = NULL, staging_path = NULL, blocked_by = NULL
+			progress_speed = NULL, progress_fps = NULL, started_at = NULL, staging_path = NULL, blocked_by = NULL
 		WHERE id = ?`
 
 	res, err := tx.ExecContext(ctx, query, string(domain.JobQueued), front, j.id)
@@ -639,6 +641,7 @@ func scanJob(row rowScanner) (domain.Job, error) {
 		ffmpegArgv     sql.NullString
 		progressPct    sql.NullFloat64
 		progressSpeed  sql.NullFloat64
+		progressFPS    sql.NullFloat64
 		estimated      sql.NullInt64
 		actual         sql.NullInt64
 		finalOutTime   sql.NullInt64
@@ -660,7 +663,7 @@ func scanJob(row rowScanner) (domain.Job, error) {
 
 	err := row.Scan(&j.ID, &j.MediaFileID, &kind, &origin, &j.Priority, &state, &j.Attempt,
 		&transform, &stagingPath, &j.UsedTempDir, &ffmpegArgv, &progressPct, &progressSpeed,
-		&estimated, &actual, &finalOutTime, &encoderUsed, &decodePath, &j.FellBack, &fallbackReason,
+		&progressFPS, &estimated, &actual, &finalOutTime, &encoderUsed, &decodePath, &j.FellBack, &fallbackReason,
 		&sourceSize, &outputSize, &outFingerprint, &outFullHash, &blockedBy, &failureCode,
 		&failureMessage, &stderrTail, &queuedAt, &startedAt, &finishedAt)
 	if err != nil {
@@ -673,6 +676,7 @@ func scanJob(row rowScanner) (domain.Job, error) {
 	j.StagingPath = stagingPath.String
 	j.ProgressPct = progressPct.Float64
 	j.ProgressSpeed = progressSpeed.Float64
+	j.ProgressFPS = progressFPS.Float64
 	j.EstimatedSeconds = int(estimated.Int64)
 	j.ActualSeconds = int(actual.Int64)
 	j.FinalOutTimeUS = finalOutTime.Int64

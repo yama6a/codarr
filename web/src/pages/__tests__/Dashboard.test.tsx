@@ -48,6 +48,7 @@ describe('Dashboard', () => {
       '43',
     );
     expect(screen.getByText('3.20x realtime')).toBeInTheDocument();
+    expect(screen.getByText('118.5')).toBeInTheDocument();
     expect(screen.getByText('hevc_qsv')).toBeInTheDocument();
   });
 

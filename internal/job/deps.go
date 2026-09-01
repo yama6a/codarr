@@ -18,6 +18,7 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/fingerprint"
 	"github.com/yama6a/codarr/internal/pkg/fsx"
+	"github.com/yama6a/codarr/internal/pkg/metrics"
 	"github.com/yama6a/codarr/internal/pkg/store"
 	"github.com/yama6a/codarr/internal/promote"
 )
@@ -43,13 +44,14 @@ type QueueStore interface {
 	SetJobState(ctx context.Context, id int64, state domain.JobState) error
 	SetJobBlockedBy(ctx context.Context, id int64, blockedBy string) error
 	UpdateJobExecution(ctx context.Context, u store.ExecutionUpdate) error
-	UpdateJobProgress(ctx context.Context, id int64, pct, speed float64, estimatedSeconds int) error
+	UpdateJobProgress(ctx context.Context, id int64, pct, speed, fps float64, estimatedSeconds int) error
 	UpdateJobTransform(ctx context.Context, id int64, t domain.TransformRecord) error
 	FailJob(ctx context.Context, id int64, code domain.FailureCode, message, stderrTail string) error
 	CancelJob(ctx context.Context, id int64) error
 	RestartJob(ctx context.Context, id int64) (domain.Job, error)
 	RequeueInterruptedJob(ctx context.Context, id int64) (store.SweepResult, error)
 	SweepInterruptedJobs(ctx context.Context) ([]store.SweepResult, error)
+	CountJobsByState(ctx context.Context) (map[domain.JobState]int, error)
 }
 
 // MediaStore is the library rows a job reads and writes.
@@ -141,6 +143,7 @@ var (
 	_ FS            = fsx.FS(nil)
 	_ Fingerprinter = (*fingerprint.Fingerprinter)(nil)
 	_ Hardware      = (*hardware.Prober)(nil)
+	_ Metrics       = (*metrics.Metrics)(nil)
 )
 
 // Analyzer re-probes one file and recomputes its plan against the current

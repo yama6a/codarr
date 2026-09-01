@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"log/slog"
 
 	gen "github.com/yama6a/codarr/api"
 	"github.com/yama6a/codarr/internal/pkg/domain"
@@ -52,7 +53,35 @@ func (s *Server) UpdateSettings(
 		return gen.UpdateSettingsdefaultJSONResponse(s.fail(ctx, err)), nil
 	}
 
+	s.warnRestartRequired(ctx, current, stored)
+
 	return gen.UpdateSettings200JSONResponse(settings(stored)), nil
+}
+
+// warnRestartRequired names the two settings that do not take effect until the
+// process restarts. promote.Deps.TempDir and hardware.New's device are fixed at
+// construction in cmd/codarr, deliberately: the temp directory is read inside
+// the pre-rename window plan.md 15.6 keeps free of allocation and I/O, and the
+// capability cache is keyed on the device it was probed against (migration
+// 003), so a device swapped under a running probe would answer about hardware
+// the encoder is not using.
+func (s *Server) warnRestartRequired(ctx context.Context, before, after domain.Settings) {
+	var changed []string
+
+	if before.TempDir != after.TempDir {
+		changed = append(changed, "temp_dir")
+	}
+
+	if before.QSVDevice != after.QSVDevice {
+		changed = append(changed, "qsv_device")
+	}
+
+	if len(changed) == 0 {
+		return
+	}
+
+	s.log.WarnContext(ctx, "a setting that is read once at startup changed; restart Codarr for it to take effect",
+		slog.Any("settings", changed))
 }
 
 func applySettings(current domain.Settings, in gen.SettingsUpdate) (domain.Settings, error) {

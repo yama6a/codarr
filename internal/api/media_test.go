@@ -390,3 +390,37 @@ func TestGetMediaFile_RendersThePlanStreams(t *testing.T) {
 	require.Nil(t, got.Plan.Streams[2].OutputIndex, "a dropped stream has no output position")
 	require.True(t, got.Plan.Streams[2].Forced)
 }
+
+// TestListMedia_SortsByProvenance closes the gap where the spec offered
+// provenance and -provenance but the store had no such column, so the query
+// quietly ordered by path instead (plan.md 18.2).
+func TestListMedia_SortsByProvenance(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		query      string
+		descending bool
+	}{
+		{query: "provenance", descending: false},
+		{query: "-provenance", descending: true},
+	} {
+		t.Run(tc.query, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHarness(t)
+			noInstances(h.store)
+
+			var seen store.MediaFilter
+
+			h.store.ListMediaFilesFunc = func(_ context.Context, f store.MediaFilter) ([]domain.MediaFile, int, error) {
+				seen = f
+
+				return []domain.MediaFile{mediaFixture()}, 1, nil
+			}
+
+			require.Equal(t, 200, h.do(t, "GET", "/api/media?sort="+tc.query, nil).Code)
+			require.Equal(t, store.SortProvenance, seen.Sort)
+			require.Equal(t, tc.descending, seen.Descending)
+		})
+	}
+}

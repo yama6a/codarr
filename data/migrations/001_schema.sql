@@ -91,7 +91,10 @@ CREATE TABLE media_files (
   nlink              INTEGER,
   fingerprint        TEXT,
   probe_json         TEXT,          -- full ffprobe output
-  media_info_json    TEXT,          -- parsed summary for the UI modal
+  -- Intentionally never written. internal/api/mediainfo.go derives the same
+  -- summary from probe_json on read, so the two can never disagree. Kept so the
+  -- schema still matches plan.md 17.1; do not start populating it.
+  media_info_json    TEXT,          -- parsed summary for the UI modal, unused
   analyzed_at        TIMESTAMP,
   plan_json          TEXT,
   plan_kind          TEXT,

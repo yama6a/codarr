@@ -111,10 +111,6 @@ func (s *Server) QueueMediaFile(
 		return gen.QueueMediaFiledefaultJSONResponse(s.fail(ctx, err)), nil
 	}
 
-	if res.Enqueued && s.metrics != nil {
-		s.metrics.JobObserved(domain.JobQueued, res.PlanKind, domain.OriginManual)
-	}
-
 	return gen.QueueMediaFile200JSONResponse{
 		Enqueued:    res.Enqueued,
 		JobId:       res.JobID,
@@ -196,9 +192,8 @@ func deref(s *string) string {
 	return *s
 }
 
-// sortColumn maps the spec's sort keys onto the store's whitelist. `provenance`
-// has no column in that whitelist, so it falls back to the store's own default
-// rather than silently sorting by something unrelated.
+// sortColumn maps the spec's sort keys onto the store's whitelist. Anything
+// unrecognised falls back to path rather than reaching the query.
 func sortColumn(sort *gen.MediaSort) store.MediaSort {
 	if sort == nil {
 		return store.SortPath
@@ -215,6 +210,8 @@ func sortColumn(sort *gen.MediaSort) store.MediaSort {
 		return store.SortUpdatedAt
 	case "video_bitrate":
 		return store.SortBitrate
+	case "provenance":
+		return store.SortProvenance
 	default:
 		return store.SortPath
 	}

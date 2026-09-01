@@ -90,6 +90,9 @@ type Deps struct {
 	Logger        *slog.Logger
 	TempDir       string
 	StreamRetry   time.Duration
+
+	// Metrics is optional. A nil value records nothing and is safe everywhere.
+	Metrics Metrics
 }
 
 // Promoter runs preflight, verification and the atomic replace.
@@ -102,6 +105,7 @@ type Promoter struct {
 	notifier    Notifier
 	copier      Copier
 	log         *slog.Logger
+	mx          recorder
 	tempDir     string
 	streamRetry time.Duration
 }
@@ -125,6 +129,7 @@ func New(d Deps) *Promoter {
 		notifier:    d.Notifier,
 		copier:      d.Copier,
 		log:         d.Logger,
+		mx:          recorder{m: d.Metrics},
 		tempDir:     d.TempDir,
 		streamRetry: d.StreamRetry,
 	}
@@ -225,6 +230,7 @@ func (p *Promoter) settle(
 	}
 
 	if err := p.notifier.NotifyPromoted(ctx, req.SourcePath); err != nil {
+		p.mx.error(ErrorNotify)
 		result.Warnings = append(result.Warnings,
 			"the file was promoted but notifying Plex and the *arr failed: "+err.Error())
 		p.log.WarnContext(ctx, "post-promotion notification failed",
@@ -366,6 +372,8 @@ func (p *Promoter) blocked(ctx context.Context, path string) (bool, string) {
 
 	switch {
 	case err != nil:
+		p.mx.error(ErrorStreamGuard)
+
 		return true, "Plex could not be asked whether the file is streaming: " + err.Error()
 	case streaming:
 		return true, who
@@ -415,6 +423,8 @@ func (p *Promoter) sync(staging, destDir string) error {
 func (p *Promoter) recheckAndRename(ctx context.Context, staging, dest string) (bool, string, error) {
 	streaming, who, err := p.guard.IsStreaming(ctx, dest)
 	if err != nil {
+		p.mx.error(ErrorStreamGuard)
+
 		//nolint:nilerr // deliberate: an unanswerable Plex is a deferral, not a failure
 		return true, "Plex could not be asked whether the file is streaming: " + err.Error(), nil
 	}

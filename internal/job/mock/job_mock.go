@@ -36,6 +36,9 @@ var _ job.Store = &StoreMock{}
 //			ClaimNextJobFunc: func(ctx context.Context) (domain.Job, bool, error) {
 //				panic("mock out the ClaimNextJob method")
 //			},
+//			CountJobsByStateFunc: func(ctx context.Context) (map[domain.JobState]int, error) {
+//				panic("mock out the CountJobsByState method")
+//			},
 //			EnqueueJobFunc: func(ctx context.Context, j domain.Job) (domain.Job, bool, error) {
 //				panic("mock out the EnqueueJob method")
 //			},
@@ -84,7 +87,7 @@ var _ job.Store = &StoreMock{}
 //			UpdateJobExecutionFunc: func(ctx context.Context, u store.ExecutionUpdate) error {
 //				panic("mock out the UpdateJobExecution method")
 //			},
-//			UpdateJobProgressFunc: func(ctx context.Context, id int64, pct float64, speed float64, estimatedSeconds int) error {
+//			UpdateJobProgressFunc: func(ctx context.Context, id int64, pct float64, speed float64, fps float64, estimatedSeconds int) error {
 //				panic("mock out the UpdateJobProgress method")
 //			},
 //			UpdateJobTransformFunc: func(ctx context.Context, id int64, t domain.TransformRecord) error {
@@ -111,6 +114,9 @@ type StoreMock struct {
 
 	// ClaimNextJobFunc mocks the ClaimNextJob method.
 	ClaimNextJobFunc func(ctx context.Context) (domain.Job, bool, error)
+
+	// CountJobsByStateFunc mocks the CountJobsByState method.
+	CountJobsByStateFunc func(ctx context.Context) (map[domain.JobState]int, error)
 
 	// EnqueueJobFunc mocks the EnqueueJob method.
 	EnqueueJobFunc func(ctx context.Context, j domain.Job) (domain.Job, bool, error)
@@ -161,7 +167,7 @@ type StoreMock struct {
 	UpdateJobExecutionFunc func(ctx context.Context, u store.ExecutionUpdate) error
 
 	// UpdateJobProgressFunc mocks the UpdateJobProgress method.
-	UpdateJobProgressFunc func(ctx context.Context, id int64, pct float64, speed float64, estimatedSeconds int) error
+	UpdateJobProgressFunc func(ctx context.Context, id int64, pct float64, speed float64, fps float64, estimatedSeconds int) error
 
 	// UpdateJobTransformFunc mocks the UpdateJobTransform method.
 	UpdateJobTransformFunc func(ctx context.Context, id int64, t domain.TransformRecord) error
@@ -190,6 +196,11 @@ type StoreMock struct {
 		}
 		// ClaimNextJob holds details about calls to the ClaimNextJob method.
 		ClaimNextJob []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
+		// CountJobsByState holds details about calls to the CountJobsByState method.
+		CountJobsByState []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
@@ -327,6 +338,8 @@ type StoreMock struct {
 			Pct float64
 			// Speed is the speed argument value.
 			Speed float64
+			// Fps is the fps argument value.
+			Fps float64
 			// EstimatedSeconds is the estimatedSeconds argument value.
 			EstimatedSeconds int
 		}
@@ -357,6 +370,7 @@ type StoreMock struct {
 	lockActiveJobForMedia     sync.RWMutex
 	lockCancelJob             sync.RWMutex
 	lockClaimNextJob          sync.RWMutex
+	lockCountJobsByState      sync.RWMutex
 	lockEnqueueJob            sync.RWMutex
 	lockFailJob               sync.RWMutex
 	lockGetJob                sync.RWMutex
@@ -480,6 +494,38 @@ func (mock *StoreMock) ClaimNextJobCalls() []struct {
 	mock.lockClaimNextJob.RLock()
 	calls = mock.calls.ClaimNextJob
 	mock.lockClaimNextJob.RUnlock()
+	return calls
+}
+
+// CountJobsByState calls CountJobsByStateFunc.
+func (mock *StoreMock) CountJobsByState(ctx context.Context) (map[domain.JobState]int, error) {
+	if mock.CountJobsByStateFunc == nil {
+		panic("StoreMock.CountJobsByStateFunc: method is nil but Store.CountJobsByState was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockCountJobsByState.Lock()
+	mock.calls.CountJobsByState = append(mock.calls.CountJobsByState, callInfo)
+	mock.lockCountJobsByState.Unlock()
+	return mock.CountJobsByStateFunc(ctx)
+}
+
+// CountJobsByStateCalls gets all the calls that were made to CountJobsByState.
+// Check the length with:
+//
+//	len(mockedStore.CountJobsByStateCalls())
+func (mock *StoreMock) CountJobsByStateCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockCountJobsByState.RLock()
+	calls = mock.calls.CountJobsByState
+	mock.lockCountJobsByState.RUnlock()
 	return calls
 }
 
@@ -1084,7 +1130,7 @@ func (mock *StoreMock) UpdateJobExecutionCalls() []struct {
 }
 
 // UpdateJobProgress calls UpdateJobProgressFunc.
-func (mock *StoreMock) UpdateJobProgress(ctx context.Context, id int64, pct float64, speed float64, estimatedSeconds int) error {
+func (mock *StoreMock) UpdateJobProgress(ctx context.Context, id int64, pct float64, speed float64, fps float64, estimatedSeconds int) error {
 	if mock.UpdateJobProgressFunc == nil {
 		panic("StoreMock.UpdateJobProgressFunc: method is nil but Store.UpdateJobProgress was just called")
 	}
@@ -1093,18 +1139,20 @@ func (mock *StoreMock) UpdateJobProgress(ctx context.Context, id int64, pct floa
 		ID               int64
 		Pct              float64
 		Speed            float64
+		Fps              float64
 		EstimatedSeconds int
 	}{
 		Ctx:              ctx,
 		ID:               id,
 		Pct:              pct,
 		Speed:            speed,
+		Fps:              fps,
 		EstimatedSeconds: estimatedSeconds,
 	}
 	mock.lockUpdateJobProgress.Lock()
 	mock.calls.UpdateJobProgress = append(mock.calls.UpdateJobProgress, callInfo)
 	mock.lockUpdateJobProgress.Unlock()
-	return mock.UpdateJobProgressFunc(ctx, id, pct, speed, estimatedSeconds)
+	return mock.UpdateJobProgressFunc(ctx, id, pct, speed, fps, estimatedSeconds)
 }
 
 // UpdateJobProgressCalls gets all the calls that were made to UpdateJobProgress.
@@ -1116,6 +1164,7 @@ func (mock *StoreMock) UpdateJobProgressCalls() []struct {
 	ID               int64
 	Pct              float64
 	Speed            float64
+	Fps              float64
 	EstimatedSeconds int
 } {
 	var calls []struct {
@@ -1123,6 +1172,7 @@ func (mock *StoreMock) UpdateJobProgressCalls() []struct {
 		ID               int64
 		Pct              float64
 		Speed            float64
+		Fps              float64
 		EstimatedSeconds int
 	}
 	mock.lockUpdateJobProgress.RLock()

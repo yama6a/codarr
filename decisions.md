@@ -590,6 +590,54 @@ Raised as a possible problem for a file with no video stream. It is not: the
 transform builder always emits the object and leaves `before`/`after` null, so
 the schema requiring the key is satisfied.
 
+## Wave 5
+
+### Metrics are recorded by the worker, not by the API
+
+The API originally incremented `codarr_jobs_total` at the five seams that start
+work, while the worker's own transitions were invisible. That double-counted a
+manual enqueue and missed an ingest one entirely. The worker owns every job
+metric now; the API only reports its own errors.
+
+The metrics dependency is a narrow consumer-defined interface on `job.Deps` and
+`promote.Deps`, and a nil value is safe at every call site. A metrics call can
+never fail a job, and no test is forced to supply one.
+
+### `codarr_bytes_*` are gauges despite the `_total` suffix
+
+24 names them `codarr_bytes_in_total`, `codarr_bytes_out_total` and
+`codarr_bytes_saved_total`, but none can be a counter: `bytes_saved` legitimately
+goes negative when an AV1 source grows into HEVC (6.2), and all three are read
+back out of SQLite rather than accumulated in memory, so a restart would reset a
+counter the database still knows the answer to. Kept the spec's names, made them
+gauges, and suppressed the linter with a comment.
+
+### `media_files.media_info_json` is intentionally never written
+
+18.3 wants a parsed media summary for the modal. Rather than a second column that
+can drift out of step with `probe_json`, it is derived from the probe on read.
+The column is left in place with a comment saying not to start writing it, since
+001 is frozen.
+
+### A settings change that needs a restart says so
+
+`temp_dir` and `qsv_device` are read once at construction. Reading them per
+operation was the alternative and was rejected: the temp dir is consulted in
+preflight, which sits on the path to the pre-rename window 15.6 requires be free
+of allocation and I/O, and the capability cache is keyed on the device it was
+probed against (migration 003), so hot-swapping the device would answer about
+hardware the encoder is not using. `PUT /api/settings` logs a warning naming
+whichever changed and the General page carries a standing note.
+
+### Overlapping roots are not a conflict; identical roots are
+
+The frontend had grown its own conflict check that flagged nested trees. That is
+wrong: `pathmap.Attribute` resolves nesting by longest prefix deliberately, so
+`/media` under one instance and `/media/movies` under another is well defined.
+Only an identical claim is ambiguous. The duplicate was deleted and
+`pathmap.Conflicts()` is the single definition, surfaced through
+`GET /api/roots` rather than a new endpoint.
+
 ## Known spec conflicts, implemented as written
 
 Both are recorded rather than fixed, because the plan is explicit and the
@@ -616,6 +664,97 @@ kept, the source is untouched. Safe, but the job can never succeed.
 It needs a real low-bitrate source that also fails the video copy test, so a
 1 Mbps 1080p VP9 or interlaced file. Rare, and it fails safe. Worth resolving
 before the space sweep runs on a large library.
+
+## Wave 5
+
+### The worker produces every job metric, and the API produces none
+
+`plan.md` 24 names `codarr_jobs_total{state,kind,origin}` without saying who
+increments it. It was the API, at the five seams that start work, which left the
+worker's own transitions invisible: nothing recorded running, verifying,
+promoting, done, or a failure code, and a manual enqueue was counted at the
+handler while an ingest enqueue was not counted at all.
+
+Every transition is now recorded inside `internal/job`, which is the only place
+that sees them all and the only place that knows the kind and origin of each.
+`api.Metrics` shrank to `Error(category)`. Recording in both would have double
+counted the API-driven half.
+
+### Metrics are an optional dependency, nil-checked in one place
+
+`job.Deps.Metrics` and `promote.Deps.Metrics` may be nil. Both packages funnel
+every call through an unexported `recorder`, so no call site guards and no
+metrics call can fail a job. Every test that does not care supplies nothing,
+which keeps the nil path under test everywhere rather than in one test.
+
+The alternative, a no-op implementation wired in the constructor, was rejected:
+it makes "was this actually recorded?" invisible at the seam and it still needs
+a nil check for a zero-valued `Deps`.
+
+### The worker re-reads the queue gauges after each transition
+
+`queue_depth` and `jobs_awaiting_stream_end` are already refreshed every 15
+seconds by `metrics.Refresher` from `CountJobsByState`. The worker now runs the
+same query after each transition it makes, so a change is visible on the next
+scrape rather than up to a refresh later. The two writers cannot disagree,
+because it is the same count. The read only happens when metrics are wired.
+
+### `codarr_errors_total{category}` counts the errors a job survived
+
+A failure already reports itself through `jobs_failed_total`, so counting it
+again as an error would say nothing new. The categories are the places the
+worker and the promoter swallow an error and carry on: `worker`, `recovery`,
+`orphan_sweep`, `progress`, `staging`, `state`, `bitrate_probe`, `idet`,
+`notify`, and promotion's `plex_stream_guard`. That last one is the reason this
+series is worth having: 15.6 turns an unanswerable Plex into a deferral, which
+is correct and completely silent.
+
+### The root conflict rides on `GET /api/roots` rather than its own endpoint
+
+`plan.md` 18.4 asks for a standing error when two enabled instances claim the
+same root, and 20 has no endpoint for it. `pathmap.Conflicts` already computed
+it and nothing called it. The listing response became
+`{roots, conflicts}` because it is the same rows, derived from the same read the
+settings page already makes on every load.
+
+The frontend's own `findRootConflicts` was deleted with it. It flagged
+*overlapping* trees, which is not a conflict: `pathmap.Attribute` resolves
+nested roots by longest prefix, deliberately, so `/media` and `/media/movies`
+owned by different instances is a well-defined configuration rather than an
+ambiguous one. Only an identical claim is ambiguous, and that is what
+`Conflicts` returns.
+
+Reachability: `roots.path` is `UNIQUE` and both creation paths normalise, so two
+identical rows cannot be produced through the API today. The banner is
+nonetheless the honest surface for a state `Attribute` already handles, and it
+is now one definition rather than two that disagreed.
+
+### `media_files.media_info_json` stays unused, and says so
+
+Nothing writes it; `internal/api/mediainfo.go` derives the same summary from
+`probe_json` on read. Deriving is the correct choice, because a stored copy can
+disagree with the probe it came from. The column keeps the schema matching
+`plan.md` 17.1 and now carries a comment saying not to start populating it.
+
+This is a comment-only edit to `001_schema.sql`, which is otherwise never
+touched. It changes no DDL, and `rubenv/sql-migrate` records applied migrations
+by id without a checksum, so an existing database is unaffected.
+
+### `temp_dir` and `qsv_device` require a restart, and the UI says so
+
+Both are read once at startup: `promote.Deps.TempDir` and the device
+`hardware.New` is constructed with. Reading them per operation was the other
+option and was rejected on both counts.
+
+The temp directory is consulted inside preflight and the orphan sweep, and
+preflight sits on the path to the pre-rename window that 15.6 keeps free of
+allocation and I/O; adding a settings read there buys nothing and costs the one
+guarantee that matters. The capability cache is keyed on the device it was
+probed against (migration 003), so swapping the device under a running probe
+would answer about hardware the encoder is not using.
+
+`PUT /api/settings` logs a warning naming whichever of the two changed, and the
+General settings page carries a standing note above both fields.
 
 ## Open items
 

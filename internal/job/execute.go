@@ -51,6 +51,8 @@ type task struct {
 // halves of plan.md 19.1. A shutdown ends none of them, and deliberately leaves
 // the row in flight for the sweep of 19.2.
 func (s *Service) execute(parent context.Context, j domain.Job) error {
+	s.observe(parent, domain.JobRunning, j.Kind, j.Origin)
+
 	return s.withRunning(parent, j, s.pipeline)
 }
 
@@ -242,6 +244,7 @@ func (s *Service) resolveBitrate(ctx context.Context, t *task) error {
 			return err
 		}
 
+		s.mx.error(errorBitrateProb)
 		s.log.WarnContext(ctx, "the bitrate sample probe failed, falling back to the 8.2 formula",
 			slog.Int64("job_id", t.job.ID), slog.Any("error", err))
 
@@ -306,6 +309,7 @@ func (s *Service) resolveScan(ctx context.Context, t *task) error {
 			return fmt.Errorf("idet sample of %s: %w", t.media.Path, err)
 		}
 
+		s.mx.error(errorIdet)
 		s.log.WarnContext(ctx, "the idet sample failed, treating the source as progressive",
 			slog.Int64("job_id", t.job.ID), slog.Any("error", err))
 
@@ -427,6 +431,8 @@ func (s *Service) encode(ctx context.Context, t *task) error {
 // fails differently.
 func (s *Service) stepBack(ctx context.Context, t *task, cmd ffmpeg.Command, res ffmpeg.RunResult) bool {
 	if retry, ok := hardware.RetryInSoftware(cmd.DecodePath, t.decodeRetried); ok {
+		s.mx.decodeFallback()
+
 		t.decodeRetried = true
 		t.forceSoftware = true
 		t.selection.FellBack = true
@@ -446,6 +452,8 @@ func (s *Service) stepBack(ctx context.Context, t *task, cmd ffmpeg.Command, res
 	if !ok {
 		return false
 	}
+
+	s.mx.encoderFallback(t.selection.Encoder, next.Encoder)
 
 	t.selection = next
 	t.decodeRetried = false
@@ -483,7 +491,8 @@ func (s *Service) runEncode(ctx context.Context, t *task, args []string) (ffmpeg
 	writeCtx := context.WithoutCancel(ctx)
 
 	throttle := ffmpeg.NewThrottle(s.clk, ffmpeg.FlushInterval, func(p ffmpeg.Progress) {
-		if err := s.store.UpdateJobProgress(writeCtx, t.job.ID, p.Percent, p.Speed, t.estimate); err != nil {
+		if err := s.store.UpdateJobProgress(writeCtx, t.job.ID, p.Percent, p.Speed, p.FPS, t.estimate); err != nil {
+			s.mx.error(errorProgress)
 			s.log.WarnContext(writeCtx, "storing job progress failed",
 				slog.Int64("job_id", t.job.ID), slog.Any("error", err))
 		}
@@ -556,7 +565,7 @@ func (s *Service) recordExecution(ctx context.Context, t *task) error {
 // part of verification, which is the check that stands between a bad encode and
 // a destroyed source and is never skipped.
 func (s *Service) finalise(ctx context.Context, t *task) error {
-	if err := s.setState(ctx, t.job.ID, domain.JobVerifying); err != nil {
+	if err := s.setState(ctx, t, domain.JobVerifying); err != nil {
 		return err
 	}
 
@@ -565,7 +574,7 @@ func (s *Service) finalise(ctx context.Context, t *task) error {
 		return wrapf(domain.FailProbe, err, "the finished output %s could not be probed", t.staging.Path)
 	}
 
-	if err := s.setState(ctx, t.job.ID, domain.JobPromoting); err != nil {
+	if err := s.setState(ctx, t, domain.JobPromoting); err != nil {
 		return err
 	}
 
@@ -603,23 +612,27 @@ func (s *Service) promoteRequest(ctx context.Context, t *task) promote.Request {
 		OnBlocked: func(reason string) {
 			t.blocked = true
 
-			s.block(writeCtx, t.job.ID, reason)
+			s.block(writeCtx, t, reason)
 		},
 	}
 }
 
 // block is plan.md 15.2 step 4: Plex is streaming the target, so the job waits
 // rather than replacing a file an NFS client has open (15.6).
-func (s *Service) block(ctx context.Context, jobID int64, reason string) {
-	if err := s.store.SetJobState(ctx, jobID, domain.JobAwaitingStreamEnd); err != nil {
+func (s *Service) block(ctx context.Context, t *task, reason string) {
+	if err := s.store.SetJobState(ctx, t.job.ID, domain.JobAwaitingStreamEnd); err != nil {
+		s.mx.error(errorState)
 		s.log.WarnContext(ctx, "moving the job to awaiting_stream_end failed",
-			slog.Int64("job_id", jobID), slog.Any("error", err))
+			slog.Int64("job_id", t.job.ID), slog.Any("error", err))
 	}
 
-	if err := s.store.SetJobBlockedBy(ctx, jobID, reason); err != nil {
+	if err := s.store.SetJobBlockedBy(ctx, t.job.ID, reason); err != nil {
+		s.mx.error(errorState)
 		s.log.WarnContext(ctx, "recording what the job is blocked by failed",
-			slog.Int64("job_id", jobID), slog.Any("error", err))
+			slog.Int64("job_id", t.job.ID), slog.Any("error", err))
 	}
+
+	s.observe(ctx, domain.JobAwaitingStreamEnd, t.plan.Kind, t.job.Origin)
 }
 
 // settle writes the measured half of the transform record and the output
@@ -641,12 +654,15 @@ func (s *Service) settle(ctx context.Context, t *task, out *ffprobe.Result, res 
 
 	if t.blocked {
 		if err := s.store.SetJobBlockedBy(ctx, t.job.ID, ""); err != nil {
+			s.mx.error(errorState)
 			s.log.WarnContext(ctx, "clearing blocked_by failed",
 				slog.Int64("job_id", t.job.ID), slog.Any("error", err))
 		}
 	}
 
 	s.est.Record(ctx, t.work(), actual)
+	s.recordDuration(t, actual)
+	s.observe(ctx, domain.JobDone, t.plan.Kind, t.job.Origin)
 
 	for _, w := range res.Warnings {
 		s.log.WarnContext(ctx, "promotion warning", slog.Int64("job_id", t.job.ID), slog.String("warning", w))
@@ -686,10 +702,12 @@ func (s *Service) recordPromotion(ctx context.Context, t *task, res promote.Resu
 	return nil
 }
 
-func (s *Service) setState(ctx context.Context, jobID int64, state domain.JobState) error {
-	if err := s.store.SetJobState(ctx, jobID, state); err != nil {
-		return wrapf(domain.FailInternal, err, "moving job %d to %s failed", jobID, state)
+func (s *Service) setState(ctx context.Context, t *task, state domain.JobState) error {
+	if err := s.store.SetJobState(ctx, t.job.ID, state); err != nil {
+		return wrapf(domain.FailInternal, err, "moving job %d to %s failed", t.job.ID, state)
 	}
+
+	s.observe(ctx, state, t.plan.Kind, t.job.Origin)
 
 	return nil
 }

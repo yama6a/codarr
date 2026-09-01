@@ -497,3 +497,37 @@ func TestService_RunDrainsTheQueue(t *testing.T) {
 		return h.jobRow(first.ID).State == domain.JobDone && h.jobRow(second.ID).State == domain.JobDone
 	}, 2*time.Second, time.Millisecond)
 }
+
+// TestService_FpsRidesTheSameThrottledProgressWrite is plan.md 18.1's fps on the
+// current-job card. The parser has always read the key; what mattered here was
+// that carrying it to the UI costs no second write (14.3).
+func TestService_FpsRidesTheSameThrottledProgressWrite(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	j := h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	h.addFile(stagingPath, sourceSize/2)
+
+	h.encoder.RunFunc = func(_ context.Context, args []string, progress func(ffmpeg.Progress)) (ffmpeg.RunResult, error) {
+		h.recordRun(args)
+
+		for i := range 11 {
+			progress(ffmpeg.Progress{Percent: float64(i) * 10, Speed: 2, FPS: 118.5})
+			h.clk.Advance(time.Second)
+		}
+
+		return ffmpeg.RunResult{FinalOutTime: time.Duration(mediaDur) * time.Second}, nil
+	}
+
+	_, err := h.svc.RunOnce(t.Context())
+	require.NoError(t, err)
+
+	estimate := h.jobRow(j.ID).EstimatedSeconds
+	require.Positive(t, estimate)
+
+	require.Equal(t, []progressWrite{
+		{JobID: j.ID, Pct: 0, Speed: 2, FPS: 118.5, Estimated: estimate},
+		{JobID: j.ID, Pct: 50, Speed: 2, FPS: 118.5, Estimated: estimate},
+		{JobID: j.ID, Pct: 100, Speed: 2, FPS: 118.5, Estimated: estimate},
+	}, h.store.progress)
+}

@@ -180,7 +180,7 @@ var _ store.Store = &StoreMock{}
 //			UpdateJobExecutionFunc: func(ctx context.Context, u store.ExecutionUpdate) error {
 //				panic("mock out the UpdateJobExecution method")
 //			},
-//			UpdateJobProgressFunc: func(ctx context.Context, id int64, pct float64, speed float64, estimatedSeconds int) error {
+//			UpdateJobProgressFunc: func(ctx context.Context, id int64, pct float64, speed float64, fps float64, estimatedSeconds int) error {
 //				panic("mock out the UpdateJobProgress method")
 //			},
 //			UpdateJobTransformFunc: func(ctx context.Context, id int64, t domain.TransformRecord) error {
@@ -368,7 +368,7 @@ type StoreMock struct {
 	UpdateJobExecutionFunc func(ctx context.Context, u store.ExecutionUpdate) error
 
 	// UpdateJobProgressFunc mocks the UpdateJobProgress method.
-	UpdateJobProgressFunc func(ctx context.Context, id int64, pct float64, speed float64, estimatedSeconds int) error
+	UpdateJobProgressFunc func(ctx context.Context, id int64, pct float64, speed float64, fps float64, estimatedSeconds int) error
 
 	// UpdateJobTransformFunc mocks the UpdateJobTransform method.
 	UpdateJobTransformFunc func(ctx context.Context, id int64, t domain.TransformRecord) error
@@ -781,6 +781,8 @@ type StoreMock struct {
 			Pct float64
 			// Speed is the speed argument value.
 			Speed float64
+			// Fps is the fps argument value.
+			Fps float64
 			// EstimatedSeconds is the estimatedSeconds argument value.
 			EstimatedSeconds int
 		}
@@ -2820,7 +2822,7 @@ func (mock *StoreMock) UpdateJobExecutionCalls() []struct {
 }
 
 // UpdateJobProgress calls UpdateJobProgressFunc.
-func (mock *StoreMock) UpdateJobProgress(ctx context.Context, id int64, pct float64, speed float64, estimatedSeconds int) error {
+func (mock *StoreMock) UpdateJobProgress(ctx context.Context, id int64, pct float64, speed float64, fps float64, estimatedSeconds int) error {
 	if mock.UpdateJobProgressFunc == nil {
 		panic("StoreMock.UpdateJobProgressFunc: method is nil but Store.UpdateJobProgress was just called")
 	}
@@ -2829,18 +2831,20 @@ func (mock *StoreMock) UpdateJobProgress(ctx context.Context, id int64, pct floa
 		ID               int64
 		Pct              float64
 		Speed            float64
+		Fps              float64
 		EstimatedSeconds int
 	}{
 		Ctx:              ctx,
 		ID:               id,
 		Pct:              pct,
 		Speed:            speed,
+		Fps:              fps,
 		EstimatedSeconds: estimatedSeconds,
 	}
 	mock.lockUpdateJobProgress.Lock()
 	mock.calls.UpdateJobProgress = append(mock.calls.UpdateJobProgress, callInfo)
 	mock.lockUpdateJobProgress.Unlock()
-	return mock.UpdateJobProgressFunc(ctx, id, pct, speed, estimatedSeconds)
+	return mock.UpdateJobProgressFunc(ctx, id, pct, speed, fps, estimatedSeconds)
 }
 
 // UpdateJobProgressCalls gets all the calls that were made to UpdateJobProgress.
@@ -2852,6 +2856,7 @@ func (mock *StoreMock) UpdateJobProgressCalls() []struct {
 	ID               int64
 	Pct              float64
 	Speed            float64
+	Fps              float64
 	EstimatedSeconds int
 } {
 	var calls []struct {
@@ -2859,6 +2864,7 @@ func (mock *StoreMock) UpdateJobProgressCalls() []struct {
 		ID               int64
 		Pct              float64
 		Speed            float64
+		Fps              float64
 		EstimatedSeconds int
 	}
 	mock.lockUpdateJobProgress.RLock()

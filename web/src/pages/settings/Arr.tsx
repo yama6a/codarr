@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api, unwrap } from '../../api/client';
 import { ArrInstanceEditor, type ArrEditorValue } from '../../components/settings/ArrInstanceEditor';
 import { TestResultLine } from '../../components/settings/TestResultLine';
-import { findRootConflicts } from '../../components/settings/rootConflicts';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -11,7 +10,7 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Panel } from '../../components/ui/Panel';
 import { toast } from '../../components/ui/Toast';
 import { formatBytes } from '../../lib/format';
-import type { ArrInstance, ArrRootFolder, ImportRootsResult, Root, TestResult } from '../../api/types';
+import type { ArrInstance, ArrRootFolder, ContestedRoot, ImportRootsResult, TestResult } from '../../api/types';
 
 function webhookUrl(webhookId: string): string {
   return `${window.location.origin}/api/webhook/${webhookId}`;
@@ -19,7 +18,7 @@ function webhookUrl(webhookId: string): string {
 
 export default function SettingsArr() {
   const [instances, setInstances] = useState<ArrInstance[]>([]);
-  const [roots, setRoots] = useState<Root[]>([]);
+  const [conflicts, setConflicts] = useState<ContestedRoot[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<ArrInstance | null | undefined>(undefined);
   const [saving, setSaving] = useState(false);
@@ -34,7 +33,7 @@ export default function SettingsArr() {
       unwrap(api.GET('/api/roots')),
     ]);
     setInstances(nextInstances);
-    setRoots(nextRoots);
+    setConflicts(nextRoots.conflicts);
   }, []);
 
   useEffect(() => {
@@ -42,8 +41,6 @@ export default function SettingsArr() {
       .catch(() => undefined)
       .finally(() => setLoading(false));
   }, [load]);
-
-  const conflicts = useMemo(() => findRootConflicts(roots, instances), [roots, instances]);
 
   const save = async (value: ArrEditorValue) => {
     setSaving(true);
@@ -195,19 +192,20 @@ export default function SettingsArr() {
         <div role="alert" className="rounded-xl border-2 border-red-500 bg-red-950 p-4">
           <p className="flex items-center gap-2 text-sm font-bold text-red-100">
             <Icon name="alert" size={18} className="text-red-400" />
-            Two enabled instances claim the same tree
+            Two enabled instances claim the same root
           </p>
           <ul className="mt-2 space-y-1 text-xs text-red-200">
             {conflicts.map((conflict) => (
-              <li key={`${conflict.path}-${conflict.otherPath}`}>
-                <span className="font-mono">{conflict.path}</span> ({conflict.owner}) overlaps{' '}
-                <span className="font-mono">{conflict.otherPath}</span> ({conflict.otherOwner})
+              <li key={conflict.path}>
+                <span className="font-mono">{conflict.path}</span> is claimed by{' '}
+                {conflict.instances.map((instance) => instance.name || `instance ${instance.id}`).join(' and ')}
               </li>
             ))}
           </ul>
           <p className="mt-2 text-xs text-red-300">
-            Codarr never guesses an owner. Disable one instance or narrow its roots, or the wrong
-            instance gets told about a replacement.
+            Codarr never guesses an owner. Files under a contested root are still processed, but no
+            instance is notified when one is replaced, so its library goes stale. Disable one
+            instance or narrow its roots.
           </p>
         </div>
       )}

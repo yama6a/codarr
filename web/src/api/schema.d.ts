@@ -309,7 +309,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every watch root. */
+        /**
+         * Every watch root, and any root two enabled instances both claim.
+         * @description conflicts carries the standing configuration error of plan.md 18.4. It
+         *     rides on this response rather than its own endpoint because it is the
+         *     same data, derived from the same rows the settings page already loads.
+         */
         get: operations["listRoots"];
         put?: never;
         /**
@@ -1144,6 +1149,24 @@ export interface components {
              */
             conflicts: components["schemas"]["RootConflict"][];
         };
+        RootList: {
+            roots: components["schemas"]["Root"][];
+            /**
+             * @description Roots claimed by two or more enabled instances. Codarr never guesses
+             *     an owner: files under a contested root are processed and nothing is
+             *     notified (plan.md 16.2).
+             */
+            conflicts: components["schemas"]["ContestedRoot"][];
+        };
+        ContestedRoot: {
+            path: string;
+            instances: components["schemas"]["ArrInstanceRef"][];
+        };
+        ArrInstanceRef: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+        };
         RootConflict: {
             path: string;
             /** Format: int64 */
@@ -1517,6 +1540,11 @@ export interface components {
              * @description ffmpeg's speed multiplier relative to realtime.
              */
             progress_speed?: number;
+            /**
+             * Format: double
+             * @description Frames per second ffmpeg is currently writing (plan.md 18.1).
+             */
+            progress_fps?: number;
             estimated_seconds?: number;
             actual_seconds?: number;
             encoder_used?: components["schemas"]["Encoder"];
@@ -1565,6 +1593,11 @@ export interface components {
             progress_pct?: number;
             /** Format: double */
             progress_speed?: number;
+            /**
+             * Format: double
+             * @description Frames per second ffmpeg is currently writing (plan.md 18.1).
+             */
+            progress_fps?: number;
             estimated_seconds?: number;
             actual_seconds?: number;
             encoder_used?: components["schemas"]["Encoder"];
@@ -2642,13 +2675,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description All roots with their owning instance. */
+            /** @description All roots with their owning instance, plus contested roots. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Root"][];
+                    "application/json": components["schemas"]["RootList"];
                 };
             };
             default: components["responses"]["Error"];

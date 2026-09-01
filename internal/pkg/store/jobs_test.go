@@ -452,7 +452,7 @@ func TestJobStore_ExecutionAndProgressUpdates(t *testing.T) {
 		EstimatedSeconds: 240,
 		FinalOutTimeUS:   7_200_000_000,
 	}))
-	require.NoError(t, s.UpdateJobProgress(t.Context(), job.ID, 42.5, 3.75, 180))
+	require.NoError(t, s.UpdateJobProgress(t.Context(), job.ID, 42.5, 3.75, 23.98, 180))
 
 	reloaded, err := s.GetJob(t.Context(), job.ID)
 	require.NoError(t, err)
@@ -464,6 +464,7 @@ func TestJobStore_ExecutionAndProgressUpdates(t *testing.T) {
 	require.Equal(t, "qsv init failed", reloaded.FallbackReason)
 	require.InEpsilon(t, 42.5, reloaded.ProgressPct, 0.0001)
 	require.InEpsilon(t, 3.75, reloaded.ProgressSpeed, 0.0001)
+	require.InEpsilon(t, 23.98, reloaded.ProgressFPS, 0.0001)
 	require.Equal(t, 180, reloaded.EstimatedSeconds)
 
 	// plan.md 15.3 needs ffmpeg's own out_time for a legacy container, and 19.2

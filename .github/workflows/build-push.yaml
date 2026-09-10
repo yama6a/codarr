@@ -10,119 +10,26 @@ concurrency:
   group: build-push-${{ github.ref }}
   cancel-in-progress: false
 
-permissions:
-  contents: write # required to create the GitHub release
-  packages: write # required, or the image push fails with permission_denied
-
 jobs:
   build-push:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }} # the deploy job below pins this tag in the cluster
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Determine next version
-        id: version
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          latest=$(gh release list --limit 1 --json tagName --jq '.[0].tagName // "0"')
-          next=$((latest + 1))
-          echo "Latest release: ${latest:-<none>} -> next: $next"
-          echo "version=$next" >> "$GITHUB_OUTPUT"
-
-      - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
-
-      - name: Build and push
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: .
-          file: .build/Dockerfile # the Dockerfile isn't at the repo root
-          # amd64 only. QSV, intel-media-va-driver-non-free and the whole hardware path are amd64;
-          # an arm64 image would silently fall back to software encoding (plan.md 23.3).
-          platforms: linux/amd64
-          push: true
-          tags: ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # Only tag a release once the image has actually been pushed.
-      - name: Create GitHub release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "${{ steps.version.outputs.version }}" \
-            --target "${{ github.sha }}" \
-            --title "${{ steps.version.outputs.version }}" \
-            --notes "Image: ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}"
+    uses: yama6a/gha/.github/workflows/docker-build-release.yaml@v1
+    permissions:
+      contents: write # required to create the GitHub release
+      packages: write # required, or the image push fails with permission_denied
+    with:
+      dockerfile: .build/Dockerfile # the Dockerfile isn't at the repo root
+      # amd64 only. QSV, intel-media-va-driver-non-free and the whole hardware path are amd64;
+      # an arm64 image would silently fall back to software encoding (plan.md 23.3).
+      platforms: linux/amd64
 
   deploy:
     needs: build-push
-    runs-on: ubuntu-latest
-    timeout-minutes: 10 # it does not wait for the target's CI, so this is only a hang guard
+    uses: yama6a/gha/.github/workflows/deploy-gitops.yaml@v1
     permissions: {} # nothing from THIS repo is needed; DEPLOY_TOKEN carries the rights
-    steps:
-      - name: Bump the image tag in offgrid-private
-        env:
-          # Not GITHUB_TOKEN: it cannot reach another repo at all, and a PR opened with it gets no CI
-          # run, so the merge below would never be armed.
-          GH_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
-          IMAGE: ghcr.io/${{ github.repository }}
-          TAG: ${{ needs.build-push.outputs.version }}
-          TARGET: yama6a/offgrid-private
-          # codarr is a template in the shared media chart rather than a chart of its own, because a PVC
-          # cannot be mounted across namespaces and media-library lives in `media`.
-          VALUES: argo_apps/workloads/charts/media/values.yaml
-        run: |
-          set -euo pipefail
-          name="${GITHUB_REPOSITORY##*/}"
-          branch="deploy/${name}-${TAG}"
-
-          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${TARGET}.git" gitops
-          cd gitops
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c "$branch"
-
-          # Substring-replace the tag rather than rewriting the YAML: `yq -i` reformats the whole file
-          # and would bury a one-line bump in noise. Anchored on the surrounding quotes and matched on
-          # the image name, so renaming a values key cannot silently break this, and the unquoted
-          # `# renovate: depName=` line above the image is not a candidate.
-          esc="${IMAGE//./\\.}"
-          sed -i -E "s|\"${esc}:[^\"]*\"|\"${IMAGE}:${TAG}\"|g" "$VALUES"
-
-          # Without this, a chart move would report a successful deploy while the cluster kept the old
-          # image, which looks identical to a healthy deploy from the outside.
-          if git diff --quiet -- "$VALUES"; then
-            echo "::error::nothing in $VALUES pointed at ${IMAGE} (already ${TAG}, or the chart moved)"
-            exit 1
-          fi
-
-          git commit -qam "Deploy ${name}:${TAG}"
-          git push -q --force origin "$branch" # force so re-running a failed deploy is idempotent
-
-          pr=$(gh pr list --repo "$TARGET" --head "$branch" --state open --json url --jq '.[0].url // empty')
-          if [ -z "$pr" ]; then
-            pr=$(gh pr create --repo "$TARGET" --base main --head "$branch" \
-                   --title "Deploy ${name}:${TAG}" \
-                   --body "Automated from ${GITHUB_REPOSITORY}@${GITHUB_SHA}. Image: \`${IMAGE}:${TAG}\`")
-          fi
-          echo "PR: $pr"
-
-          # Queue the merge behind the target's required checks and stop, rather than burning runner
-          # minutes watching them. The trade: this job goes green as soon as the merge is armed, so a
-          # failure there leaves the PR open and silent. A forgotten open PR is a tag pinned at an old
-          # version, so watch for them.
-          # On a re-run the checks may already be green, and GitHub rejects --auto when there is nothing
-          # left to wait for, so fall back to merging outright. Protection still blocks a red PR.
-          gh pr merge "$pr" --repo "$TARGET" --auto --squash --delete-branch \
-            || gh pr merge "$pr" --repo "$TARGET" --squash --delete-branch
+    with:
+      tag: ${{ needs.build-push.outputs.version }}
+      # codarr is a template in the shared media chart rather than a chart of its own, because a PVC
+      # cannot be mounted across namespaces and media-library lives in `media`.
+      values-path: argo_apps/workloads/charts/media/values.yaml
+    secrets:
+      DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}

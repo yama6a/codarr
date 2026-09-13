@@ -3,13 +3,13 @@ package job
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"path/filepath"
 	"strconv"
 
 	"github.com/yama6a/codarr/internal/ffmpeg"
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/store"
+	"go.uber.org/zap"
 )
 
 // The space reclaim sweep of plan.md 11. It never runs automatically and is
@@ -102,8 +102,8 @@ func (s *Service) Recheck(ctx context.Context, req Recheck) (RecheckResult, erro
 
 		refreshed, err := s.analyzer.Analyze(ctx, m)
 		if err != nil {
-			s.log.WarnContext(ctx, "re-analysing a file failed, skipping it",
-				slog.Int64("media_file_id", m.ID), slog.String("path", m.Path), slog.Any("error", err))
+			s.log.Warn("re-analysing a file failed, skipping it",
+				zap.Int64("media_file_id", m.ID), zap.String("path", m.Path), zap.Error(err))
 
 			continue
 		}
@@ -254,8 +254,8 @@ func (s *Service) queueSweep(ctx context.Context, m domain.MediaFile, queue bool
 func (s *Service) evaluate(ctx context.Context, settings domain.Settings, m domain.MediaFile) (SpaceSweepCandidate, bool) {
 	probe, err := storedProbe(m)
 	if err != nil {
-		s.log.WarnContext(ctx, "the stored probe could not be read, skipping the file",
-			slog.Int64("media_file_id", m.ID), slog.Any("error", err))
+		s.log.Warn("the stored probe could not be read, skipping the file",
+			zap.Int64("media_file_id", m.ID), zap.Error(err))
 
 		return SpaceSweepCandidate{}, false
 	}
@@ -271,8 +271,8 @@ func (s *Service) evaluate(ctx context.Context, settings domain.Settings, m doma
 
 	base, err := s.sampleProbe(ctx, settings.TempDir, name, m.Path, duration)
 	if err != nil {
-		s.log.WarnContext(ctx, "the sample probe failed, skipping the file",
-			slog.Int64("media_file_id", m.ID), slog.String("path", m.Path), slog.Any("error", err))
+		s.log.Warn("the sample probe failed, skipping the file",
+			zap.Int64("media_file_id", m.ID), zap.String("path", m.Path), zap.Error(err))
 
 		return SpaceSweepCandidate{}, false
 	}

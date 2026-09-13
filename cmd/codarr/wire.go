@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"runtime"
 	"runtime/debug"
 	"time"
@@ -25,6 +24,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/store"
 	"github.com/yama6a/codarr/internal/plex"
 	"github.com/yama6a/codarr/internal/promote"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // The schema ships no settings row and store holds no policy, so first-run
@@ -43,7 +44,7 @@ var defaultSettings = domain.Settings{ //nolint:gochecknoglobals // first-run de
 // app is everything constructed, held together only so shutdown can reach it.
 type app struct {
 	cfg        config
-	logger     *slog.Logger
+	logger     *zap.Logger
 	db         *store.DB
 	store      store.Store
 	queue      *job.Service
@@ -60,14 +61,21 @@ type app struct {
 func (a *app) close() {
 	if a.db != nil {
 		if err := a.db.Close(); err != nil {
-			a.logger.Error("closing the database failed", slog.String("error", err.Error()))
+			a.logger.Error("closing the database failed", zap.Error(err))
 		}
 	}
+
+	// Syncing os.Stdout returns EINVAL on Linux, so the error is not worth reporting.
+	_ = a.logger.Sync()
 }
 
 //nolint:funlen // pure wiring: one long list of constructors with no branching to hide
 func build(ctx context.Context, cfg config) (*app, error) {
-	level := events.ParseLevel(cfg.logLevel)
+	// A typo in -log-level must not stop the process from starting.
+	level, err := zapcore.ParseLevel(cfg.logLevel)
+	if err != nil {
+		level = zapcore.InfoLevel
+	}
 
 	// The store needs a logger and the logger needs the store, so it is built
 	// twice over the same pools.
@@ -78,6 +86,8 @@ func build(ctx context.Context, cfg config) (*app, error) {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 
+	// The store behind the events core logs to the bootstrap logger, so an insert
+	// that logs cannot recurse into another insert.
 	logger := events.New(events.Options{
 		Level: level,
 		Store: store.New(db, bootstrap),
@@ -192,11 +202,10 @@ func newEncoder(bin string) job.NewEncoder {
 }
 
 // ffmpegVersion is read once because the binary cannot change under a running process.
-func ffmpegVersion(ctx context.Context, hw *hardware.Prober, logger *slog.Logger) string {
+func ffmpegVersion(ctx context.Context, hw *hardware.Prober, logger *zap.Logger) string {
 	version, err := hw.Version(ctx)
 	if err != nil {
-		logger.WarnContext(ctx, "could not read the ffmpeg version",
-			slog.String("error", err.Error()))
+		logger.Warn("could not read the ffmpeg version", zap.Error(err))
 
 		return ""
 	}

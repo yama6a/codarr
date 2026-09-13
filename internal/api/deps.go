@@ -6,7 +6,6 @@ package api
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"github.com/yama6a/codarr/internal/arr"
@@ -18,6 +17,7 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/fsx"
 	"github.com/yama6a/codarr/internal/pkg/store"
 	"github.com/yama6a/codarr/internal/plex"
+	"go.uber.org/zap"
 )
 
 //go:generate go tool moq -out mock/api_mock.go -pkg mock . Store Queue Analyzer Scanner Webhooks Hardware Fingerprinter FS Pinger PlexAuth PlexClient ArrClient Metrics
@@ -211,7 +211,7 @@ type Deps struct {
 	ArrFactory    ArrFactory
 	Metrics       Metrics
 	Clock         clock.Clock
-	Logger        *slog.Logger
+	Logger        *zap.Logger
 	Build         Build
 
 	// FfmpegVersion is reported by GET /api/version and GET /api/hardware. It is

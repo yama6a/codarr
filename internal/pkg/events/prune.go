@@ -2,10 +2,10 @@ package events
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"github.com/yama6a/codarr/internal/pkg/clock"
+	"go.uber.org/zap"
 )
 
 // PruneInterval is how often the retention bounds of plan.md 24 are applied; the
@@ -21,12 +21,12 @@ type PruneStore interface {
 type Pruner struct {
 	store    PruneStore
 	clk      clock.Clock
-	log      *slog.Logger
+	log      *zap.Logger
 	interval time.Duration
 }
 
 // NewPruner returns a Pruner. A zero interval means PruneInterval.
-func NewPruner(st PruneStore, clk clock.Clock, log *slog.Logger, interval time.Duration) *Pruner {
+func NewPruner(st PruneStore, clk clock.Clock, log *zap.Logger, interval time.Duration) *Pruner {
 	if interval <= 0 {
 		interval = PruneInterval
 	}
@@ -34,7 +34,7 @@ func NewPruner(st PruneStore, clk clock.Clock, log *slog.Logger, interval time.D
 	return &Pruner{
 		store:    st,
 		clk:      clk,
-		log:      log.With(slog.String("component", "events.prune")),
+		log:      log.With(zap.String("component", "events.prune")),
 		interval: interval,
 	}
 }
@@ -60,12 +60,12 @@ func (p *Pruner) once(ctx context.Context) {
 			return
 		}
 
-		p.log.ErrorContext(ctx, "pruning the events table failed", slog.String("error", err.Error()))
+		p.log.Error("pruning the events table failed", zap.Error(err))
 
 		return
 	}
 
 	if deleted > 0 {
-		p.log.InfoContext(ctx, "pruned the events table", slog.Int64("deleted", deleted))
+		p.log.Info("pruned the events table", zap.Int64("deleted", deleted))
 	}
 }

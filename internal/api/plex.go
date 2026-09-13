@@ -18,7 +18,7 @@ import (
 func (s *Server) GetPlex(ctx context.Context, _ gen.GetPlexRequestObject) (gen.GetPlexResponseObject, error) {
 	cfg, mappings, err := s.plexState(ctx)
 	if err != nil {
-		return gen.GetPlexdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.GetPlexdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.GetPlex200JSONResponse(plexConfig(cfg, mappings)), nil
@@ -30,17 +30,17 @@ func (s *Server) UpdatePlex(
 	ctx context.Context, req gen.UpdatePlexRequestObject,
 ) (gen.UpdatePlexResponseObject, error) {
 	if req.Body == nil {
-		return gen.UpdatePlexdefaultJSONResponse(s.fail(ctx, badRequest("a plex body is required"))), nil
+		return gen.UpdatePlexdefaultJSONResponse(s.fail(badRequest("a plex body is required"))), nil
 	}
 
 	cfg, _, err := s.plexState(ctx)
 	if err != nil {
-		return gen.UpdatePlexdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.UpdatePlexdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	mappings, err := domainMappings(req.Body.PathMappings)
 	if err != nil {
-		return gen.UpdatePlexdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.UpdatePlexdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	cfg.BaseURL = strings.TrimSpace(req.Body.BaseUrl)
@@ -50,16 +50,16 @@ func (s *Server) UpdatePlex(
 	cfg.GuardActiveStreams = req.Body.GuardActiveStreams
 
 	if err := s.store.UpdatePlexConfig(ctx, cfg); err != nil {
-		return gen.UpdatePlexdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.UpdatePlexdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	if err := s.store.ReplacePlexPathMappings(ctx, mappings); err != nil {
-		return gen.UpdatePlexdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.UpdatePlexdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	stored, storedMappings, err := s.plexState(ctx)
 	if err != nil {
-		return gen.UpdatePlexdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.UpdatePlexdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.UpdatePlex200JSONResponse(plexConfig(stored, storedMappings)), nil
@@ -70,14 +70,14 @@ func (s *Server) UpdatePlex(
 func (s *Server) TestPlex(ctx context.Context, _ gen.TestPlexRequestObject) (gen.TestPlexResponseObject, error) {
 	client, err := s.plexClient(ctx)
 	if err != nil {
-		return gen.TestPlexdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.TestPlexdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	res := client.Test(ctx)
 	now := s.clk.Now()
 
 	if err := s.store.SetPlexTestResult(ctx, now, res.Message); err != nil {
-		return gen.TestPlexdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.TestPlexdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.TestPlex200JSONResponse{
@@ -95,12 +95,12 @@ func (s *Server) ListPlexLibraries(
 ) (gen.ListPlexLibrariesResponseObject, error) {
 	client, err := s.plexClient(ctx)
 	if err != nil {
-		return gen.ListPlexLibrariesdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ListPlexLibrariesdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	sections, err := client.Sections(ctx)
 	if err != nil {
-		return gen.ListPlexLibrariesdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ListPlexLibrariesdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	out := make([]gen.PlexLibrary, 0, len(sections))
@@ -122,17 +122,17 @@ func (s *Server) ResolvePlexPath(
 	ctx context.Context, req gen.ResolvePlexPathRequestObject,
 ) (gen.ResolvePlexPathResponseObject, error) {
 	if req.Body == nil {
-		return gen.ResolvePlexPathdefaultJSONResponse(s.fail(ctx, badRequest("a path is required"))), nil
+		return gen.ResolvePlexPathdefaultJSONResponse(s.fail(badRequest("a path is required"))), nil
 	}
 
 	local, err := s.underRoots(ctx, req.Body.Path)
 	if err != nil {
-		return gen.ResolvePlexPathdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ResolvePlexPathdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	mappings, err := s.store.ListPlexPathMappings(ctx)
 	if err != nil {
-		return gen.ResolvePlexPathdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ResolvePlexPathdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	remote, matched := pathmap.New(mappings).ToRemote(local)
@@ -173,25 +173,25 @@ func (s *Server) StartPlexAuth(
 ) (gen.StartPlexAuthResponseObject, error) {
 	cfg, _, err := s.plexState(ctx)
 	if err != nil {
-		return gen.StartPlexAuthdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.StartPlexAuthdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	if cfg.ClientIdentifier == "" {
 		id, genErr := plex.NewClientIdentifier()
 		if genErr != nil {
-			return gen.StartPlexAuthdefaultJSONResponse(s.fail(ctx, genErr)), nil
+			return gen.StartPlexAuthdefaultJSONResponse(s.fail(genErr)), nil
 		}
 
 		cfg.ClientIdentifier = id
 
 		if err := s.store.UpdatePlexConfig(ctx, cfg); err != nil {
-			return gen.StartPlexAuthdefaultJSONResponse(s.fail(ctx, err)), nil
+			return gen.StartPlexAuthdefaultJSONResponse(s.fail(err)), nil
 		}
 	}
 
 	pin, err := s.plexAuth.CreatePin(ctx, cfg.ClientIdentifier)
 	if err != nil {
-		return gen.StartPlexAuthdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.StartPlexAuthdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.StartPlexAuth200JSONResponse{
@@ -210,17 +210,16 @@ func (s *Server) PollPlexAuth(
 ) (gen.PollPlexAuthResponseObject, error) {
 	cfg, _, err := s.plexState(ctx)
 	if err != nil {
-		return gen.PollPlexAuthdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.PollPlexAuthdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	if cfg.ClientIdentifier == "" {
-		return gen.PollPlexAuthdefaultJSONResponse(s.fail(ctx,
-			conflict("no_pin_flow", "no PIN flow has been started"))), nil
+		return gen.PollPlexAuthdefaultJSONResponse(s.fail(conflict("no_pin_flow", "no PIN flow has been started"))), nil
 	}
 
 	pin, err := s.plexAuth.CheckPin(ctx, cfg.ClientIdentifier, req.PinId)
 	if err != nil {
-		return gen.PollPlexAuthdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.PollPlexAuthdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	if !pin.Authorized() {
@@ -233,7 +232,7 @@ func (s *Server) PollPlexAuth(
 
 	cfg.Token = pin.AuthToken
 	if err := s.store.UpdatePlexConfig(ctx, cfg); err != nil {
-		return gen.PollPlexAuthdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.PollPlexAuthdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.PollPlexAuth200JSONResponse{

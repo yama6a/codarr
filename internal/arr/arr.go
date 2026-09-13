@@ -9,13 +9,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/yama6a/codarr/internal/pkg/clock"
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/pathmap"
+	"go.uber.org/zap"
 )
 
 //go:generate go tool moq -out mock/arr_mock.go -pkg mock . Client MediaServer OwnerResolver
@@ -58,7 +58,7 @@ type Config struct {
 
 	HTTPClient *http.Client
 	Clock      clock.Clock
-	Logger     *slog.Logger
+	Logger     *zap.Logger
 	Retry      Retry
 }
 
@@ -67,7 +67,7 @@ type API struct {
 	tr       *transport
 	identity Identity
 	mapper   *pathmap.Mapper
-	log      *slog.Logger
+	log      *zap.Logger
 }
 
 var _ Client = (*API)(nil)
@@ -115,10 +115,6 @@ func (c Config) withDefaults() Config {
 
 	if c.Clock == nil {
 		c.Clock = clock.System()
-	}
-
-	if c.Logger == nil {
-		c.Logger = slog.Default()
 	}
 
 	return c

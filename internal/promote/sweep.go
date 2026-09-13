@@ -3,12 +3,12 @@ package promote
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/yama6a/codarr/internal/pkg/fsx"
+	"go.uber.org/zap"
 )
 
 // Sweep removes staging files and write probes no live job claims; it runs after
@@ -84,14 +84,13 @@ func (s *sweeper) remove(path string) {
 
 	if err := s.promoter.fs.Remove(path); err != nil {
 		s.errs = append(s.errs, err)
-		s.promoter.log.WarnContext(s.ctx, "orphan sweep could not remove an entry",
-			slog.String("path", path), slog.Any("error", err))
+		s.promoter.log.Warn("orphan sweep could not remove an entry", zap.String("path", path), zap.Error(err))
 
 		return
 	}
 
 	s.removed = append(s.removed, path)
-	s.promoter.log.InfoContext(s.ctx, "orphan sweep removed a leftover", slog.String("path", path))
+	s.promoter.log.Info("orphan sweep removed a leftover", zap.String("path", path))
 }
 
 func isDebris(name string) bool {

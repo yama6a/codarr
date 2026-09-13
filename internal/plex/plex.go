@@ -9,13 +9,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/yama6a/codarr/internal/pkg/clock"
 	"github.com/yama6a/codarr/internal/pkg/pathmap"
 	"github.com/yama6a/codarr/internal/promote"
+	"go.uber.org/zap"
 )
 
 // DefaultTimeout bounds a single call to the server. The refresh and analyze
@@ -51,7 +51,7 @@ type Config struct {
 
 	HTTPClient *http.Client
 	Clock      clock.Clock
-	Logger     *slog.Logger
+	Logger     *zap.Logger
 	Retry      Retry
 	SectionTTL time.Duration
 	PartTTL    time.Duration
@@ -61,7 +61,7 @@ type Config struct {
 type Client struct {
 	tr           *transport
 	mapper       *pathmap.Mapper
-	log          *slog.Logger
+	log          *zap.Logger
 	clk          clock.Clock
 	refreshAfter bool
 	analyzeAfter bool
@@ -117,10 +117,6 @@ func (c Config) withDefaults() Config {
 
 	if c.Clock == nil {
 		c.Clock = clock.System()
-	}
-
-	if c.Logger == nil {
-		c.Logger = slog.Default()
 	}
 
 	if c.SectionTTL <= 0 {

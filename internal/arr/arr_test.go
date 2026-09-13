@@ -13,6 +13,7 @@ import (
 	"github.com/yama6a/codarr/internal/arr"
 	"github.com/yama6a/codarr/internal/pkg/clock"
 	"github.com/yama6a/codarr/internal/pkg/domain"
+	"go.uber.org/zap"
 )
 
 func TestNew_RejectsAnUnusableInstance(t *testing.T) {
@@ -26,7 +27,7 @@ func TestNew_RejectsAnUnusableInstance(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := arr.New(arr.Config{Instance: instance})
+			_, err := arr.New(arr.Config{Instance: instance, Logger: zap.NewNop()})
 			require.Error(t, err)
 		})
 	}
@@ -114,6 +115,7 @@ func TestTest_ExplainsAnUnreachableInstance(t *testing.T) {
 		Instance: instance,
 		Clock:    clock.NewFake(time.Date(2026, 9, 1, 10, 0, 0, 0, time.UTC)),
 		Retry:    arr.Retry{Attempts: 1, Base: time.Millisecond, Max: time.Millisecond},
+		Logger:   zap.NewNop(),
 	})
 	require.NoError(t, err)
 

@@ -3,7 +3,6 @@ package ingest_test
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -19,6 +18,7 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/fsx"
 	"github.com/yama6a/codarr/internal/pkg/store"
+	"go.uber.org/zap"
 )
 
 const (
@@ -29,7 +29,7 @@ const (
 
 var now = time.Date(2026, 9, 1, 4, 0, 0, 0, time.UTC)
 
-func discardLogger() *slog.Logger { return slog.New(slog.DiscardHandler) }
+func discardLogger() *zap.Logger { return zap.NewNop() }
 
 func fixture(t *testing.T, name string) *ffprobe.Result {
 	t.Helper()

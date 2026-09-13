@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/yama6a/codarr/internal/pkg/domain"
+	"go.uber.org/zap"
 )
 
 // ErrNotFound is returned when a row a caller named does not exist.
@@ -273,14 +273,14 @@ var _ Store = (*store)(nil)
 
 type store struct {
 	db     *DB
-	logger *slog.Logger
+	logger *zap.Logger
 }
 
 // New returns a Store over db.
 //
 //nolint:ireturn // consumers hold the interface so they can swap in the generated mock
-func New(db *DB, logger *slog.Logger) Store {
-	return &store{db: db, logger: logger.With(slog.String("component", "store"))}
+func New(db *DB, logger *zap.Logger) Store {
+	return &store{db: db, logger: logger.With(zap.String("component", "store"))}
 }
 
 // write runs fn in a single transaction on the write pool. Nothing inside fn may read

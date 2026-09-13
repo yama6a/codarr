@@ -174,7 +174,7 @@ func TestCreateArrInstance_RequiresARealKeyAndGeneratesTheWebhookID(t *testing.T
 	require.NotContains(t, rec.Body.String(), "brand-new-key")
 }
 
-const storedToken = "real-plex-token" //nolint:gosec // G101: a test fixture, not a credential
+const storedToken = "real-plex-token"
 
 func withPlexConfig(s *mock.StoreMock, cfg *domain.PlexConfig) {
 	s.GetPlexConfigFunc = func(context.Context) (domain.PlexConfig, error) { return *cfg, nil }

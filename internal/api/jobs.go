@@ -24,12 +24,12 @@ func (s *Server) ListJobs(ctx context.Context, req gen.ListJobsRequestObject) (g
 
 	jobs, total, err := s.store.ListJobs(ctx, filter)
 	if err != nil {
-		return gen.ListJobsdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ListJobsdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	items, err := s.jobSummaries(ctx, jobs)
 	if err != nil {
-		return gen.ListJobsdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ListJobsdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.ListJobs200JSONResponse{Items: items, Page: pageNo, PageSize: pageSize, Total: total}, nil
@@ -40,7 +40,7 @@ func (s *Server) ListJobs(ctx context.Context, req gen.ListJobsRequestObject) (g
 func (s *Server) GetJob(ctx context.Context, req gen.GetJobRequestObject) (gen.GetJobResponseObject, error) {
 	out, err := s.jobView(ctx, req.Id)
 	if err != nil {
-		return gen.GetJobdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.GetJobdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.GetJob200JSONResponse(out), nil
@@ -50,12 +50,12 @@ func (s *Server) GetJob(ctx context.Context, req gen.GetJobRequestObject) (gen.G
 // queue; the job stays visible at the top of the list.
 func (s *Server) CancelJob(ctx context.Context, req gen.CancelJobRequestObject) (gen.CancelJobResponseObject, error) {
 	if err := s.queue.Cancel(ctx, req.Id); err != nil {
-		return gen.CancelJobdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.CancelJobdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	out, err := s.jobView(ctx, req.Id)
 	if err != nil {
-		return gen.CancelJobdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.CancelJobdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.CancelJob200JSONResponse(out), nil
@@ -68,12 +68,12 @@ func (s *Server) RestartJob(
 ) (gen.RestartJobResponseObject, error) {
 	_, err := s.queue.Restart(ctx, req.Id)
 	if err != nil {
-		return gen.RestartJobdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.RestartJobdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	out, err := s.jobView(ctx, req.Id)
 	if err != nil {
-		return gen.RestartJobdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.RestartJobdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.RestartJob200JSONResponse(out), nil
@@ -83,7 +83,7 @@ func (s *Server) RestartJob(
 func (s *Server) GetQueue(ctx context.Context, _ gen.GetQueueRequestObject) (gen.GetQueueResponseObject, error) {
 	out, err := s.queueState(ctx)
 	if err != nil {
-		return gen.GetQueuedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.GetQueuedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.GetQueue200JSONResponse(out), nil
@@ -92,12 +92,12 @@ func (s *Server) GetQueue(ctx context.Context, _ gen.GetQueueRequestObject) (gen
 // PauseQueue stops new jobs starting. A running job continues (plan.md 19).
 func (s *Server) PauseQueue(ctx context.Context, _ gen.PauseQueueRequestObject) (gen.PauseQueueResponseObject, error) {
 	if err := s.queue.Pause(ctx); err != nil {
-		return gen.PauseQueuedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.PauseQueuedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	out, err := s.queueState(ctx)
 	if err != nil {
-		return gen.PauseQueuedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.PauseQueuedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.PauseQueue200JSONResponse(out), nil
@@ -108,12 +108,12 @@ func (s *Server) ResumeQueue(
 	ctx context.Context, _ gen.ResumeQueueRequestObject,
 ) (gen.ResumeQueueResponseObject, error) {
 	if err := s.queue.Resume(ctx); err != nil {
-		return gen.ResumeQueuedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ResumeQueuedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	out, err := s.queueState(ctx)
 	if err != nil {
-		return gen.ResumeQueuedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ResumeQueuedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.ResumeQueue200JSONResponse(out), nil

@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/url"
 
 	"github.com/yama6a/codarr/internal/pkg/pathmap"
+	"go.uber.org/zap"
 )
 
 // Plex item type codes for filtering a section listing: a show section's /all returns
@@ -159,8 +159,8 @@ func (c *Client) beforeRefreshRatingKey(ctx context.Context, target Target) (str
 
 	ratingKey, err := c.ratingKeyIn(ctx, target)
 	if err != nil {
-		c.log.DebugContext(ctx, "no plex item found for the promoted path yet",
-			slog.String("path", target.RemotePath), slog.Any("error", err))
+		c.log.Debug("no plex item found for the promoted path yet",
+			zap.String("path", target.RemotePath), zap.Error(err))
 
 		return "", err
 	}

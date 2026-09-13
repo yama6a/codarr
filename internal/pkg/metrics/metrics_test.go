@@ -3,17 +3,16 @@ package metrics_test
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
 	"github.com/yama6a/codarr/internal/pkg/clock"
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/metrics"
 	"github.com/yama6a/codarr/internal/pkg/store"
+	"go.uber.org/zap"
 )
 
 var errSourceDown = errors.New("database is unavailable")
@@ -140,7 +139,7 @@ func TestRefresher_SetsGaugesFromTheStore(t *testing.T) {
 	probed := false
 	probe := func(context.Context, *metrics.Metrics) { probed = true }
 
-	metrics.NewRefresher(m, src, clock.System(), slog.New(slog.DiscardHandler), 0, probe).
+	metrics.NewRefresher(m, src, clock.System(), zap.NewNop(), 0, probe).
 		Refresh(t.Context())
 
 	body := scrape(t, m)
@@ -161,7 +160,7 @@ func TestRefresher_StoreFailureKeepsTheLastValues(t *testing.T) {
 	m.SetQueueDepth(11)
 
 	metrics.NewRefresher(m, fakeSource{err: errSourceDown}, clock.System(),
-		slog.New(slog.DiscardHandler), 0).Refresh(t.Context())
+		zap.NewNop(), 0).Refresh(t.Context())
 
 	require.Contains(t, scrape(t, m), "codarr_queue_depth 11")
 }

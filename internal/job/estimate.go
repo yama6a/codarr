@@ -3,12 +3,12 @@ package job
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"math"
 
 	"github.com/yama6a/codarr/internal/pkg/clock"
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/store"
+	"go.uber.org/zap"
 )
 
 // The seeds of plan.md 14.3, deliberately pessimistic: a generous estimate reads
@@ -36,7 +36,7 @@ const throughputWindow = 20
 type estimator struct {
 	store ThroughputStore
 	clk   clock.Clock
-	log   *slog.Logger
+	log   *zap.Logger
 }
 
 // work is what an estimate is computed from.
@@ -108,8 +108,8 @@ func (e estimator) Estimate(ctx context.Context, w work) int {
 	stat, err := e.store.GetThroughputStat(ctx, kind, encoder, resolution)
 	if err != nil || stat.Samples == 0 || stat.AvgValue <= 0 {
 		if err != nil && !errors.Is(err, store.ErrNotFound) {
-			e.log.WarnContext(ctx, "reading a throughput statistic failed, using the seed",
-				slog.String("kind", string(kind)), slog.Any("error", err))
+			e.log.Warn("reading a throughput statistic failed, using the seed",
+				zap.String("kind", string(kind)), zap.Error(err))
 		}
 
 		return w.predict(w.seed())
@@ -130,8 +130,8 @@ func (e estimator) Record(ctx context.Context, w work, actualSeconds int) {
 
 	stat, err := e.store.GetThroughputStat(ctx, kind, encoder, resolution)
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
-		e.log.WarnContext(ctx, "reading a throughput statistic failed, not recording this job",
-			slog.String("kind", string(kind)), slog.Any("error", err))
+		e.log.Warn("reading a throughput statistic failed, not recording this job",
+			zap.String("kind", string(kind)), zap.Error(err))
 
 		return
 	}
@@ -147,7 +147,6 @@ func (e estimator) Record(ctx context.Context, w work, actualSeconds int) {
 	}
 
 	if err := e.store.UpsertThroughputStat(ctx, updated); err != nil {
-		e.log.WarnContext(ctx, "storing a throughput statistic failed",
-			slog.String("kind", string(kind)), slog.Any("error", err))
+		e.log.Warn("storing a throughput statistic failed", zap.String("kind", string(kind)), zap.Error(err))
 	}
 }

@@ -55,7 +55,7 @@ func (s *Server) GetVersion(_ context.Context, _ gen.GetVersionRequestObject) (g
 func (s *Server) GetStats(ctx context.Context, _ gen.GetStatsRequestObject) (gen.GetStatsResponseObject, error) {
 	out, err := s.stats(ctx)
 	if err != nil {
-		return gen.GetStatsdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.GetStatsdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.GetStats200JSONResponse(out), nil
@@ -121,7 +121,7 @@ func (s *Server) ListEvents(ctx context.Context, req gen.ListEventsRequestObject
 
 	rows, err := s.store.ListEvents(ctx, filter)
 	if err != nil {
-		return gen.ListEventsdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ListEventsdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	hasMore := len(rows) > limit

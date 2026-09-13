@@ -61,7 +61,7 @@ no API key check and no session handling, deliberately.
 ## Development
 
 ```bash
-make ci        # fumpt, generate, lint, vet, govulncheck, go test ./...
+make ci        # tidy, generate, fmt, lint, vet, test, govulncheck
 make build     # frontend, then the binary with it embedded
 make run       # against ./data/codarr.db
 make web-dev   # Vite dev server, proxies /api to the Go server

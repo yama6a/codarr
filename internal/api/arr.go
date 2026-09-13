@@ -23,7 +23,7 @@ func (s *Server) ListArrInstances(
 ) (gen.ListArrInstancesResponseObject, error) {
 	instances, err := s.store.ListArrInstances(ctx)
 	if err != nil {
-		return gen.ListArrInstancesdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ListArrInstancesdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	out := make([]gen.ArrInstance, 0, len(instances))
@@ -31,7 +31,7 @@ func (s *Server) ListArrInstances(
 	for _, in := range instances {
 		mappings, err := s.store.ListArrPathMappings(ctx, in.ID)
 		if err != nil {
-			return gen.ListArrInstancesdefaultJSONResponse(s.fail(ctx, err)), nil
+			return gen.ListArrInstancesdefaultJSONResponse(s.fail(err)), nil
 		}
 
 		out = append(out, arrInstance(in, mappings))
@@ -46,7 +46,7 @@ func (s *Server) GetArrInstance(
 ) (gen.GetArrInstanceResponseObject, error) {
 	out, err := s.arrView(ctx, req.Id)
 	if err != nil {
-		return gen.GetArrInstancedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.GetArrInstancedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.GetArrInstance200JSONResponse(out), nil
@@ -58,26 +58,26 @@ func (s *Server) CreateArrInstance(
 	ctx context.Context, req gen.CreateArrInstanceRequestObject,
 ) (gen.CreateArrInstanceResponseObject, error) {
 	if req.Body == nil {
-		return gen.CreateArrInstancedefaultJSONResponse(s.fail(ctx, badRequest("an instance body is required"))), nil
+		return gen.CreateArrInstancedefaultJSONResponse(s.fail(badRequest("an instance body is required"))), nil
 	}
 
 	instance, mappings, err := newArrInstance(*req.Body)
 	if err != nil {
-		return gen.CreateArrInstancedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.CreateArrInstancedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	created, err := s.store.CreateArrInstance(ctx, instance)
 	if err != nil {
-		return gen.CreateArrInstancedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.CreateArrInstancedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	if err := s.store.ReplaceArrPathMappings(ctx, created.ID, mappings); err != nil {
-		return gen.CreateArrInstancedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.CreateArrInstancedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	out, err := s.arrView(ctx, created.ID)
 	if err != nil {
-		return gen.CreateArrInstancedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.CreateArrInstancedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.CreateArrInstance201JSONResponse(out), nil
@@ -89,30 +89,30 @@ func (s *Server) UpdateArrInstance(
 	ctx context.Context, req gen.UpdateArrInstanceRequestObject,
 ) (gen.UpdateArrInstanceResponseObject, error) {
 	if req.Body == nil {
-		return gen.UpdateArrInstancedefaultJSONResponse(s.fail(ctx, badRequest("an instance body is required"))), nil
+		return gen.UpdateArrInstancedefaultJSONResponse(s.fail(badRequest("an instance body is required"))), nil
 	}
 
 	current, err := s.store.GetArrInstance(ctx, req.Id)
 	if err != nil {
-		return gen.UpdateArrInstancedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.UpdateArrInstancedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	updated, mappings, err := applyArrInstance(current, *req.Body)
 	if err != nil {
-		return gen.UpdateArrInstancedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.UpdateArrInstancedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	if err := s.store.UpdateArrInstance(ctx, updated); err != nil {
-		return gen.UpdateArrInstancedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.UpdateArrInstancedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	if err := s.store.ReplaceArrPathMappings(ctx, req.Id, mappings); err != nil {
-		return gen.UpdateArrInstancedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.UpdateArrInstancedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	out, err := s.arrView(ctx, req.Id)
 	if err != nil {
-		return gen.UpdateArrInstancedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.UpdateArrInstancedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.UpdateArrInstance200JSONResponse(out), nil
@@ -124,7 +124,7 @@ func (s *Server) DeleteArrInstance(
 	ctx context.Context, req gen.DeleteArrInstanceRequestObject,
 ) (gen.DeleteArrInstanceResponseObject, error) {
 	if err := s.store.DeleteArrInstance(ctx, req.Id); err != nil {
-		return gen.DeleteArrInstancedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.DeleteArrInstancedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.DeleteArrInstance204Response{}, nil
@@ -137,14 +137,14 @@ func (s *Server) TestArrInstance(
 ) (gen.TestArrInstanceResponseObject, error) {
 	client, err := s.arrClient(ctx, req.Id)
 	if err != nil {
-		return gen.TestArrInstancedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.TestArrInstancedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	res := client.Test(ctx)
 	now := s.clk.Now()
 
 	if err := s.store.SetArrTestResult(ctx, req.Id, now, res.Message); err != nil {
-		return gen.TestArrInstancedefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.TestArrInstancedefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.TestArrInstance200JSONResponse{
@@ -163,7 +163,7 @@ func (s *Server) ListArrRootFolders(
 ) (gen.ListArrRootFoldersResponseObject, error) {
 	folders, existing, err := s.arrRootFolders(ctx, req.Id)
 	if err != nil {
-		return gen.ListArrRootFoldersdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ListArrRootFoldersdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	out := make([]gen.ArrRootFolder, 0, len(folders))
@@ -188,31 +188,31 @@ func (s *Server) ImportArrRoots(
 ) (gen.ImportArrRootsResponseObject, error) {
 	folders, _, err := s.arrRootFolders(ctx, req.Id)
 	if err != nil {
-		return gen.ImportArrRootsdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ImportArrRootsdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	roots, err := s.store.ListRoots(ctx)
 	if err != nil {
-		return gen.ImportArrRootsdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ImportArrRootsdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	instances, err := s.instanceNames(ctx)
 	if err != nil {
-		return gen.ImportArrRootsdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ImportArrRootsdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	result := gen.ImportRootsResult{Conflicts: []gen.RootConflict{}, Roots: []gen.Root{}}
 
 	for _, f := range folders {
 		if !f.Imported.Mapped {
-			return gen.ImportArrRootsdefaultJSONResponse(s.fail(ctx, fmt.Errorf(
+			return gen.ImportArrRootsdefaultJSONResponse(s.fail(fmt.Errorf(
 				"%w: %s reports %s, which no mapping rewrites",
 				arr.ErrNoPathMapping, instances[req.Id], f.Imported.ReportedPath))), nil
 		}
 
 		created, err := s.importRoot(ctx, f, req.Id, roots, instances, &result)
 		if err != nil {
-			return gen.ImportArrRootsdefaultJSONResponse(s.fail(ctx, err)), nil
+			return gen.ImportArrRootsdefaultJSONResponse(s.fail(err)), nil
 		}
 
 		if created != nil {

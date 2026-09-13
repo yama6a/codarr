@@ -13,9 +13,9 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/runner_mock.go -pkg mock . Runner
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/store_mock.go -pkg mock . Store
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/fs_mock.go -pkg mock . FS
+//go:generate go tool moq -out mock/runner_mock.go -pkg mock . Runner
+//go:generate go tool moq -out mock/store_mock.go -pkg mock . Store
+//go:generate go tool moq -out mock/fs_mock.go -pkg mock . FS
 
 // ErrNoFfmpeg is returned when the binary cannot be run at all, which is a
 // different problem from a codec that does not work.

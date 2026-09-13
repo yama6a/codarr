@@ -14,7 +14,7 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/fsx"
 )
 
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/promote_mock.go -pkg mock . Prober StreamGuard Fingerprinter Notifier Copier
+//go:generate go tool moq -out mock/promote_mock.go -pkg mock . Prober StreamGuard Fingerprinter Notifier Copier
 
 // DefaultStreamRetry is how long the job waits before re-asking Plex whether the
 // target is still being streamed (plan.md 15.2 step 4).

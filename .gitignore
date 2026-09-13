@@ -1,4 +1,8 @@
 /codarr
+/cover.out
+/.build/canonical-golangci.yaml
+/.build/golangci.yaml
+/.build/cover-core.out
 /vendor
 /.env
 /data/*.db

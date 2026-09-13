@@ -187,7 +187,7 @@ type Stats struct {
 // Store is the whole persistence surface. It is one interface rather than nine
 // because there is one database, one transaction boundary and one mock.
 //
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/store_mock.go -pkg mock . Store
+//go:generate go tool moq -out mock/store_mock.go -pkg mock . Store
 type Store interface { //nolint:interfacebloat // one database, one mock; splitting it would only move the seams
 	// Settings. GetSettings returns ErrNotFound until EnsureSettings has run;
 	// the schema ships no default row.

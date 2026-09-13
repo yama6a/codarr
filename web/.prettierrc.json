@@ -1,0 +1,7 @@
+{
+  "printWidth": 100,
+  "singleQuote": true,
+  "overrides": [
+    { "files": ["*.html", "*.css", "*.json", "*.json5", "*.yaml", "*.yml"], "options": { "singleQuote": false } }
+  ]
+}

@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/fs_mock.go -pkg mock . FS
+//go:generate go tool moq -out mock/fs_mock.go -pkg mock . FS
 
 // FileInfo is the subset of stat Codarr acts on. NLink > 1 fails preflight, because
 // renaming over a seeding copy that shares an inode would damage it.

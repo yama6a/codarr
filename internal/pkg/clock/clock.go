@@ -4,7 +4,7 @@ package clock
 
 import "time"
 
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/clock_mock.go -pkg mock . Clock
+//go:generate go tool moq -out mock/clock_mock.go -pkg mock . Clock
 
 type Clock interface {
 	Now() time.Time

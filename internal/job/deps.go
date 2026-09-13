@@ -18,7 +18,7 @@ import (
 	"github.com/yama6a/codarr/internal/promote"
 )
 
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/job_mock.go -pkg mock . Store Prober Encoder Promoter FS Fingerprinter Notifier Hardware Analyzer
+//go:generate go tool moq -out mock/job_mock.go -pkg mock . Store Prober Encoder Promoter FS Fingerprinter Notifier Hardware Analyzer
 
 // Store is the persistence this package uses, split by concern so no single
 // interface grows into a second copy of store.Store.

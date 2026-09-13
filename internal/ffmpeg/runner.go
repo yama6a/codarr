@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/encoder_mock.go -pkg mock . Encoder
+//go:generate go tool moq -out mock/encoder_mock.go -pkg mock . Encoder
 
 var (
 	ErrFfmpegFailed = errors.New("ffmpeg: non-zero exit")

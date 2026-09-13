@@ -1,6 +1,9 @@
 MAIN_PKG=./cmd/codarr
 BINARY=codarr
-IMAGE=codarr:dev
+
+GO_LINT_CONFIG     ?= .build/golangci.yaml
+CANONICAL_LINT_URL := https://raw.githubusercontent.com/yama6a/gha/v2/.golangci.yaml
+IMAGE              ?= ghcr.io/yama6a/codarr
 
 # Local dev database and listen address. `?=` so an exported value wins.
 CODARR_DB?=./data/codarr.db
@@ -8,123 +11,85 @@ CODARR_LISTEN?=:8080
 export CODARR_DB
 export CODARR_LISTEN
 
-# Nothing in the module needs cgo, and modernc.org/sqlite is pure Go. Pin it off
-# so a cgo dependency fails here rather than passing CI and only breaking the
-# image build.
-CGO_ENABLED=0
-export CGO_ENABLED
+.PHONY: lint-config generate fmt fmt-check lint vet test cover vuln tidy tidy-check \
+	generate-check mod image ci
 
-.PHONY: help
-help: ## Display this help.
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+lint-config:
+	mkdir -p .build
+	curl -fsSL $(CANONICAL_LINT_URL) -o .build/canonical-golangci.yaml
+	if [ -f .golangci.local.yaml ]; then \
+		yq eval-all '. as $$item ireduce ({}; . *+ $$item)' \
+			.build/canonical-golangci.yaml .golangci.local.yaml > $(GO_LINT_CONFIG); \
+	else \
+		cp .build/canonical-golangci.yaml $(GO_LINT_CONFIG); \
+	fi
 
-##@ Development
-.PHONY: lint
-lint: assert_golangci_lint_installed ## Run code linters.
-	golangci-lint run ./... --concurrency 2 -c .golangci.yaml
-
-.PHONY: vet
-vet: assert_go_installed ## Run go vet.
-	go vet ./...
-
-.PHONY: vuln
-vuln: assert_govulncheck_installed ## Run govulncheck.
-	govulncheck ./...
-
-.PHONY: test
-test: assert_go_installed ## Run tests. ffmpeg-dependent tests skip when ffmpeg is absent.
-	go test ./...
-
-.PHONY: cover
-cover: assert_go_installed ## Report branch coverage for the three packages that must stay near 100%.
-	go test -coverprofile=.build/cover.out ./internal/decide/... ./internal/ffmpeg/...
-	go tool cover -func=.build/cover.out | tail -1
-
-.PHONY: ci
-ci: fumpt generate lint vet vuln test ## Run all checks.
-
-.PHONY: generate
-generate: assert_go_installed ## Run code generation (oapi-codegen, moq).
+generate:
 	go generate ./...
 
-.PHONY: fumpt
-fumpt: assert_gofumpt_installed ## Format with gofumpt.
-	gofumpt -w .
+fmt: lint-config
+	golangci-lint fmt -c $(GO_LINT_CONFIG)
 
-.PHONY: build
-build: web assert_go_installed ## Build the binary with the frontend embedded.
-	go build -trimpath -ldflags='-s -w' -o $(BINARY) $(MAIN_PKG)
+fmt-check: lint-config
+	golangci-lint fmt --diff -c $(GO_LINT_CONFIG)
 
-.PHONY: mod
-mod: assert_go_installed ## Update go modules.
+lint: lint-config
+	golangci-lint run ./... -c $(GO_LINT_CONFIG)
+
+vet:
+	go vet ./...
+
+test:
+	go test ./... -race -count=1
+
+cover:
+	go test ./... -coverprofile=cover.out -covermode=atomic
+	go tool cover -func=cover.out | tail -1
+
+vuln:
+	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+tidy:
+	go mod tidy
+
+tidy-check:
+	go mod tidy
+	git diff --exit-code -- go.mod go.sum
+
+generate-check: generate
+	git diff --exit-code
+
+mod:
 	go get -u -t ./...
 	go mod tidy
 
-.PHONY: run
-run: assert_go_installed ## Run the server locally against CODARR_DB.
+image:
+	docker buildx build -f .build/Dockerfile -t $(IMAGE) --load .
+
+ci: tidy-check generate-check fmt-check lint vet test vuln
+
+.PHONY: cover-core run build web-deps web web-dev web-ci
+
+# decide and ffmpeg carry the encoding decisions, so their coverage is tracked on its own.
+cover-core:
+	go test -coverprofile=.build/cover-core.out ./internal/decide/... ./internal/ffmpeg/...
+	go tool cover -func=.build/cover-core.out | tail -1
+
+run:
 	go run $(MAIN_PKG)
 
-##@ Frontend
-.PHONY: web-deps
-web-deps: assert_npm_installed ## Install frontend dependencies.
+# go:embed of internal/web/dist needs the frontend built first.
+build: web
+	CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o $(BINARY) $(MAIN_PKG)
+
+web-deps:
 	cd web && npm ci
 
-.PHONY: web
-web: assert_npm_installed ## Build the frontend into internal/web/dist.
+web:
 	cd web && npm run build
 
-.PHONY: web-dev
-web-dev: assert_npm_installed ## Run the Vite dev server, proxying /api to CODARR_LISTEN.
+web-dev:
 	cd web && npm run dev
 
-.PHONY: web-ci
-web-ci: assert_npm_installed ## Run the frontend checks.
+web-ci:
 	cd web && npm run ci
-
-##@ Container
-.PHONY: image
-image: assert_docker_installed ## Build the amd64 image. QSV and the Intel VAAPI driver are amd64 only.
-	docker buildx build --platform linux/amd64 -f .build/Dockerfile -t $(IMAGE) --load .
-
-##@ Assertions
-.PHONY: assert_go_installed
-assert_go_installed: ## Assert go is installed.
-	@if ! command -v go >/dev/null 2>&1; then \
-		echo "go is not installed; you need to install it in order to run this command"; \
-		exit 1; \
-	fi
-
-.PHONY: assert_golangci_lint_installed
-assert_golangci_lint_installed: ## Assert golangci-lint is installed.
-	@if ! command -v golangci-lint >/dev/null 2>&1; then \
-		echo "golangci-lint is not installed; you need to install it in order to run this command"; \
-		exit 1; \
-	fi
-
-.PHONY: assert_gofumpt_installed
-assert_gofumpt_installed: ## Assert gofumpt is installed.
-	@if ! command -v gofumpt >/dev/null 2>&1; then \
-		echo "gofumpt is not installed; you need to install it in order to run this command"; \
-		exit 1; \
-	fi
-
-.PHONY: assert_govulncheck_installed
-assert_govulncheck_installed: ## Assert govulncheck is installed.
-	@if ! command -v govulncheck >/dev/null 2>&1; then \
-		echo "govulncheck is not installed; you need to install it in order to run this command"; \
-		exit 1; \
-	fi
-
-.PHONY: assert_npm_installed
-assert_npm_installed: ## Assert npm is installed.
-	@if ! command -v npm >/dev/null 2>&1; then \
-		echo "npm is not installed; you need to install it in order to run this command"; \
-		exit 1; \
-	fi
-
-.PHONY: assert_docker_installed
-assert_docker_installed: ## Assert docker is installed.
-	@if ! command -v docker >/dev/null 2>&1; then \
-		echo "docker is not installed; you need to install it in order to run this command"; \
-		exit 1; \
-	fi

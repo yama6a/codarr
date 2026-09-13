@@ -20,7 +20,7 @@ import (
 	"github.com/yama6a/codarr/internal/plex"
 )
 
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/api_mock.go -pkg mock . Store Queue Analyzer Scanner Webhooks Hardware Fingerprinter FS Pinger PlexAuth PlexClient ArrClient Metrics
+//go:generate go tool moq -out mock/api_mock.go -pkg mock . Store Queue Analyzer Scanner Webhooks Hardware Fingerprinter FS Pinger PlexAuth PlexClient ArrClient Metrics
 
 // Store is the persistence the API reads and writes, split by concern so no handler
 // depends on the whole of store.Store.

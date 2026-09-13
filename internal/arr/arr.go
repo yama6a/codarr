@@ -18,7 +18,7 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/pathmap"
 )
 
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/arr_mock.go -pkg mock . Client MediaServer OwnerResolver
+//go:generate go tool moq -out mock/arr_mock.go -pkg mock . Client MediaServer OwnerResolver
 
 // DefaultTimeout bounds one call. Every verb here queues work and returns.
 const DefaultTimeout = 15 * time.Second

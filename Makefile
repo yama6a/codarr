@@ -63,8 +63,10 @@ mod:
 	go get -u -t ./...
 	go mod tidy
 
+# amd64 only: QSV, intel-media-va-driver-non-free and the whole hardware path are amd64,
+# and an arm64 image would silently fall back to software encoding.
 image:
-	docker buildx build -f .build/Dockerfile -t $(IMAGE) --load .
+	docker buildx build --platform linux/amd64 -f .build/Dockerfile -t $(IMAGE) --load .
 
 ci: tidy-check generate-check fmt-check lint vet test vuln
 

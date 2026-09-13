@@ -128,8 +128,6 @@ func (c *storeCore) Check(entry zapcore.Entry, checked *zapcore.CheckedEntry) *z
 func (c *storeCore) Write(entry zapcore.Entry, fields []zapcore.Field) error {
 	ev := c.event(entry, fields)
 
-	// The caller's context is usually a request or a job that is about to be
-	// cancelled; the row is still worth writing.
 	ctx, cancel := context.WithTimeout(context.Background(), SinkTimeout)
 	defer cancel()
 

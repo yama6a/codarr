@@ -12,7 +12,9 @@ export function StatsRow({ stats }: { stats: Stats }) {
         value={formatSignedBytes(stats.bytes_saved)}
         tone={stats.bytes_saved < 0 ? 'bad' : 'good'}
         hint={`${formatBytes(stats.bytes_in)} in, ${formatBytes(stats.bytes_out)} out${
-          stats.avg_saving_pct !== undefined ? `, ${formatPercent(stats.avg_saving_pct)} average` : ''
+          stats.avg_saving_pct !== undefined
+            ? `, ${formatPercent(stats.avg_saving_pct)} average`
+            : ''
         }`}
       />
       <StatTile

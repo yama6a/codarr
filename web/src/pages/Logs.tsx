@@ -133,7 +133,9 @@ export default function Logs() {
 
       {hasMore && (
         <div className="flex items-center justify-between rounded-lg border border-amber-800 bg-amber-950/50 px-3 py-2 text-xs text-amber-200">
-          <span>More events matched than one page holds. The next poll continues from the cursor.</span>
+          <span>
+            More events matched than one page holds. The next poll continues from the cursor.
+          </span>
           <Button variant="ghost" icon="refresh" onClick={refresh}>
             Fetch now
           </Button>
@@ -151,12 +153,18 @@ export default function Logs() {
           <ul className="space-y-0.5">
             {events.map((event) => (
               <li key={event.id} className="flex gap-3 rounded px-2 py-1 hover:bg-slate-800/50">
-                <span className="flex-shrink-0 text-slate-600">{formatDateTime(event.created_at)}</span>
-                <span className={`w-12 flex-shrink-0 font-semibold uppercase ${levelClasses[event.level]}`}>
+                <span className="flex-shrink-0 text-slate-600">
+                  {formatDateTime(event.created_at)}
+                </span>
+                <span
+                  className={`w-12 flex-shrink-0 font-semibold uppercase ${levelClasses[event.level]}`}
+                >
                   {event.level}
                 </span>
                 <span className="w-32 flex-shrink-0 truncate text-blue-400">{event.category}</span>
-                <span className={`min-w-0 break-words ${levelClasses[event.level]}`}>{event.message}</span>
+                <span className={`min-w-0 break-words ${levelClasses[event.level]}`}>
+                  {event.message}
+                </span>
               </li>
             ))}
           </ul>

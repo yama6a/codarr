@@ -178,7 +178,9 @@ export function dashboard(overrides: Partial<Dashboard> = {}): Dashboard {
     generated_at: '2026-08-01T10:05:00.000000000Z',
     queue_paused: false,
     queue_depth: 1,
-    queue: [jobSummary({ id: 2, state: 'queued', attempt: 2, kind: 'remux', estimated_seconds: 120 })],
+    queue: [
+      jobSummary({ id: 2, state: 'queued', attempt: 2, kind: 'remux', estimated_seconds: 120 }),
+    ],
     awaiting_stream_end: [],
     recent_completions: [],
     failures: [],

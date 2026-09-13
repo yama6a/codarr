@@ -61,7 +61,9 @@ export default function SettingsGeneral() {
   const toggleQueue = async () => {
     setPausing(true);
     try {
-      const state = await unwrap(paused ? api.POST('/api/queue/resume') : api.POST('/api/queue/pause'));
+      const state = await unwrap(
+        paused ? api.POST('/api/queue/resume') : api.POST('/api/queue/pause'),
+      );
       setPaused(state.paused);
     } catch {
       // Already toasted.
@@ -91,14 +93,18 @@ export default function SettingsGeneral() {
       <Panel title="Paths and device" icon="hardware">
         <div className="space-y-5">
           <p className="rounded-lg border border-amber-800 bg-amber-950/40 px-3 py-2 text-xs text-amber-200">
-            Both of these are read once at startup. Saving stores the new value, but promotion and the
-            hardware probe keep using the old one until Codarr is restarted.
+            Both of these are read once at startup. Saving stores the new value, but promotion and
+            the hardware probe keep using the old one until Codarr is restarted.
           </p>
           <FormField
             label="Temp directory"
             hint="Staging fallback for when the destination filesystem cannot hold the output alongside the source."
           >
-            <TextInput value={form.temp_dir} onChange={(next) => set('temp_dir', next)} placeholder="/tmp" />
+            <TextInput
+              value={form.temp_dir}
+              onChange={(next) => set('temp_dir', next)}
+              placeholder="/tmp"
+            />
           </FormField>
           <FormField
             label="QSV device"
@@ -122,7 +128,11 @@ export default function SettingsGeneral() {
             description="Walk every enabled root on a schedule. Webhooks work regardless."
           />
           <FormField label="Scan schedule" hint="Cron expression, server local time.">
-            <TextInput value={form.scan_cron} onChange={(next) => set('scan_cron', next)} placeholder="0 4 * * *" />
+            <TextInput
+              value={form.scan_cron}
+              onChange={(next) => set('scan_cron', next)}
+              placeholder="0 4 * * *"
+            />
           </FormField>
           <FormField
             label="Scan rate limit"
@@ -153,7 +163,9 @@ export default function SettingsGeneral() {
           />
           <div className="flex items-center justify-between border-t border-slate-800 pt-4">
             <div>
-              <p className="text-sm font-medium text-white">Queue is {paused ? 'paused' : 'running'}</p>
+              <p className="text-sm font-medium text-white">
+                Queue is {paused ? 'paused' : 'running'}
+              </p>
               <p className="text-xs text-slate-400">
                 Pausing stops new jobs starting. A running job continues to completion.
               </p>

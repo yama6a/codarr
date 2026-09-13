@@ -15,7 +15,12 @@ interface ProvenanceSectionProps {
 
 // plan.md 17.1 and 18.3: the recorded output fingerprint against the current one, and a plain
 // statement when they differ.
-export function ProvenanceSection({ media, integrity, verifying, onVerify }: ProvenanceSectionProps) {
+export function ProvenanceSection({
+  media,
+  integrity,
+  verifying,
+  onVerify,
+}: ProvenanceSectionProps) {
   const modified = media.provenance === 'modified_since_transcode';
   const written = Boolean(media.codarr_output_fingerprint);
 
@@ -44,12 +49,16 @@ export function ProvenanceSection({ media, integrity, verifying, onVerify }: Pro
       )}
 
       {!written && !modified && (
-        <p className="text-xs text-slate-400">Codarr has never written this file, so there is nothing to compare.</p>
+        <p className="text-xs text-slate-400">
+          Codarr has never written this file, so there is nothing to compare.
+        </p>
       )}
 
       <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <KeyValue label="Recorded fingerprint">
-          <span className="font-mono text-xs break-all">{media.codarr_output_fingerprint || 'none'}</span>
+          <span className="font-mono text-xs break-all">
+            {media.codarr_output_fingerprint || 'none'}
+          </span>
         </KeyValue>
         <KeyValue label="Current fingerprint">
           <span className={`font-mono text-xs break-all ${modified ? 'text-red-300' : ''}`}>
@@ -58,7 +67,9 @@ export function ProvenanceSection({ media, integrity, verifying, onVerify }: Pro
         </KeyValue>
         <KeyValue label="Fingerprint algorithm">{media.fingerprint_algo || 'unknown'}</KeyValue>
         <KeyValue label="Recorded full hash">
-          <span className="font-mono text-xs break-all">{media.codarr_output_full_hash || 'not recorded'}</span>
+          <span className="font-mono text-xs break-all">
+            {media.codarr_output_full_hash || 'not recorded'}
+          </span>
         </KeyValue>
         <KeyValue label="Produced by job">
           {media.codarr_job_id ? `#${media.codarr_job_id}` : 'none'}
@@ -71,22 +82,30 @@ export function ProvenanceSection({ media, integrity, verifying, onVerify }: Pro
         <KeyValue label="Policy hash at promotion">
           <span className="font-mono text-xs break-all">{media.codarr_policy_hash || 'none'}</span>
         </KeyValue>
-        <KeyValue label="Last integrity check">{formatDateTime(media.integrity_checked_at)}</KeyValue>
+        <KeyValue label="Last integrity check">
+          {formatDateTime(media.integrity_checked_at)}
+        </KeyValue>
       </dl>
 
       {integrity && (
         <div
           className={`rounded-lg border p-3 text-xs ${
-            integrity.ok ? 'border-green-800 bg-green-950/50 text-green-200' : 'border-red-800 bg-red-950/50 text-red-200'
+            integrity.ok
+              ? 'border-green-800 bg-green-950/50 text-green-200'
+              : 'border-red-800 bg-red-950/50 text-red-200'
           }`}
         >
           <p className="font-semibold">
-            {integrity.ok ? 'Still byte-identical to what Codarr wrote.' : 'The file no longer matches.'}
+            {integrity.ok
+              ? 'Still byte-identical to what Codarr wrote.'
+              : 'The file no longer matches.'}
           </p>
           {integrity.message && <p className="mt-1">{integrity.message}</p>}
           <p className="mt-1 text-slate-400">
             Checked {formatDateTime(integrity.checked_at)}
-            {integrity.full_hash_checked ? ', whole-file hash included' : ', sparse fingerprint only'}
+            {integrity.full_hash_checked
+              ? ', whole-file hash included'
+              : ', sparse fingerprint only'}
           </p>
         </div>
       )}

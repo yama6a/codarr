@@ -3,7 +3,11 @@ import type { JobSummary } from '../../api/types';
 
 // Deliberately the loudest thing on the page. plan.md 10.2: a silent software fallback turns a
 // 20-minute job into a 4-hour one, and nothing else on the dashboard says so.
-export function FallbackWarning({ job }: { job: Pick<JobSummary, 'fell_back' | 'fallback_reason' | 'encoder_used'> }) {
+export function FallbackWarning({
+  job,
+}: {
+  job: Pick<JobSummary, 'fell_back' | 'fallback_reason' | 'encoder_used'>;
+}) {
   if (!job.fell_back) {
     return null;
   }
@@ -19,8 +23,8 @@ export function FallbackWarning({ job }: { job: Pick<JobSummary, 'fell_back' | '
           Software encoder fallback
         </p>
         <p className="mt-1 text-sm">
-          Running on {job.encoder_used ?? 'a software encoder'} instead of the hardware encoder. This
-          job will take roughly an order of magnitude longer than it should.
+          Running on {job.encoder_used ?? 'a software encoder'} instead of the hardware encoder.
+          This job will take roughly an order of magnitude longer than it should.
         </p>
         {job.fallback_reason && <p className="mt-1 text-xs text-red-300">{job.fallback_reason}</p>}
       </div>

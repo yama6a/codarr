@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, unwrap } from '../../api/client';
-import { ArrInstanceEditor, type ArrEditorValue } from '../../components/settings/ArrInstanceEditor';
+import {
+  ArrInstanceEditor,
+  type ArrEditorValue,
+} from '../../components/settings/ArrInstanceEditor';
 import { TestResultLine } from '../../components/settings/TestResultLine';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -10,7 +13,13 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Panel } from '../../components/ui/Panel';
 import { toast } from '../../components/ui/Toast';
 import { formatBytes } from '../../lib/format';
-import type { ArrInstance, ArrRootFolder, ContestedRoot, ImportRootsResult, TestResult } from '../../api/types';
+import type {
+  ArrInstance,
+  ArrRootFolder,
+  ContestedRoot,
+  ImportRootsResult,
+  TestResult,
+} from '../../api/types';
 
 function webhookUrl(webhookId: string): string {
   return `${window.location.origin}/api/webhook/${webhookId}`;
@@ -119,7 +128,9 @@ export default function SettingsArr() {
     setBusyId(instance.id);
     try {
       await unwrap(api.DELETE('/api/arr/{id}', { params: { path: { id: instance.id } } }));
-      toast.success(`${instance.name} deleted. Its roots keep their files but nothing is notified.`);
+      toast.success(
+        `${instance.name} deleted. Its roots keep their files but nothing is notified.`,
+      );
       await load();
     } catch {
       // Already toasted.
@@ -131,7 +142,9 @@ export default function SettingsArr() {
   const test = async (instance: ArrInstance) => {
     setBusyId(instance.id);
     try {
-      const result = await unwrap(api.POST('/api/arr/{id}/test', { params: { path: { id: instance.id } } }));
+      const result = await unwrap(
+        api.POST('/api/arr/{id}/test', { params: { path: { id: instance.id } } }),
+      );
       setTests((prev) => ({ ...prev, [instance.id]: result }));
     } catch {
       // Already toasted.
@@ -198,7 +211,9 @@ export default function SettingsArr() {
             {conflicts.map((conflict) => (
               <li key={conflict.path}>
                 <span className="font-mono">{conflict.path}</span> is claimed by{' '}
-                {conflict.instances.map((instance) => instance.name || `instance ${instance.id}`).join(' and ')}
+                {conflict.instances
+                  .map((instance) => instance.name || `instance ${instance.id}`)
+                  .join(' and ')}
               </li>
             ))}
           </ul>
@@ -220,7 +235,12 @@ export default function SettingsArr() {
             icon="hub"
             actions={
               <>
-                <Button variant="ghost" icon="probe" loading={busyId === instance.id} onClick={() => test(instance)}>
+                <Button
+                  variant="ghost"
+                  icon="probe"
+                  loading={busyId === instance.id}
+                  onClick={() => test(instance)}
+                >
                   Test
                 </Button>
                 <Button variant="ghost" icon="edit" onClick={() => setEditing(instance)}>
@@ -254,7 +274,9 @@ export default function SettingsArr() {
               />
 
               <div>
-                <p className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">Webhook URL</p>
+                <p className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">
+                  Webhook URL
+                </p>
                 <div className="mt-1 flex items-center gap-2">
                   <code className="flex-1 truncate rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-200">
                     {webhookUrl(instance.webhook_id)}
@@ -277,9 +299,13 @@ export default function SettingsArr() {
               </div>
 
               <div>
-                <p className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">Path mappings</p>
+                <p className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">
+                  Path mappings
+                </p>
                 {instance.path_mappings.length === 0 ? (
-                  <p className="mt-1 text-xs text-slate-500">None. Paths are used as the instance reports them.</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    None. Paths are used as the instance reports them.
+                  </p>
                 ) : (
                   <ul className="mt-1 space-y-0.5 font-mono text-xs text-slate-300">
                     {instance.path_mappings.map((mapping) => (
@@ -320,7 +346,9 @@ export default function SettingsArr() {
                       {!folder.accessible && <Badge tone="danger">not accessible</Badge>}
                       {folder.already_imported && <Badge tone="neutral">already imported</Badge>}
                       {folder.free_space !== null && folder.free_space !== undefined && (
-                        <span className="text-slate-500">{formatBytes(folder.free_space)} free</span>
+                        <span className="text-slate-500">
+                          {formatBytes(folder.free_space)} free
+                        </span>
                       )}
                     </li>
                   ))}
@@ -329,7 +357,9 @@ export default function SettingsArr() {
 
               {imports[instance.id] && imports[instance.id].conflicts.length > 0 && (
                 <div className="rounded-lg border border-red-800 bg-red-950/50 p-3 text-xs text-red-200">
-                  <p className="font-semibold">Skipped, already claimed by another enabled instance:</p>
+                  <p className="font-semibold">
+                    Skipped, already claimed by another enabled instance:
+                  </p>
                   <ul className="mt-1 space-y-0.5">
                     {imports[instance.id].conflicts.map((conflict) => (
                       <li key={conflict.path}>

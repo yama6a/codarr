@@ -15,7 +15,15 @@ interface RecheckDialogProps {
 
 // Only ever opens on the back of a `confirm: false` dry run, which plan.md 15.5 requires of
 // anything touching more than one file.
-export function RecheckDialog({ open, title, scope, preview, busy, onConfirm, onCancel }: RecheckDialogProps) {
+export function RecheckDialog({
+  open,
+  title,
+  scope,
+  preview,
+  busy,
+  onConfirm,
+  onCancel,
+}: RecheckDialogProps) {
   return (
     <ConfirmDialog
       open={open}
@@ -35,12 +43,14 @@ export function RecheckDialog({ open, title, scope, preview, busy, onConfirm, on
             re-planned.
           </p>
           <p className="text-sm text-slate-200">
-            <span className="text-2xl font-bold text-white">{preview.count.toLocaleString()}</span> no
-            longer match the current policy and would be queued.
+            <span className="text-2xl font-bold text-white">{preview.count.toLocaleString()}</span>{' '}
+            no longer match the current policy and would be queued.
           </p>
           <PlanKindBreakdownList breakdown={preview.by_plan_kind} />
           {preview.count === 0 && (
-            <p className="text-xs text-slate-400">Nothing to queue. Everything already matches the policy.</p>
+            <p className="text-xs text-slate-400">
+              Nothing to queue. Everything already matches the policy.
+            </p>
           )}
         </div>
       )}

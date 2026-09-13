@@ -6,7 +6,13 @@ import { Panel } from '../ui/Panel';
 import { ProgressBar } from '../ui/ProgressBar';
 import { FallbackWarning } from './FallbackWarning';
 import { useNow } from '../../hooks/useNow';
-import { elapsedSeconds, formatBytes, formatDuration, formatPercent, humanise } from '../../lib/format';
+import {
+  elapsedSeconds,
+  formatBytes,
+  formatDuration,
+  formatPercent,
+  humanise,
+} from '../../lib/format';
 import { jobStateTone, planKindTone } from '../../lib/tone';
 import type { JobSummary } from '../../api/types';
 
@@ -29,7 +35,13 @@ function remainingSeconds(job: JobSummary, elapsed: number): number | null {
   return null;
 }
 
-export function CurrentJobPanel({ job, paused, onCancel, onOpen, cancelling }: CurrentJobPanelProps) {
+export function CurrentJobPanel({
+  job,
+  paused,
+  onCancel,
+  onOpen,
+  cancelling,
+}: CurrentJobPanelProps) {
   const now = useNow(job !== undefined);
 
   if (!job) {
@@ -37,7 +49,9 @@ export function CurrentJobPanel({ job, paused, onCancel, onOpen, cancelling }: C
       <Panel title="Current job" icon="play">
         <EmptyState
           icon="inbox"
-          message={paused ? 'Queue is paused. Nothing is running.' : 'Nothing is running right now.'}
+          message={
+            paused ? 'Queue is paused. Nothing is running.' : 'Nothing is running right now.'
+          }
         />
       </Panel>
     );
@@ -75,13 +89,19 @@ export function CurrentJobPanel({ job, paused, onCancel, onOpen, cancelling }: C
 
         <div>
           <div className="mb-1.5 flex items-baseline justify-between text-sm">
-            <span className="font-medium text-slate-200">{formatPercent(job.progress_pct ?? 0)}</span>
+            <span className="font-medium text-slate-200">
+              {formatPercent(job.progress_pct ?? 0)}
+            </span>
             <span className="text-xs text-slate-400">
               {formatDuration(elapsed)} elapsed
               {remaining !== null ? `, ${formatDuration(remaining)} remaining` : ''}
             </span>
           </div>
-          <ProgressBar pct={job.progress_pct ?? 0} tone={job.fell_back ? 'warning' : 'primary'} label="Encode progress" />
+          <ProgressBar
+            pct={job.progress_pct ?? 0}
+            tone={job.fell_back ? 'warning' : 'primary'}
+            label="Encode progress"
+          />
         </div>
 
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -100,7 +120,9 @@ export function CurrentJobPanel({ job, paused, onCancel, onOpen, cancelling }: C
             </span>
           </KeyValue>
           <KeyValue label="Estimated total">{formatDuration(job.estimated_seconds)}</KeyValue>
-          <KeyValue label="Source size">{job.source_size ? formatBytes(job.source_size) : 'unknown'}</KeyValue>
+          <KeyValue label="Source size">
+            {job.source_size ? formatBytes(job.source_size) : 'unknown'}
+          </KeyValue>
           <KeyValue label="Origin">{humanise(job.origin)}</KeyValue>
           <KeyValue label="Job">#{job.id}</KeyValue>
           <KeyValue label="Blocked by">{job.blocked_by || 'nothing'}</KeyValue>

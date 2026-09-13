@@ -12,7 +12,13 @@ interface SpaceSweepDialogProps {
   onCancel: () => void;
 }
 
-export function SpaceSweepDialog({ open, preview, busy, onConfirm, onCancel }: SpaceSweepDialogProps) {
+export function SpaceSweepDialog({
+  open,
+  preview,
+  busy,
+  onConfirm,
+  onCancel,
+}: SpaceSweepDialogProps) {
   return (
     <ConfirmDialog
       open={open}
@@ -33,10 +39,12 @@ export function SpaceSweepDialog({ open, preview, busy, onConfirm, onCancel }: S
           </p>
           <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 text-sm">
             <p className="text-slate-300">
-              {formatBytes(preview.current_bytes)} now, {formatBytes(preview.projected_bytes)} projected
+              {formatBytes(preview.current_bytes)} now, {formatBytes(preview.projected_bytes)}{' '}
+              projected
             </p>
             <p className="mt-1 text-lg font-semibold text-green-400">
-              {formatBytes(preview.projected_saving_bytes)} saved ({formatPercent(preview.projected_saving_pct)})
+              {formatBytes(preview.projected_saving_bytes)} saved (
+              {formatPercent(preview.projected_saving_pct)})
             </p>
           </div>
           <PlanKindBreakdownList breakdown={preview.by_plan_kind} />

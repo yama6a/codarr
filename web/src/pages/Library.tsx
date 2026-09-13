@@ -4,7 +4,12 @@ import { LibraryFilters } from '../components/library/LibraryFilters';
 import { LibraryTable } from '../components/library/LibraryTable';
 import { RecheckDialog } from '../components/library/RecheckDialog';
 import { SpaceSweepDialog } from '../components/library/SpaceSweepDialog';
-import { describeFilter, emptyFilters, toMediaFilter, type LibraryFilterState } from '../components/library/filters';
+import {
+  describeFilter,
+  emptyFilters,
+  toMediaFilter,
+  type LibraryFilterState,
+} from '../components/library/filters';
 import { MediaDetailModal } from '../components/media/MediaDetailModal';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -12,7 +17,13 @@ import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { Pagination } from '../components/ui/Pagination';
 import { toast } from '../components/ui/Toast';
 import { useDebounced } from '../hooks/useDebounced';
-import type { ArrInstance, MediaPage, MediaSort, RecheckResult, SpaceSweepPreview } from '../api/types';
+import type {
+  ArrInstance,
+  MediaPage,
+  MediaSort,
+  RecheckResult,
+  SpaceSweepPreview,
+} from '../api/types';
 
 const PAGE_SIZE = 50;
 
@@ -115,7 +126,9 @@ export default function Library() {
     setRecheckPreview(null);
     setDialog('all');
     try {
-      setRecheckPreview(await unwrap(api.POST('/api/media/recheck-all', { body: { confirm: false } })));
+      setRecheckPreview(
+        await unwrap(api.POST('/api/media/recheck-all', { body: { confirm: false } })),
+      );
     } catch {
       setDialog(null);
     }

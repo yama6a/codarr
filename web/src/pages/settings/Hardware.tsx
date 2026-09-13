@@ -64,7 +64,10 @@ export default function SettingsHardware() {
       </header>
 
       {softwareOnly && (
-        <div role="alert" className="flex items-start gap-3 rounded-xl border-2 border-red-500 bg-red-950 p-4">
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-xl border-2 border-red-500 bg-red-950 p-4"
+        >
           <Icon name="alert" size={22} className="mt-0.5 flex-shrink-0 text-red-400" />
           <div className="text-sm text-red-100">
             <p className="font-bold">Every job will run on the software encoder.</p>
@@ -115,7 +118,9 @@ export default function SettingsHardware() {
             </thead>
             <tbody className="divide-y divide-slate-800">
               {hardware.capabilities.map((capability) => (
-                <tr key={`${capability.backend}-${capability.codec}-${capability.profile}-${capability.direction}`}>
+                <tr
+                  key={`${capability.backend}-${capability.codec}-${capability.profile}-${capability.direction}`}
+                >
                   <td className="py-2 pr-3 text-slate-200">{capability.backend}</td>
                   <td className="py-2 pr-3 text-slate-300">{capability.codec}</td>
                   <td className="py-2 pr-3 text-slate-300">{capability.profile}</td>
@@ -124,7 +129,10 @@ export default function SettingsHardware() {
                     {capability.works ? (
                       <Badge tone="success">works</Badge>
                     ) : (
-                      <Badge tone={actionable(capability) ? 'danger' : 'neutral'} title={capability.error}>
+                      <Badge
+                        tone={actionable(capability) ? 'danger' : 'neutral'}
+                        title={capability.error}
+                      >
                         {actionable(capability) ? 'failed' : 'unavailable'}
                       </Badge>
                     )}
@@ -139,8 +147,12 @@ export default function SettingsHardware() {
                       </details>
                     )}
                   </td>
-                  <td className="py-2 pr-3 text-xs text-slate-500">{capability.ffmpeg_version ?? ''}</td>
-                  <td className="py-2 text-xs text-slate-500">{formatDateTime(capability.probed_at)}</td>
+                  <td className="py-2 pr-3 text-xs text-slate-500">
+                    {capability.ffmpeg_version ?? ''}
+                  </td>
+                  <td className="py-2 text-xs text-slate-500">
+                    {formatDateTime(capability.probed_at)}
+                  </td>
                 </tr>
               ))}
             </tbody>

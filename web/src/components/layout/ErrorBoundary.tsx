@@ -56,8 +56,12 @@ export default class ErrorBoundary extends Component<Props, State> {
           </p>
           {this.state.error && (
             <details className="mb-6 rounded-lg bg-gray-800 p-4 text-left">
-              <summary className="cursor-pointer text-sm font-medium text-gray-300">Error details</summary>
-              <pre className="mt-2 overflow-auto text-xs text-red-400">{this.state.error.message}</pre>
+              <summary className="cursor-pointer text-sm font-medium text-gray-300">
+                Error details
+              </summary>
+              <pre className="mt-2 overflow-auto text-xs text-red-400">
+                {this.state.error.message}
+              </pre>
             </details>
           )}
           <div className="flex justify-center gap-3">

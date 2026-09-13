@@ -20,22 +20,22 @@ func (s *Server) ReceiveArrWebhook(
 	ctx context.Context, req gen.ReceiveArrWebhookRequestObject,
 ) (gen.ReceiveArrWebhookResponseObject, error) {
 	if req.Body == nil {
-		return gen.ReceiveArrWebhookdefaultJSONResponse(s.fail(ctx, badRequest("an event body is required"))), nil
+		return gen.ReceiveArrWebhookdefaultJSONResponse(s.fail(badRequest("an event body is required"))), nil
 	}
 
 	instance, err := s.store.GetArrInstanceByWebhookID(ctx, req.WebhookId)
 	if err != nil {
-		return gen.ReceiveArrWebhookdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ReceiveArrWebhookdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	ev, err := parseWebhook(instance.Flavour, *req.Body)
 	if err != nil {
-		return gen.ReceiveArrWebhookdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ReceiveArrWebhookdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	ack, err := s.webhooks.Handle(ctx, req.WebhookId, ev)
 	if err != nil {
-		return gen.ReceiveArrWebhookdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ReceiveArrWebhookdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.ReceiveArrWebhook200JSONResponse(webhookAck(ack)), nil

@@ -4,18 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/yama6a/codarr/internal/pkg/clock"
 	"github.com/yama6a/codarr/internal/pkg/domain"
+	"go.uber.org/zap"
 )
 
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/runner_mock.go -pkg mock . Runner
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/store_mock.go -pkg mock . Store
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/fs_mock.go -pkg mock . FS
+//go:generate go tool moq -out mock/runner_mock.go -pkg mock . Runner
+//go:generate go tool moq -out mock/store_mock.go -pkg mock . Store
+//go:generate go tool moq -out mock/fs_mock.go -pkg mock . FS
 
 // ErrNoFfmpeg is returned when the binary cannot be run at all, which is a
 // different problem from a codec that does not work.
@@ -48,12 +48,12 @@ type Prober struct {
 	clock   clock.Clock
 	device  string
 	tempDir string
-	logger  *slog.Logger
+	logger  *zap.Logger
 }
 
 // New returns a Prober. device is settings.qsv_device and tempDir is where the
 // VP9 sample is written.
-func New(runner Runner, st Store, fs FS, clk clock.Clock, device, tempDir string, logger *slog.Logger) *Prober {
+func New(runner Runner, st Store, fs FS, clk clock.Clock, device, tempDir string, logger *zap.Logger) *Prober {
 	return &Prober{
 		runner:  runner,
 		store:   st,
@@ -61,7 +61,7 @@ func New(runner Runner, st Store, fs FS, clk clock.Clock, device, tempDir string
 		clock:   clk,
 		device:  device,
 		tempDir: tempDir,
-		logger:  logger.With(slog.String("component", "hardware")),
+		logger:  logger.With(zap.String("component", "hardware")),
 	}
 }
 
@@ -82,8 +82,7 @@ func (p *Prober) Capabilities(ctx context.Context) (Capabilities, error) {
 		return caps, nil
 	}
 
-	p.logger.Info("hardware capability cache is stale or empty, probing",
-		slog.String("ffmpeg_version", version))
+	p.logger.Info("hardware capability cache is stale or empty, probing", zap.String("ffmpeg_version", version))
 
 	return p.Probe(ctx)
 }
@@ -119,8 +118,8 @@ func (p *Prober) Probe(ctx context.Context) (Capabilities, error) {
 	}
 
 	p.logger.Info("hardware probe complete",
-		slog.String("ffmpeg_version", version),
-		slog.String("encoder", string(caps.Select(false).Encoder)))
+		zap.String("ffmpeg_version", version),
+		zap.String("encoder", string(caps.Select(false).Encoder)))
 
 	return caps, nil
 }
@@ -172,8 +171,7 @@ func (p *Prober) decodeEntries(ctx context.Context, version string, now time.Tim
 	if sampleErr == nil {
 		defer func() {
 			if err := p.fs.Remove(sample); err != nil {
-				p.logger.Warn("could not remove the VP9 probe sample",
-					slog.String("path", sample), slog.String("error", err.Error()))
+				p.logger.Warn("could not remove the VP9 probe sample", zap.String("path", sample), zap.Error(err))
 			}
 		}()
 	}

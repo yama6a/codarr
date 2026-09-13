@@ -1,28 +1,29 @@
-// Package events is Codarr's logging: slog JSON to stdout, wrapped so info and above
+// Package events is Codarr's logging: zap JSON to stdout, teed so info and above
 // also reach the events table (plan.md 24).
 //
-// Stdout is the source of truth, so the wrapper calls the inner handler first and never
-// propagates the table's error.
+// Stdout is the source of truth, so the table core never returns an error and never
+// stops the console line being written.
 package events
 
 import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/yama6a/codarr/internal/pkg/clock"
 	"github.com/yama6a/codarr/internal/pkg/domain"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // SinkTimeout bounds one events-table insert, so a goroutine that was only trying to
 // log does not block waiting for the single write connection.
 const SinkTimeout = 5 * time.Second
 
-// DefaultCategory is used for a record carrying no component or category attr.
+// DefaultCategory is used for an entry carrying no component or category field.
 const DefaultCategory = "app"
 
 // Store is the events table. store.Store satisfies it.
@@ -36,32 +37,22 @@ type Options struct {
 	// names as the source of truth.
 	Out io.Writer
 
-	// Level is the floor for stdout.
-	Level slog.Level
+	// Level is the floor for stdout. The events table additionally never sees
+	// anything below info.
+	Level zapcore.Level
 
 	// Store is the events table sink. A nil Store logs to stdout only.
 	Store Store
 
 	Clock clock.Clock
 
-	// TableLevel is the floor for the events table, info by default (24).
-	TableLevel slog.Level
-
 	// OnSinkError sees every failed table insert. The default writes one line
-	// to stderr, which cannot recurse back into this handler.
+	// to stderr, which cannot recurse back into this logger.
 	OnSinkError func(error)
-
-	// AddSource stamps the call site on every record.
-	AddSource bool
 }
 
 // New returns the logger the whole binary uses.
-func New(o Options) *slog.Logger {
-	return slog.New(NewHandler(o))
-}
-
-// NewHandler returns the JSON handler with the events-table sink wrapped around it.
-func NewHandler(o Options) slog.Handler {
+func New(o Options) *zap.Logger {
 	if o.Out == nil {
 		o.Out = os.Stdout
 	}
@@ -70,213 +61,255 @@ func NewHandler(o Options) slog.Handler {
 		o.Clock = clock.System()
 	}
 
-	if o.TableLevel == 0 {
-		o.TableLevel = slog.LevelInfo
-	}
-
 	if o.OnSinkError == nil {
 		o.OnSinkError = stderrSinkError
 	}
 
-	inner := slog.NewJSONHandler(o.Out, &slog.HandlerOptions{
-		Level:       o.Level,
-		AddSource:   o.AddSource,
-		ReplaceAttr: redact,
-	})
+	level := zap.NewAtomicLevelAt(o.Level)
+
+	console := Redacting(zapcore.NewCore(
+		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+		zapcore.AddSync(o.Out),
+		level,
+	))
 
 	if o.Store == nil {
-		return inner
+		return zap.New(console)
 	}
 
-	return &handler{
-		inner:      inner,
-		store:      o.Store,
-		clk:        o.Clock,
-		tableLevel: o.TableLevel,
-		onErr:      o.OnSinkError,
-	}
+	return zap.New(zapcore.NewTee(console, NewStoreCore(o.Store, o.Clock, level, o.OnSinkError)))
 }
 
 func stderrSinkError(err error) {
 	fmt.Fprintf(os.Stderr, "events: writing the events table failed: %v\n", err)
 }
 
-// handler mirrors info-and-above records into the events table.
-type handler struct {
-	inner      slog.Handler
-	store      Store
-	clk        clock.Clock
-	tableLevel slog.Level
-	onErr      func(error)
+// storeCore mirrors info-and-above entries into the events table.
+type storeCore struct {
+	store Store
+	clk   clock.Clock
+	level zapcore.LevelEnabler
+	onErr func(error)
 
-	// attrs are the attributes fixed by With, kept so the columns the UI
-	// filters on survive logger.With(slog.Int64("job_id", id)).
-	attrs []slog.Attr
-
-	// grouped is set once WithGroup has run. Attributes inside a group are
-	// nested in the JSON and no longer name the columns, so harvesting stops.
-	grouped bool
+	// fields are the ones fixed by With, kept so the columns the UI filters on
+	// survive logger.With(zap.Int64("job_id", id)).
+	fields []zapcore.Field
 }
 
-var _ slog.Handler = (*handler)(nil)
+// NewStoreCore returns the events-table half of the logger. It writes info and above,
+// as long as level lets the entry through at all.
+func NewStoreCore(st Store, clk clock.Clock, level zapcore.LevelEnabler, onErr func(error)) zapcore.Core {
+	return &storeCore{store: st, clk: clk, level: level, onErr: onErr}
+}
 
-func (h *handler) Enabled(ctx context.Context, l slog.Level) bool { return h.inner.Enabled(ctx, l) }
+func (c *storeCore) Enabled(l zapcore.Level) bool {
+	return l >= zapcore.InfoLevel && c.level.Enabled(l)
+}
 
-// Handle writes stdout first. plan.md 24: a database failure must never prevent
-// the stdout line, so the sink runs afterwards and its error never propagates.
-func (h *handler) Handle(ctx context.Context, r slog.Record) error {
-	err := h.inner.Handle(ctx, r)
+func (c *storeCore) With(fields []zapcore.Field) zapcore.Core {
+	next := *c
+	next.fields = make([]zapcore.Field, 0, len(c.fields)+len(fields))
+	next.fields = append(next.fields, c.fields...)
+	next.fields = append(next.fields, redactFields(fields)...)
 
-	h.sink(ctx, r)
+	return &next
+}
 
-	if err != nil {
-		return fmt.Errorf("write log record: %w", err)
+func (c *storeCore) Check(entry zapcore.Entry, checked *zapcore.CheckedEntry) *zapcore.CheckedEntry {
+	if c.Enabled(entry.Level) {
+		return checked.AddCore(entry, c)
+	}
+
+	return checked
+}
+
+// Write never returns an error: plan.md 24 makes stdout the source of truth, and a
+// zapcore error would be written to stderr by zap on top of what onErr already reports.
+func (c *storeCore) Write(entry zapcore.Entry, fields []zapcore.Field) error {
+	ev := c.event(entry, fields)
+
+	ctx, cancel := context.WithTimeout(context.Background(), SinkTimeout)
+	defer cancel()
+
+	if _, err := c.store.AppendEvent(ctx, ev); err != nil {
+		c.onErr(err)
 	}
 
 	return nil
 }
 
-func (h *handler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	if len(attrs) == 0 {
-		return h
-	}
+func (c *storeCore) Sync() error { return nil }
 
-	next := h.clone()
-	next.inner = h.inner.WithAttrs(attrs)
-
-	if !h.grouped {
-		next.attrs = append(next.attrs, attrs...)
-	}
-
-	return next
-}
-
-func (h *handler) WithGroup(name string) slog.Handler {
-	if name == "" {
-		return h
-	}
-
-	next := h.clone()
-	next.inner = h.inner.WithGroup(name)
-	next.grouped = true
-
-	return next
-}
-
-func (h *handler) clone() *handler {
-	next := *h
-	next.attrs = append([]slog.Attr(nil), h.attrs...)
-
-	return &next
-}
-
-// sinkGuard marks a context that is already inside a table write, so a log line
-// emitted by the store itself cannot recurse into another insert.
-type sinkGuard struct{}
-
-func (h *handler) sink(ctx context.Context, r slog.Record) {
-	if r.Level < h.tableLevel {
-		return
-	}
-
-	if _, inside := ctx.Value(sinkGuard{}).(bool); inside {
-		return
-	}
-
-	ev := h.event(r)
-
-	// The caller's context is usually a request or a job that is about to be
-	// cancelled; the row is still worth writing.
-	writeCtx, cancel := context.WithTimeout(
-		context.WithValue(context.WithoutCancel(ctx), sinkGuard{}, true), SinkTimeout)
-	defer cancel()
-
-	if _, err := h.store.AppendEvent(writeCtx, ev); err != nil {
-		h.onErr(err)
-	}
-}
-
-func (h *handler) event(r slog.Record) domain.Event {
+func (c *storeCore) event(entry zapcore.Entry, fields []zapcore.Field) domain.Event {
 	ev := domain.Event{
-		Level:     levelName(r.Level),
+		Level:     entry.Level.String(),
 		Category:  DefaultCategory,
-		Message:   r.Message,
-		CreatedAt: r.Time,
+		Message:   entry.Message,
+		CreatedAt: entry.Time,
 	}
 
 	if ev.CreatedAt.IsZero() {
-		ev.CreatedAt = h.clk.Now()
+		ev.CreatedAt = c.clk.Now()
 	}
 
-	for _, a := range h.attrs {
-		harvest(&ev, a)
+	// A zap.Namespace nests everything after it, so the encoded map only carries
+	// the fields that are still at the top level and can name a column.
+	enc := zapcore.NewMapObjectEncoder()
+	for _, f := range c.fields {
+		f.AddTo(enc)
 	}
 
-	if !h.grouped {
-		r.Attrs(func(a slog.Attr) bool {
-			harvest(&ev, a)
-
-			return true
-		})
+	for _, f := range redactFields(fields) {
+		f.AddTo(enc)
 	}
+
+	harvest(&ev, enc.Fields)
 
 	return ev
 }
 
-// The three attributes the log view filters and links on get their own columns.
-func harvest(ev *domain.Event, a slog.Attr) {
-	switch a.Key {
-	case "category", "component":
-		if s := a.Value.String(); s != "" {
-			ev.Category = s
-		}
-	case "job_id":
-		if id := a.Value.Int64(); id != 0 {
-			ev.JobID = &id
-		}
-	case "media_file_id":
-		if id := a.Value.Int64(); id != 0 {
-			ev.MediaFileID = &id
-		}
+// The three fields the log view filters and links on get their own columns.
+func harvest(ev *domain.Event, fields map[string]any) {
+	if s, ok := fields["category"].(string); ok && s != "" {
+		ev.Category = s
+	}
+
+	if s, ok := fields["component"].(string); ok && s != "" {
+		ev.Category = s
+	}
+
+	if id, ok := int64Field(fields["job_id"]); ok {
+		ev.JobID = &id
+	}
+
+	if id, ok := int64Field(fields["media_file_id"]); ok {
+		ev.MediaFileID = &id
 	}
 }
 
-func levelName(l slog.Level) string {
-	switch {
-	case l < slog.LevelInfo:
-		return "debug"
-	case l < slog.LevelWarn:
-		return "info"
-	case l < slog.LevelError:
-		return "warn"
+func int64Field(v any) (int64, bool) {
+	switch n := v.(type) {
+	case int64:
+		return n, n != 0
+	case int:
+		return int64(n), n != 0
 	default:
-		return "error"
+		return 0, false
 	}
 }
 
-// ParseLevel maps the --log-level flag onto a slog level, falling back to info rather
-// than refusing to start over a typo.
-func ParseLevel(s string) slog.Level {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "debug":
-		return slog.LevelDebug
-	case "warn", "warning":
-		return slog.LevelWarn
-	case "error":
-		return slog.LevelError
+// Redacting wraps a core so the Plex token and *arr API keys never reach it
+// (plan.md 24), on every field including nested ones, because a secret is a secret
+// wherever it appears.
+func Redacting(inner zapcore.Core) zapcore.Core {
+	return &redactingCore{Core: inner}
+}
+
+type redactingCore struct {
+	zapcore.Core
+}
+
+func (c *redactingCore) With(fields []zapcore.Field) zapcore.Core {
+	return &redactingCore{Core: c.Core.With(redactFields(fields))}
+}
+
+func (c *redactingCore) Check(entry zapcore.Entry, checked *zapcore.CheckedEntry) *zapcore.CheckedEntry {
+	if c.Enabled(entry.Level) {
+		return checked.AddCore(entry, c)
+	}
+
+	return checked
+}
+
+func (c *redactingCore) Write(entry zapcore.Entry, fields []zapcore.Field) error {
+	if err := c.Core.Write(entry, redactFields(fields)); err != nil {
+		return fmt.Errorf("write log entry: %w", err)
+	}
+
+	return nil
+}
+
+func redactFields(fields []zapcore.Field) []zapcore.Field {
+	out := fields
+	copied := false
+
+	for i, f := range fields {
+		masked, changed := redactField(f)
+		if !changed {
+			continue
+		}
+
+		if !copied {
+			out = append([]zapcore.Field(nil), fields...)
+			copied = true
+		}
+
+		out[i] = masked
+	}
+
+	return out
+}
+
+func redactField(f zapcore.Field) (zapcore.Field, bool) {
+	if secretKey(f.Key) {
+		return zap.String(f.Key, domain.MaskedSecret), true
+	}
+
+	if !nests(f.Type) {
+		return f, false
+	}
+
+	enc := zapcore.NewMapObjectEncoder()
+	f.AddTo(enc)
+
+	redacted, changed := redactValue(enc.Fields[f.Key])
+	if !changed {
+		return f, false
+	}
+
+	return zap.Any(f.Key, redacted), true
+}
+
+// nests reports whether a field can carry keys of its own, which a secret could hide under.
+func nests(t zapcore.FieldType) bool {
+	return t == zapcore.ArrayMarshalerType || t == zapcore.ObjectMarshalerType ||
+		t == zapcore.InlineMarshalerType || t == zapcore.ReflectType
+}
+
+func redactValue(v any) (any, bool) {
+	switch val := v.(type) {
+	case map[string]any:
+		changed := false
+		out := make(map[string]any, len(val))
+
+		for k, inner := range val {
+			if secretKey(k) {
+				out[k] = domain.MaskedSecret
+				changed = true
+
+				continue
+			}
+
+			redacted, innerChanged := redactValue(inner)
+			out[k] = redacted
+			changed = changed || innerChanged
+		}
+
+		return out, changed
+	case []any:
+		changed := false
+		out := make([]any, len(val))
+
+		for i, inner := range val {
+			redacted, innerChanged := redactValue(inner)
+			out[i] = redacted
+			changed = changed || innerChanged
+		}
+
+		return out, changed
 	default:
-		return slog.LevelInfo
+		return v, false
 	}
-}
-
-// redact keeps the Plex token and *arr API keys out of both sinks (plan.md 24), on
-// every attribute including nested ones, because a secret is a secret wherever it appears.
-func redact(_ []string, a slog.Attr) slog.Attr {
-	if !secretKey(a.Key) {
-		return a
-	}
-
-	return slog.String(a.Key, domain.MaskedSecret)
 }
 
 func secretKey(key string) bool {

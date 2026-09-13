@@ -33,7 +33,9 @@ export default function Dashboard() {
     }
     setBusy('pause');
     try {
-      await unwrap(data.queue_paused ? api.POST('/api/queue/resume') : api.POST('/api/queue/pause'));
+      await unwrap(
+        data.queue_paused ? api.POST('/api/queue/resume') : api.POST('/api/queue/pause'),
+      );
       toast.success(data.queue_paused ? 'Queue resumed.' : 'Queue paused.');
       refresh();
     } catch {
@@ -77,7 +79,9 @@ export default function Dashboard() {
     return (
       <div className="p-8">
         <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-        <p className="mt-2 text-sm text-red-400">{error?.message ?? 'The dashboard could not be loaded.'}</p>
+        <p className="mt-2 text-sm text-red-400">
+          {error?.message ?? 'The dashboard could not be loaded.'}
+        </p>
       </div>
     );
   }

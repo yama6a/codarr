@@ -33,7 +33,9 @@ export function AwaitingPanel({ items, onOpen }: AwaitingPanelProps) {
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm text-slate-200">{item.filename}</span>
-                  <span className="block truncate text-xs text-amber-300">Blocked by {blockedBy(item)}</span>
+                  <span className="block truncate text-xs text-amber-300">
+                    Blocked by {blockedBy(item)}
+                  </span>
                 </span>
                 <span className="flex-shrink-0 text-right text-xs text-slate-400">
                   waiting {formatDuration(item.waiting_seconds)}

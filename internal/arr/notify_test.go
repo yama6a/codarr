@@ -3,7 +3,6 @@ package arr_test
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,14 +10,15 @@ import (
 	"github.com/yama6a/codarr/internal/arr/mock"
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/promote"
+	"go.uber.org/zap"
 )
 
 var _ promote.Notifier = (*arr.Notifier)(nil)
 
 const promoted = "/media/yama/movies/Arrival (2016)/Arrival (2016) Bluray-1080p.mkv"
 
-func quietLogger() *slog.Logger {
-	return slog.New(slog.DiscardHandler)
+func quietLogger() *zap.Logger {
+	return zap.NewNop()
 }
 
 func clientMock() *mock.ClientMock {

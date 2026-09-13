@@ -22,11 +22,15 @@ export function CompatibilityPanel({ summary }: { summary: CompatibilitySummary 
       <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
         <div className="flex gap-8">
           <div>
-            <p className="text-5xl font-bold text-amber-400">{summary.files_needing_work.toLocaleString()}</p>
+            <p className="text-5xl font-bold text-amber-400">
+              {summary.files_needing_work.toLocaleString()}
+            </p>
             <p className="mt-1 text-xs tracking-wide text-slate-400 uppercase">Need work</p>
           </div>
           <div>
-            <p className="text-5xl font-bold text-green-400">{summary.files_compatible.toLocaleString()}</p>
+            <p className="text-5xl font-bold text-green-400">
+              {summary.files_compatible.toLocaleString()}
+            </p>
             <p className="mt-1 text-xs tracking-wide text-slate-400 uppercase">Compatible</p>
           </div>
         </div>
@@ -38,19 +42,26 @@ export function CompatibilityPanel({ summary }: { summary: CompatibilitySummary 
               <span>{summary.files_unanalyzed.toLocaleString()} not analysed yet</span>
             </div>
             <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
-              <div className="h-full rounded-full bg-green-500" style={{ width: `${compatiblePct}%` }} />
+              <div
+                className="h-full rounded-full bg-green-500"
+                style={{ width: `${compatiblePct}%` }}
+              />
             </div>
           </div>
 
           <ul className="space-y-2">
             {reasonMeta.map((reason) => {
               const count = summary.by_reason[reason.key];
-              const width = summary.files_needing_work > 0 ? (count / summary.files_needing_work) * 100 : 0;
+              const width =
+                summary.files_needing_work > 0 ? (count / summary.files_needing_work) * 100 : 0;
               return (
                 <li key={reason.key} className="flex items-center gap-3">
                   <span className="w-20 flex-shrink-0 text-xs text-slate-400">{reason.label}</span>
                   <span className="h-2 flex-1 overflow-hidden rounded-full bg-slate-800">
-                    <span className={`block h-full rounded-full ${reason.bar}`} style={{ width: `${width}%` }} />
+                    <span
+                      className={`block h-full rounded-full ${reason.bar}`}
+                      style={{ width: `${width}%` }}
+                    />
                   </span>
                   <span className="w-16 flex-shrink-0 text-right text-xs font-medium text-slate-200">
                     {count.toLocaleString()}

@@ -2,9 +2,9 @@ package job
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/yama6a/codarr/internal/pkg/domain"
+	"go.uber.org/zap"
 )
 
 // Error categories for codarr_errors_total: every place the worker swallows an
@@ -110,7 +110,7 @@ func (s *Service) syncQueueGauges(ctx context.Context) {
 
 	counts, err := s.store.CountJobsByState(ctx)
 	if err != nil {
-		s.log.WarnContext(ctx, "counting jobs by state for the queue gauges failed", slog.Any("error", err))
+		s.log.Warn("counting jobs by state for the queue gauges failed", zap.Error(err))
 
 		return
 	}

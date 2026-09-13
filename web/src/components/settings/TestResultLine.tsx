@@ -11,10 +11,13 @@ interface TestResultLineProps {
 export function TestResultLine({ result, lastTestedAt, lastTestResult }: TestResultLineProps) {
   if (result) {
     return (
-      <p className={`flex items-center gap-2 text-xs ${result.ok ? 'text-green-400' : 'text-red-400'}`}>
+      <p
+        className={`flex items-center gap-2 text-xs ${result.ok ? 'text-green-400' : 'text-red-400'}`}
+      >
         <Icon name={result.ok ? 'success' : 'error'} size={14} />
         {result.message}
-        {result.server_name && ` (${result.server_name}${result.server_version ? ` ${result.server_version}` : ''})`}
+        {result.server_name &&
+          ` (${result.server_name}${result.server_version ? ` ${result.server_version}` : ''})`}
       </p>
     );
   }

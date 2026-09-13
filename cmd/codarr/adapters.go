@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"sync"
 
 	"github.com/yama6a/codarr/internal/api"
@@ -16,6 +15,7 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/store"
 	"github.com/yama6a/codarr/internal/plex"
 	"github.com/yama6a/codarr/internal/promote"
+	"go.uber.org/zap"
 )
 
 // The adapters live here because owning one would make one package depend on another (plan.md 2.2).
@@ -88,14 +88,14 @@ func (a *analyzer) Analyze(ctx context.Context, m domain.MediaFile) (domain.Medi
 // client per call loses the section and rating-key caches, one built at startup goes stale.
 type plexProvider struct {
 	store  store.Store
-	logger *slog.Logger
+	logger *zap.Logger
 
 	mu      sync.Mutex
 	client  *plex.Client
 	fingerp string
 }
 
-func newPlexProvider(st store.Store, logger *slog.Logger) *plexProvider {
+func newPlexProvider(st store.Store, logger *zap.Logger) *plexProvider {
 	return &plexProvider{store: st, logger: logger}
 }
 
@@ -213,7 +213,7 @@ var (
 // changes, for the same reason as plexProvider.
 type arrProvider struct {
 	store  store.Store
-	logger *slog.Logger
+	logger *zap.Logger
 
 	mu      sync.Mutex
 	clients map[int64]*cachedArr
@@ -224,7 +224,7 @@ type cachedArr struct {
 	fingerp string
 }
 
-func newArrProvider(st store.Store, logger *slog.Logger) *arrProvider {
+func newArrProvider(st store.Store, logger *zap.Logger) *arrProvider {
 	return &arrProvider{store: st, logger: logger, clients: map[int64]*cachedArr{}}
 }
 

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
-
 	"github.com/yama6a/codarr/internal/api"
 	"github.com/yama6a/codarr/internal/api/mock"
 	"github.com/yama6a/codarr/internal/ingest"
@@ -22,6 +20,7 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/store"
 	"github.com/yama6a/codarr/internal/plex"
+	"go.uber.org/zap"
 )
 
 // The handler tests run against the generated router with moq'd services (plan.md 2.3),
@@ -79,7 +78,7 @@ func newHarness(t *testing.T) *harness {
 			return h.arr, nil
 		},
 		Clock:  clock.NewFake(testNow),
-		Logger: slog.New(slog.DiscardHandler),
+		Logger: zap.NewNop(),
 		Build:  api.Build{Version: "test", Commit: "abc123", GoVersion: "go1.27.0"},
 	})
 

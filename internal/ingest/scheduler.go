@@ -3,10 +3,10 @@ package ingest
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"time"
 
 	"github.com/yama6a/codarr/internal/pkg/clock"
+	"go.uber.org/zap"
 )
 
 // RecheckInterval bounds how long a settings change takes to be noticed when the
@@ -19,16 +19,16 @@ type Scheduler struct {
 	store   ScanStore
 	scanner *Scanner
 	clock   clock.Clock
-	logger  *slog.Logger
+	logger  *zap.Logger
 }
 
 // NewScheduler returns a Scheduler.
-func NewScheduler(st ScanStore, scanner *Scanner, clk clock.Clock, logger *slog.Logger) *Scheduler {
+func NewScheduler(st ScanStore, scanner *Scanner, clk clock.Clock, logger *zap.Logger) *Scheduler {
 	return &Scheduler{
 		store:   st,
 		scanner: scanner,
 		clock:   clk,
-		logger:  logger.With(slog.String("component", "ingest.scheduler")),
+		logger:  logger.With(zap.String("component", "ingest.scheduler")),
 	}
 }
 
@@ -58,7 +58,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 				return nil
 			}
 
-			s.logger.Error("scheduled scan failed", slog.String("error", err.Error()))
+			s.logger.Error("scheduled scan failed", zap.Error(err))
 		}
 	}
 }
@@ -68,8 +68,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 func (s *Scheduler) nextWait(ctx context.Context) (time.Duration, bool) {
 	settings, err := s.store.GetSettings(ctx)
 	if err != nil {
-		s.logger.Error("could not read settings, retrying",
-			slog.String("error", err.Error()))
+		s.logger.Error("could not read settings, retrying", zap.Error(err))
 
 		return RecheckInterval, false
 	}
@@ -81,7 +80,7 @@ func (s *Scheduler) nextWait(ctx context.Context) (time.Duration, bool) {
 	schedule, err := ParseCron(settings.ScanCron)
 	if err != nil {
 		s.logger.Error("scan_cron is not a schedule Codarr can read, so no scan is running",
-			slog.String("scan_cron", settings.ScanCron), slog.String("error", err.Error()))
+			zap.String("scan_cron", settings.ScanCron), zap.Error(err))
 
 		return RecheckInterval, false
 	}
@@ -91,7 +90,7 @@ func (s *Scheduler) nextWait(ctx context.Context) (time.Duration, bool) {
 	next := schedule.Next(now)
 	if next.IsZero() {
 		s.logger.Error("scan_cron matches no time in the next few years",
-			slog.String("scan_cron", settings.ScanCron))
+			zap.String("scan_cron", settings.ScanCron))
 
 		return RecheckInterval, false
 	}

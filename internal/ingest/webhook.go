@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log/slog"
 	"path/filepath"
 
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/fsx"
 	"github.com/yama6a/codarr/internal/pkg/pathmap"
 	"github.com/yama6a/codarr/internal/pkg/store"
+	"go.uber.org/zap"
 )
 
 // EventType is the *arr eventType field. Anything not listed is acknowledged
@@ -69,16 +69,16 @@ type Webhook struct {
 	store    WebhookStore
 	analyzer FileAnalyzer
 	fs       FS
-	logger   *slog.Logger
+	logger   *zap.Logger
 }
 
 // NewWebhook returns a Webhook.
-func NewWebhook(st WebhookStore, analyzer FileAnalyzer, fs FS, logger *slog.Logger) *Webhook {
+func NewWebhook(st WebhookStore, analyzer FileAnalyzer, fs FS, logger *zap.Logger) *Webhook {
 	return &Webhook{
 		store:    st,
 		analyzer: analyzer,
 		fs:       fs,
-		logger:   logger.With(slog.String("component", "ingest.webhook")),
+		logger:   logger.With(zap.String("component", "ingest.webhook")),
 	}
 }
 
@@ -140,8 +140,8 @@ func (w *Webhook) ingest(ctx context.Context, instance domain.ArrInstance, ev Ev
 			// One bad file does not fail the webhook: the *arr would retry the
 			// whole event, and the daily scan covers what is missed anyway.
 			w.logger.Error("webhook analysis failed",
-				slog.String("instance", instance.Name),
-				slog.String("path", p), slog.String("error", err.Error()))
+				zap.String("instance", instance.Name),
+				zap.String("path", p), zap.Error(err))
 
 			continue
 		}
@@ -229,7 +229,7 @@ func (w *Webhook) mapPaths(instance domain.ArrInstance, mapper *pathmap.Mapper, 
 	for _, r := range remote {
 		if pathmap.Normalise(r) == "" {
 			w.logger.Warn("webhook path is not absolute, ignoring",
-				slog.String("instance", instance.Name), slog.String("path", r))
+				zap.String("instance", instance.Name), zap.String("path", r))
 
 			continue
 		}
@@ -240,7 +240,7 @@ func (w *Webhook) mapPaths(instance domain.ArrInstance, mapper *pathmap.Mapper, 
 			// Every live instance reports /media (VERIFY.md), so an unmapped path would
 			// be attributed to the wrong instance or to none.
 			w.logger.Warn("webhook path has no mapping for this instance",
-				slog.String("instance", instance.Name), slog.String("path", r))
+				zap.String("instance", instance.Name), zap.String("path", r))
 		}
 
 		out = append(out, local)
@@ -258,7 +258,7 @@ func (w *Webhook) walkFolder(instance domain.ArrInstance, mapper *pathmap.Mapper
 
 	if !mapped {
 		w.logger.Warn("webhook folder has no mapping for this instance",
-			slog.String("instance", instance.Name), slog.String("path", remote))
+			zap.String("instance", instance.Name), zap.String("path", remote))
 	}
 
 	var out []string
@@ -284,8 +284,8 @@ func (w *Webhook) walkFolder(instance domain.ArrInstance, mapper *pathmap.Mapper
 	})
 	if err != nil {
 		w.logger.Error("could not walk the renamed folder",
-			slog.String("instance", instance.Name),
-			slog.String("path", local), slog.String("error", err.Error()))
+			zap.String("instance", instance.Name),
+			zap.String("path", local), zap.Error(err))
 	}
 
 	return out

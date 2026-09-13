@@ -10,13 +10,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/url"
 	"time"
 
 	migrate "github.com/rubenv/sql-migrate"
 	"github.com/yama6a/codarr/data"
-
+	"go.uber.org/zap"
 	_ "modernc.org/sqlite" // pure-Go SQLite driver; the binary stays CGO-free
 )
 
@@ -92,7 +91,7 @@ func Open(ctx context.Context, path string) (*DB, error) {
 }
 
 // Migrate applies the embedded migrations through the write pool.
-func Migrate(db *DB, logger *slog.Logger) error {
+func Migrate(db *DB, logger *zap.Logger) error {
 	source := migrate.EmbedFileSystemMigrationSource{
 		FileSystem: data.FS,
 		Root:       migrationsRoot,
@@ -103,13 +102,13 @@ func Migrate(db *DB, logger *slog.Logger) error {
 		return fmt.Errorf("run migrations: %w", err)
 	}
 
-	logger.Info("migrations complete", slog.Int("applied", n))
+	logger.Info("migrations complete", zap.Int("applied", n))
 
 	return nil
 }
 
 // OpenAndMigrate is the wiring path in cmd/codarr: open, migrate, hand back.
-func OpenAndMigrate(ctx context.Context, path string, logger *slog.Logger) (*DB, error) {
+func OpenAndMigrate(ctx context.Context, path string, logger *zap.Logger) (*DB, error) {
 	db, err := Open(ctx, path)
 	if err != nil {
 		return nil, err

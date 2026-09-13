@@ -18,7 +18,9 @@ export function FailureSection({ job, retrying, onRetry }: FailureSectionProps) 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Icon name="error" size={20} className="text-red-400" />
-          <span className="text-sm font-semibold text-red-100">{failureLabel(job.failure_code)}</span>
+          <span className="text-sm font-semibold text-red-100">
+            {failureLabel(job.failure_code)}
+          </span>
           <Badge tone={interrupted ? 'warning' : 'danger'}>{job.failure_code ?? 'unknown'}</Badge>
           {job.attempt > 1 && <Badge tone="warning">Attempt {job.attempt}</Badge>}
         </div>
@@ -35,11 +37,15 @@ export function FailureSection({ job, retrying, onRetry }: FailureSectionProps) 
         </p>
       )}
 
-      {job.failure_message && <p className="text-sm break-words text-red-100">{job.failure_message}</p>}
+      {job.failure_message && (
+        <p className="text-sm break-words text-red-100">{job.failure_message}</p>
+      )}
 
       {job.stderr_tail && (
         <div>
-          <p className="mb-1 text-[11px] font-medium tracking-wide text-slate-400 uppercase">ffmpeg stderr tail</p>
+          <p className="mb-1 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+            ffmpeg stderr tail
+          </p>
           <pre className="max-h-64 overflow-auto rounded-lg bg-slate-950 p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-red-300">
             {job.stderr_tail}
           </pre>

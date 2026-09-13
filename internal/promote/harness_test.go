@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -20,6 +19,7 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/fsx"
 	"github.com/yama6a/codarr/internal/promote"
 	"github.com/yama6a/codarr/internal/promote/mock"
+	"go.uber.org/zap"
 )
 
 const (
@@ -516,7 +516,7 @@ func newHarness(t *testing.T) *harness {
 		Fingerprinter: h.fp,
 		Notifier:      h.notifier,
 		Copier:        h.copier,
-		Logger:        slog.New(slog.DiscardHandler),
+		Logger:        zap.NewNop(),
 		TempDir:       tempDir,
 	}
 	h.promoter = promote.New(h.deps)

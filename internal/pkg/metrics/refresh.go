@@ -2,12 +2,12 @@ package metrics
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"github.com/yama6a/codarr/internal/pkg/clock"
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/store"
+	"go.uber.org/zap"
 )
 
 // RefreshInterval is how often the state-derived series are re-read; it only has to
@@ -31,13 +31,13 @@ type Refresher struct {
 	metrics  *Metrics
 	source   Source
 	clk      clock.Clock
-	log      *slog.Logger
+	log      *zap.Logger
 	interval time.Duration
 	probes   []Probe
 }
 
 // NewRefresher returns a Refresher. A zero interval means RefreshInterval.
-func NewRefresher(m *Metrics, src Source, clk clock.Clock, log *slog.Logger,
+func NewRefresher(m *Metrics, src Source, clk clock.Clock, log *zap.Logger,
 	interval time.Duration, probes ...Probe,
 ) *Refresher {
 	if interval <= 0 {
@@ -48,7 +48,7 @@ func NewRefresher(m *Metrics, src Source, clk clock.Clock, log *slog.Logger,
 		metrics:  m,
 		source:   src,
 		clk:      clk,
-		log:      log.With(slog.String("component", "metrics")),
+		log:      log.With(zap.String("component", "metrics")),
 		interval: interval,
 		probes:   probes,
 	}
@@ -100,5 +100,5 @@ func (r *Refresher) warn(ctx context.Context, msg string, err error) {
 		return
 	}
 
-	r.log.WarnContext(ctx, msg, slog.String("error", err.Error()))
+	r.log.Warn(msg, zap.Error(err))
 }

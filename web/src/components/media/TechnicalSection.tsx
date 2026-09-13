@@ -18,13 +18,25 @@ export function TechnicalSection({ argv, sourceProbe, outputProbe }: TechnicalSe
   return (
     <div className="space-y-2">
       <Collapsible title="ffmpeg argv">
-        {argv && argv.length > 0 ? <Block text={argv.join(' \\\n  ')} /> : <p className="text-xs text-slate-500">No argv recorded.</p>}
+        {argv && argv.length > 0 ? (
+          <Block text={argv.join(' \\\n  ')} />
+        ) : (
+          <p className="text-xs text-slate-500">No argv recorded.</p>
+        )}
       </Collapsible>
       <Collapsible title="ffprobe output (source)">
-        {sourceProbe ? <Block text={sourceProbe} /> : <p className="text-xs text-slate-500">No probe stored.</p>}
+        {sourceProbe ? (
+          <Block text={sourceProbe} />
+        ) : (
+          <p className="text-xs text-slate-500">No probe stored.</p>
+        )}
       </Collapsible>
       <Collapsible title="ffprobe output (staged result)">
-        {outputProbe ? <Block text={outputProbe} /> : <p className="text-xs text-slate-500">No probe stored.</p>}
+        {outputProbe ? (
+          <Block text={outputProbe} />
+        ) : (
+          <p className="text-xs text-slate-500">No probe stored.</p>
+        )}
       </Collapsible>
     </div>
   );

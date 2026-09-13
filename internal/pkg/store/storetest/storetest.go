@@ -5,12 +5,12 @@
 package storetest
 
 import (
-	"log/slog"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yama6a/codarr/internal/pkg/store"
+	"go.uber.org/zap"
 )
 
 // NewDB returns a Store over a fresh, migrated database.
@@ -46,5 +46,5 @@ func NewStore(t *testing.T, db *store.DB) store.Store {
 	return store.New(db, Logger())
 }
 
-// Logger is a discarding slog.Logger, so store logging does not colour test output.
-func Logger() *slog.Logger { return slog.New(slog.DiscardHandler) }
+// Logger is a no-op logger, so store logging does not colour test output.
+func Logger() *zap.Logger { return zap.NewNop() }

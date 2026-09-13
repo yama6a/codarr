@@ -2,10 +2,10 @@ package api
 
 import (
 	"context"
-	"log/slog"
 
 	gen "github.com/yama6a/codarr/api"
 	"github.com/yama6a/codarr/internal/pkg/domain"
+	"go.uber.org/zap"
 )
 
 // MaxScanRateLimitFPS bounds the stat rate a scan is allowed to ask for. Zero
@@ -19,7 +19,7 @@ func (s *Server) GetSettings(
 ) (gen.GetSettingsResponseObject, error) {
 	current, err := s.store.GetSettings(ctx)
 	if err != nil {
-		return gen.GetSettingsdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.GetSettingsdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.GetSettings200JSONResponse(settings(current)), nil
@@ -31,36 +31,36 @@ func (s *Server) UpdateSettings(
 	ctx context.Context, req gen.UpdateSettingsRequestObject,
 ) (gen.UpdateSettingsResponseObject, error) {
 	if req.Body == nil {
-		return gen.UpdateSettingsdefaultJSONResponse(s.fail(ctx, badRequest("a settings body is required"))), nil
+		return gen.UpdateSettingsdefaultJSONResponse(s.fail(badRequest("a settings body is required"))), nil
 	}
 
 	current, err := s.store.GetSettings(ctx)
 	if err != nil {
-		return gen.UpdateSettingsdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.UpdateSettingsdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	updated, err := applySettings(current, *req.Body)
 	if err != nil {
-		return gen.UpdateSettingsdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.UpdateSettingsdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	if err := s.store.UpdateSettings(ctx, updated); err != nil {
-		return gen.UpdateSettingsdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.UpdateSettingsdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	stored, err := s.store.GetSettings(ctx)
 	if err != nil {
-		return gen.UpdateSettingsdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.UpdateSettingsdefaultJSONResponse(s.fail(err)), nil
 	}
 
-	s.warnRestartRequired(ctx, current, stored)
+	s.warnRestartRequired(current, stored)
 
 	return gen.UpdateSettings200JSONResponse(settings(stored)), nil
 }
 
 // Both are fixed at construction in cmd/codarr: the temp dir is read inside the
 // allocation-free window of plan.md 15.6, the capability cache is keyed on the device.
-func (s *Server) warnRestartRequired(ctx context.Context, before, after domain.Settings) {
+func (s *Server) warnRestartRequired(before, after domain.Settings) {
 	var changed []string
 
 	if before.TempDir != after.TempDir {
@@ -75,8 +75,8 @@ func (s *Server) warnRestartRequired(ctx context.Context, before, after domain.S
 		return
 	}
 
-	s.log.WarnContext(ctx, "a setting that is read once at startup changed; restart Codarr for it to take effect",
-		slog.Any("settings", changed))
+	s.log.Warn("a setting that is read once at startup changed; restart Codarr for it to take effect",
+		zap.Any("settings", changed))
 }
 
 func applySettings(current domain.Settings, in gen.SettingsUpdate) (domain.Settings, error) {

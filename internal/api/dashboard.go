@@ -23,7 +23,7 @@ func (s *Server) GetDashboard(
 ) (gen.GetDashboardResponseObject, error) {
 	out, err := s.dashboard(ctx)
 	if err != nil {
-		return gen.GetDashboarddefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.GetDashboarddefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.GetDashboard200JSONResponse(out), nil

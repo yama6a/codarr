@@ -58,7 +58,8 @@ export function ArrInstanceEditor({ instance, saving, onSave, onCancel }: ArrIns
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const creating = instance === null;
-  const valid = form.name.trim() !== '' && form.base_url.trim() !== '' && form.api_key.trim() !== '';
+  const valid =
+    form.name.trim() !== '' && form.base_url.trim() !== '' && form.api_key.trim() !== '';
 
   return (
     <Modal
@@ -78,7 +79,11 @@ export function ArrInstanceEditor({ instance, saving, onSave, onCancel }: ArrIns
     >
       <div className="space-y-5">
         <FormField label="Name" required>
-          <TextInput value={form.name} onChange={(next) => set('name', next)} placeholder="radarr-4k" />
+          <TextInput
+            value={form.name}
+            onChange={(next) => set('name', next)}
+            placeholder="radarr-4k"
+          />
         </FormField>
 
         <FormField label="Flavour" required>
@@ -116,7 +121,11 @@ export function ArrInstanceEditor({ instance, saving, onSave, onCancel }: ArrIns
               ariaLabel="API key"
             />
           ) : (
-            <SecretInput label="API key" value={form.api_key} onChange={(next) => set('api_key', next)} />
+            <SecretInput
+              label="API key"
+              value={form.api_key}
+              onChange={(next) => set('api_key', next)}
+            />
           )}
         </FormField>
 

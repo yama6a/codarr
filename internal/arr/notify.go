@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"github.com/yama6a/codarr/internal/promote"
+	"go.uber.org/zap"
 )
 
 // MediaServer is the Plex half of the post-promotion notification, narrowed to
@@ -35,17 +35,13 @@ type OwnerResolver interface {
 type Notifier struct {
 	plex     MediaServer
 	resolver OwnerResolver
-	log      *slog.Logger
+	log      *zap.Logger
 }
 
 var _ promote.Notifier = (*Notifier)(nil)
 
 // NewNotifier returns the composed notifier.
-func NewNotifier(plex MediaServer, resolver OwnerResolver, log *slog.Logger) *Notifier {
-	if log == nil {
-		log = slog.Default()
-	}
-
+func NewNotifier(plex MediaServer, resolver OwnerResolver, log *zap.Logger) *Notifier {
 	return &Notifier{plex: plex, resolver: resolver, log: log}
 }
 
@@ -57,8 +53,7 @@ func (n *Notifier) NotifyPromoted(ctx context.Context, path string) error {
 	if n.plex != nil {
 		if err := n.plex.NotifyPromoted(ctx, path); err != nil {
 			failures = append(failures, fmt.Errorf("notifying plex about %s failed: %w", path, err))
-			n.log.WarnContext(ctx, "notifying plex after a promotion failed",
-				slog.String("path", path), slog.Any("error", err))
+			n.log.Warn("notifying plex after a promotion failed", zap.String("path", path), zap.Error(err))
 		}
 	}
 
@@ -76,15 +71,13 @@ func (n *Notifier) notifyArr(ctx context.Context, path string) error {
 
 	owner, ok, err := n.resolver.ResolveOwner(ctx, path)
 	if err != nil {
-		n.log.WarnContext(ctx, "resolving the owning *arr instance failed",
-			slog.String("path", path), slog.Any("error", err))
+		n.log.Warn("resolving the owning *arr instance failed", zap.String("path", path), zap.Error(err))
 
 		return fmt.Errorf("resolving the *arr instance owning %s failed: %w", path, err)
 	}
 
 	if !ok || owner.Client == nil {
-		n.log.InfoContext(ctx, "no *arr instance owns the promoted path, nothing to notify",
-			slog.String("path", path))
+		n.log.Info("no *arr instance owns the promoted path, nothing to notify", zap.String("path", path))
 
 		return nil
 	}
@@ -100,8 +93,8 @@ func (n *Notifier) tell(ctx context.Context, path string, owner Owner) error {
 	if owner.RescanAfter {
 		if err := owner.Client.Rescan(ctx, owner.Item); err != nil {
 			failures = append(failures, fmt.Errorf("rescanning %s on %s failed: %w", path, id.Name, err))
-			n.log.WarnContext(ctx, "rescan after a promotion failed",
-				slog.String("path", path), slog.String("instance", id.Name), slog.Any("error", err))
+			n.log.Warn("rescan after a promotion failed",
+				zap.String("path", path), zap.String("instance", id.Name), zap.Error(err))
 		}
 	}
 
@@ -110,8 +103,8 @@ func (n *Notifier) tell(ctx context.Context, path string, owner Owner) error {
 	if owner.UnmonitorAfter {
 		if err := owner.Client.Unmonitor(ctx, owner.Item); err != nil {
 			failures = append(failures, fmt.Errorf("unmonitoring %s on %s failed: %w", path, id.Name, err))
-			n.log.WarnContext(ctx, "unmonitor after a promotion failed",
-				slog.String("path", path), slog.String("instance", id.Name), slog.Any("error", err))
+			n.log.Warn("unmonitor after a promotion failed",
+				zap.String("path", path), zap.String("instance", id.Name), zap.Error(err))
 		}
 	}
 

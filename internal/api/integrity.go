@@ -19,7 +19,7 @@ func (s *Server) VerifyMediaIntegrity(
 ) (gen.VerifyMediaIntegrityResponseObject, error) {
 	res, err := s.verifyOne(ctx, req.Id)
 	if err != nil {
-		return gen.VerifyMediaIntegritydefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.VerifyMediaIntegritydefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.VerifyMediaIntegrity200JSONResponse(res), nil
@@ -35,7 +35,7 @@ func (s *Server) VerifyMediaIntegrityBulk(
 	}
 
 	if len(req.Body.Ids) > MaxSelectionSize {
-		return gen.VerifyMediaIntegrityBulkdefaultJSONResponse(s.fail(ctx, badRequest(
+		return gen.VerifyMediaIntegrityBulkdefaultJSONResponse(s.fail(badRequest(
 			"at most %d ids", MaxSelectionSize))), nil
 	}
 
@@ -49,7 +49,7 @@ func (s *Server) VerifyMediaIntegrityBulk(
 			var apiErr *Error
 			if errors.As(err, &apiErr) || ctx.Err() != nil {
 				//nolint:nilerr // the failure is rendered into the response, not dropped
-				return gen.VerifyMediaIntegrityBulkdefaultJSONResponse(s.fail(ctx, err)), nil
+				return gen.VerifyMediaIntegrityBulkdefaultJSONResponse(s.fail(err)), nil
 			}
 
 			res = gen.IntegrityResult{

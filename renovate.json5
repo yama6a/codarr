@@ -33,5 +33,13 @@
       ],
       automerge: true,
     },
+    {
+      // openapi-typescript 7.13 peers typescript ^5, and a TS 6 bump takes `npm run generate` down.
+      // Lift this once openapi-typescript widens the peer range.
+      description: "openapi-typescript@7.13 peers typescript ^5",
+      matchFileNames: ["web/package.json"],
+      matchPackageNames: ["typescript"],
+      allowedVersions: "<6.0.0",
+    },
   ],
 }

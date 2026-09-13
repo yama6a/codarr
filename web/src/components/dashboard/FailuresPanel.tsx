@@ -23,7 +23,9 @@ export function FailuresPanel({ jobs, retryingId, onRetry, onOpen }: FailuresPan
             <li key={job.id} className="flex items-start gap-3 py-2.5">
               <button onClick={() => onOpen(job)} className="min-w-0 flex-1 text-left">
                 <div className="flex items-center gap-2">
-                  <span className="min-w-0 truncate text-sm text-slate-200">{job.media_filename}</span>
+                  <span className="min-w-0 truncate text-sm text-slate-200">
+                    {job.media_filename}
+                  </span>
                   <Badge tone={job.failure_code === 'interrupted' ? 'warning' : 'danger'}>
                     {failureLabel(job.failure_code)}
                   </Badge>
@@ -31,7 +33,9 @@ export function FailuresPanel({ jobs, retryingId, onRetry, onOpen }: FailuresPan
                 {job.failure_message && (
                   <p className="mt-1 line-clamp-2 text-xs text-red-300">{job.failure_message}</p>
                 )}
-                <p className="mt-0.5 text-[11px] text-slate-500">{formatDateTime(job.finished_at)}</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  {formatDateTime(job.finished_at)}
+                </p>
               </button>
               <Button
                 variant="secondary"

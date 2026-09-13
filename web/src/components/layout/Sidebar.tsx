@@ -49,7 +49,9 @@ export default function Sidebar() {
           ))}
 
           <div className="mt-4 mb-2 px-3">
-            <span className="text-[10px] font-bold tracking-wider text-gray-500 uppercase">Settings</span>
+            <span className="text-[10px] font-bold tracking-wider text-gray-500 uppercase">
+              Settings
+            </span>
           </div>
           {settings.map((item) => (
             <NavLink key={item.to} to={item.to} className={linkClasses}>

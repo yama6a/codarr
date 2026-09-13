@@ -13,7 +13,15 @@ interface ModalProps {
 
 const widths = { md: 'max-w-lg', lg: 'max-w-3xl', xl: 'max-w-5xl' };
 
-export function Modal({ open, onClose, title, subtitle, size = 'lg', footer, children }: ModalProps) {
+export function Modal({
+  open,
+  onClose,
+  title,
+  subtitle,
+  size = 'lg',
+  footer,
+  children,
+}: ModalProps) {
   useEffect(() => {
     if (!open) {
       return;
@@ -42,7 +50,9 @@ export function Modal({ open, onClose, title, subtitle, size = 'lg', footer, chi
         <header className="flex items-start justify-between gap-4 border-b border-slate-800 px-6 py-4">
           <div className="min-w-0">
             <h2 className="truncate text-lg font-semibold text-white">{title}</h2>
-            {subtitle && <p className="mt-0.5 truncate font-mono text-xs text-slate-400">{subtitle}</p>}
+            {subtitle && (
+              <p className="mt-0.5 truncate font-mono text-xs text-slate-400">{subtitle}</p>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -54,7 +64,9 @@ export function Modal({ open, onClose, title, subtitle, size = 'lg', footer, chi
         </header>
         <div className="max-h-[70vh] overflow-y-auto px-6 py-5">{children}</div>
         {footer && (
-          <footer className="flex items-center justify-end gap-3 border-t border-slate-800 px-6 py-4">{footer}</footer>
+          <footer className="flex items-center justify-end gap-3 border-t border-slate-800 px-6 py-4">
+            {footer}
+          </footer>
         )}
       </div>
     </div>

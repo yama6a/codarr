@@ -126,9 +126,14 @@ export default function SettingsPlex() {
       pinTimer.current = setInterval(async () => {
         try {
           const poll = await unwrap(
-            api.GET('/api/plex/auth/poll/{pin_id}', { params: { path: { pin_id: started.pin_id } } }),
+            api.GET('/api/plex/auth/poll/{pin_id}', {
+              params: { path: { pin_id: started.pin_id } },
+            }),
           );
-          setPinMessage(poll.message ?? (poll.authorized ? 'Authorized.' : 'Waiting for the PIN to be claimed.'));
+          setPinMessage(
+            poll.message ??
+              (poll.authorized ? 'Authorized.' : 'Waiting for the PIN to be claimed.'),
+          );
           if (poll.token_stored) {
             clearInterval(pinTimer.current);
             setPin(null);
@@ -153,7 +158,9 @@ export default function SettingsPlex() {
       <header className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Plex</h1>
-          <p className="mt-1 text-sm text-slate-400">One server. Sessions, refresh, analyze and path mapping.</p>
+          <p className="mt-1 text-sm text-slate-400">
+            One server. Sessions, refresh, analyze and path mapping.
+          </p>
         </div>
         <Button icon="save" loading={saving} onClick={save}>
           Save
@@ -295,13 +302,20 @@ export default function SettingsPlex() {
         title="Libraries"
         icon="library"
         actions={
-          <Button variant="secondary" icon="refresh" loading={loadingLibraries} onClick={loadLibraries}>
+          <Button
+            variant="secondary"
+            icon="refresh"
+            loading={loadingLibraries}
+            onClick={loadLibraries}
+          >
             Load
           </Button>
         }
       >
         {libraries === null ? (
-          <p className="text-sm text-slate-400">Load the section list from the server to see it here.</p>
+          <p className="text-sm text-slate-400">
+            Load the section list from the server to see it here.
+          </p>
         ) : libraries.length === 0 ? (
           <EmptyState icon="library" message="Plex reports no library sections." />
         ) : (
@@ -309,7 +323,10 @@ export default function SettingsPlex() {
             {libraries.map((library) => (
               <li key={library.key} className="py-2.5">
                 <p className="text-sm text-slate-100">
-                  {library.title} <span className="text-xs text-slate-500">({library.type}, key {library.key})</span>
+                  {library.title}{' '}
+                  <span className="text-xs text-slate-500">
+                    ({library.type}, key {library.key})
+                  </span>
                 </p>
                 <p className="font-mono text-xs text-slate-500">{library.locations.join(', ')}</p>
               </li>

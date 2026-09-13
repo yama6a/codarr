@@ -2,11 +2,11 @@ package api
 
 import (
 	"context"
-	"log/slog"
 
 	gen "github.com/yama6a/codarr/api"
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/pathmap"
+	"go.uber.org/zap"
 )
 
 // ListRoots carries the contested roots too, because plan.md 18.4 wants a conflict shown
@@ -14,12 +14,12 @@ import (
 func (s *Server) ListRoots(ctx context.Context, _ gen.ListRootsRequestObject) (gen.ListRootsResponseObject, error) {
 	roots, err := s.store.ListRoots(ctx)
 	if err != nil {
-		return gen.ListRootsdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ListRootsdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	names, err := s.instanceNames(ctx)
 	if err != nil {
-		return gen.ListRootsdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ListRootsdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	out := make([]gen.Root, 0, len(roots))
@@ -55,17 +55,17 @@ func (s *Server) CreateRoot(
 	ctx context.Context, req gen.CreateRootRequestObject,
 ) (gen.CreateRootResponseObject, error) {
 	if req.Body == nil {
-		return gen.CreateRootdefaultJSONResponse(s.fail(ctx, badRequest("a root body is required"))), nil
+		return gen.CreateRootdefaultJSONResponse(s.fail(badRequest("a root body is required"))), nil
 	}
 
 	path, err := s.rootPath(ctx, req.Body.Path)
 	if err != nil {
-		return gen.CreateRootdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.CreateRootdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	if req.Body.ArrInstanceId != nil {
 		if _, err := s.store.GetArrInstance(ctx, *req.Body.ArrInstanceId); err != nil {
-			return gen.CreateRootdefaultJSONResponse(s.fail(ctx, err)), nil
+			return gen.CreateRootdefaultJSONResponse(s.fail(err)), nil
 		}
 	}
 
@@ -75,12 +75,12 @@ func (s *Server) CreateRoot(
 		Enabled:       boolOr(req.Body.Enabled, true),
 	})
 	if err != nil {
-		return gen.CreateRootdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.CreateRootdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	names, err := s.instanceNames(ctx)
 	if err != nil {
-		return gen.CreateRootdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.CreateRootdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.CreateRoot201JSONResponse(root(created, instanceName(names, created.ArrInstanceID), nil)), nil
@@ -92,7 +92,7 @@ func (s *Server) DeleteRoot(
 	ctx context.Context, req gen.DeleteRootRequestObject,
 ) (gen.DeleteRootResponseObject, error) {
 	if err := s.store.DeleteRoot(ctx, req.Id); err != nil {
-		return gen.DeleteRootdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.DeleteRootdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.DeleteRoot204Response{}, nil
@@ -102,7 +102,7 @@ func (s *Server) DeleteRoot(
 // and the request would time out long before it finished.
 func (s *Server) ScanRoot(ctx context.Context, req gen.ScanRootRequestObject) (gen.ScanRootResponseObject, error) {
 	if _, err := s.store.GetRoot(ctx, req.Id); err != nil {
-		return gen.ScanRootdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ScanRootdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	started := s.clk.Now()
@@ -122,18 +122,17 @@ func (s *Server) scanInBackground(rootID int64) {
 
 	report, err := s.scanner.ScanRoot(ctx, rootID)
 	if err != nil {
-		s.log.ErrorContext(ctx, "manual root scan failed",
-			slog.Int64("root_id", rootID), slog.String("error", err.Error()))
+		s.log.Error("manual root scan failed", zap.Int64("root_id", rootID), zap.Error(err))
 
 		return
 	}
 
-	s.log.InfoContext(ctx, "manual root scan finished",
-		slog.Int64("root_id", rootID),
-		slog.Int("walked", report.Walked),
-		slog.Int("analyzed", report.Analyzed),
-		slog.Int("queued", report.Queued),
-		slog.Int("missing", report.Missing))
+	s.log.Info("manual root scan finished",
+		zap.Int64("root_id", rootID),
+		zap.Int("walked", report.Walked),
+		zap.Int("analyzed", report.Analyzed),
+		zap.Int("queued", report.Queued),
+		zap.Int("missing", report.Missing))
 }
 
 func instanceName(names map[int64]string, id *int64) string {

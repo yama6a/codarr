@@ -30,15 +30,14 @@ Validated by executing it against an in-memory SQLite: 11 tables, 8 indexes,
 `foreign_keys=ON`. Following bolan's rule that the consolidated starting schema
 is never edited after landing; corrections ship as new numbered files.
 
-### Logging is `log/slog`, not zap
+### Logging is `go.uber.org/zap`, against `plan.md` 24
 
-`plan.md` section 24 says `log/slog` with a JSON handler explicitly. bolan-api
-uses `go.uber.org/zap`. The plan wins, and it happens to make the events-table
-sink cheaper: it is a plain `slog.Handler` wrapper rather than a custom
-`zapcore.Core`.
+`plan.md` section 24 asks for `log/slog` with a JSON handler. Every other repo
+in the org logs with zap and typed fields, and the shared golangci config is
+written for it, so the convention wins over the plan here.
 
-Consequence: `sloglint` in `.golangci.yaml` becomes meaningful rather than
-inert, and `go.uber.org/zap/zapcore.Core` came out of the `ireturn` allow list.
+The events-table sink is a `zapcore.Core` teed alongside the stdout core.
+Redaction wraps both, so a secret is masked whichever sink it was headed for.
 
 ### Migrations use `rubenv/sql-migrate` on SQLite
 
@@ -177,10 +176,10 @@ in `api/` and the hand-written handlers in `internal/api/`. Went with `api/`, in
 two files (`models.gen.go`, `server.gen.go`) as bolan does. The `oapi-codegen.yaml`
 snippet in 2.1 is now stale.
 
-### `//go:generate go run github.com/oapi-codegen/...` rather than a bare binary
+### `//go:generate go tool oapi-codegen ...` rather than a bare binary
 
-Pinned through `tools.go`, so `make generate` and CI need no separate install
-step. This is the form `plan.md` 2.1 shows.
+Pinned through Go 1.24 `tool` directives in `go.mod`, so `make generate` and CI
+need no separate install step.
 
 ### `always-prefix-enum-values: true` on both codegen configs
 
@@ -264,12 +263,6 @@ pattern does not skip `node_modules`. On a fresh CI checkout `go test ./...`
 would try to build a dependency's vendored Go. A nested module is the
 documented way to cut a subtree out of the parent module. There is no Go code
 under `web/`.
-
-### CI checks formatting drift, not just generated-code drift
-
-`make ci` runs `gofumpt -w .`, which rewrites rather than reports. Without a
-following `git diff --exit-code` the runner silently fixes formatting and the
-branch stays unformatted forever.
 
 ## *arr configuration
 

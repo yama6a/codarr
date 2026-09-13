@@ -31,6 +31,10 @@ RUN --mount=type=cache,target=/root/.cache/go-build,id=go-build-$TARGETARCH \
 # --- runtime ---
 FROM debian:bookworm-slim@sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171
 
+# The jellyfin key is fetched through a pipe, and the default /bin/sh -c would let curl fail
+# silently while gpg still succeeds.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # intel-media-va-driver-non-free lives in Debian's non-free component, which the stock image does not
 # enable. Without this sed the build fails at apt-get.
 # jellyfin-ffmpeg7 rather than distro ffmpeg: it is patched for this workload and handles HDR metadata

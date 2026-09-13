@@ -127,7 +127,10 @@ export default function SettingsRoots() {
 
       <Panel title={`Watch roots (${roots.length})`} icon="folder">
         {roots.length === 0 ? (
-          <EmptyState icon="folder" message="No roots yet. Import them from an instance or add one above." />
+          <EmptyState
+            icon="folder"
+            message="No roots yet. Import them from an instance or add one above."
+          />
         ) : (
           <ul className="divide-y divide-slate-800">
             {roots.map((root) => (
@@ -135,18 +138,29 @@ export default function SettingsRoots() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-mono text-sm text-slate-100">{root.path}</p>
                   <p className="mt-0.5 text-xs text-slate-500">
-                    {root.arr_instance_name ?? 'no instance'}, {(root.media_file_count ?? 0).toLocaleString()} files,
-                    added {formatDateTime(root.created_at)}
+                    {root.arr_instance_name ?? 'no instance'},{' '}
+                    {(root.media_file_count ?? 0).toLocaleString()} files, added{' '}
+                    {formatDateTime(root.created_at)}
                   </p>
                 </div>
                 {root.imported && <Badge tone="info">imported</Badge>}
                 <Badge tone={root.enabled ? 'success' : 'neutral'}>
                   {root.enabled ? 'Enabled' : 'Disabled'}
                 </Badge>
-                <Button variant="ghost" icon="probe" loading={busyId === root.id} onClick={() => scan(root)}>
+                <Button
+                  variant="ghost"
+                  icon="probe"
+                  loading={busyId === root.id}
+                  onClick={() => scan(root)}
+                >
                   Scan now
                 </Button>
-                <Button variant="ghost" icon="trash" loading={busyId === root.id} onClick={() => remove(root)}>
+                <Button
+                  variant="ghost"
+                  icon="trash"
+                  loading={busyId === root.id}
+                  onClick={() => remove(root)}
+                >
                   Remove
                 </Button>
               </li>

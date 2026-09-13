@@ -7,14 +7,18 @@ interface PaginationProps {
   onPageChange: (offset: number) => void;
 }
 
-const btnBase = 'flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm font-medium transition-colors';
+const btnBase =
+  'flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm font-medium transition-colors';
 const btnEnabled = 'border border-slate-700 text-slate-300 hover:bg-slate-800';
 const btnDisabled = 'border border-slate-800 text-slate-600 cursor-not-allowed';
 const btnActive = 'border border-primary bg-primary text-white';
 
 function pageNumbers(currentPage: number, totalPages: number): number[] {
   const maxVisible = 5;
-  const end = Math.min(totalPages, Math.max(1, currentPage - Math.floor(maxVisible / 2)) + maxVisible - 1);
+  const end = Math.min(
+    totalPages,
+    Math.max(1, currentPage - Math.floor(maxVisible / 2)) + maxVisible - 1,
+  );
   const start = Math.max(1, end - maxVisible + 1);
   return Array.from({ length: end - start + 1 }, (_, i) => start + i);
 }

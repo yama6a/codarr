@@ -1,6 +1,6 @@
 module github.com/yama6a/codarr
 
-go 1.27.0
+go 1.27.1
 
 require (
 	github.com/getkin/kin-openapi v0.149.0

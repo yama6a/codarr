@@ -5,4 +5,4 @@
 // There is no Go code under web/. Do not add any.
 module github.com/yama6a/codarr/web
 
-go 1.27.0
+go 1.27.1

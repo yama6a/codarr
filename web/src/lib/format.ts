@@ -56,6 +56,21 @@ export function formatDateTime(iso: string | undefined | null): string {
   });
 }
 
+/** formatDateParts splits a timestamp into a date line and a time line; "never" comes back with no time. */
+export function formatDateParts(iso: string | undefined | null): [string, string | null] {
+  if (!iso) {
+    return ['never', null];
+  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return [iso, null];
+  }
+  return [
+    date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' }),
+    date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+  ];
+}
+
 export function formatTime(iso: string | undefined | null): string {
   if (!iso) {
     return '';

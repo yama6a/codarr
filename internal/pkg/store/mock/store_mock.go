@@ -96,6 +96,9 @@ var _ store.Store = &StoreMock{}
 //			ListArrPathMappingsFunc: func(ctx context.Context, arrInstanceID int64) ([]domain.PathMapping, error) {
 //				panic("mock out the ListArrPathMappings method")
 //			},
+//			ListCompletionsFunc: func(ctx context.Context, limit int, offset int) ([]domain.Completion, int, error) {
+//				panic("mock out the ListCompletions method")
+//			},
 //			ListEventsFunc: func(ctx context.Context, f store.EventFilter) ([]domain.Event, error) {
 //				panic("mock out the ListEvents method")
 //			},
@@ -282,6 +285,9 @@ type StoreMock struct {
 
 	// ListArrPathMappingsFunc mocks the ListArrPathMappings method.
 	ListArrPathMappingsFunc func(ctx context.Context, arrInstanceID int64) ([]domain.PathMapping, error)
+
+	// ListCompletionsFunc mocks the ListCompletions method.
+	ListCompletionsFunc func(ctx context.Context, limit int, offset int) ([]domain.Completion, int, error)
 
 	// ListEventsFunc mocks the ListEvents method.
 	ListEventsFunc func(ctx context.Context, f store.EventFilter) ([]domain.Event, error)
@@ -560,6 +566,15 @@ type StoreMock struct {
 			Ctx context.Context
 			// ArrInstanceID is the arrInstanceID argument value.
 			ArrInstanceID int64
+		}
+		// ListCompletions holds details about calls to the ListCompletions method.
+		ListCompletions []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Limit is the limit argument value.
+			Limit int
+			// Offset is the offset argument value.
+			Offset int
 		}
 		// ListEvents holds details about calls to the ListEvents method.
 		ListEvents []struct {
@@ -856,6 +871,7 @@ type StoreMock struct {
 	lockGetThroughputStat         sync.RWMutex
 	lockListArrInstances          sync.RWMutex
 	lockListArrPathMappings       sync.RWMutex
+	lockListCompletions           sync.RWMutex
 	lockListEvents                sync.RWMutex
 	lockListHWCapabilities        sync.RWMutex
 	lockListJobs                  sync.RWMutex
@@ -1782,6 +1798,46 @@ func (mock *StoreMock) ListArrPathMappingsCalls() []struct {
 	mock.lockListArrPathMappings.RLock()
 	calls = mock.calls.ListArrPathMappings
 	mock.lockListArrPathMappings.RUnlock()
+	return calls
+}
+
+// ListCompletions calls ListCompletionsFunc.
+func (mock *StoreMock) ListCompletions(ctx context.Context, limit int, offset int) ([]domain.Completion, int, error) {
+	if mock.ListCompletionsFunc == nil {
+		panic("StoreMock.ListCompletionsFunc: method is nil but Store.ListCompletions was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		Limit  int
+		Offset int
+	}{
+		Ctx:    ctx,
+		Limit:  limit,
+		Offset: offset,
+	}
+	mock.lockListCompletions.Lock()
+	mock.calls.ListCompletions = append(mock.calls.ListCompletions, callInfo)
+	mock.lockListCompletions.Unlock()
+	return mock.ListCompletionsFunc(ctx, limit, offset)
+}
+
+// ListCompletionsCalls gets all the calls that were made to ListCompletions.
+// Check the length with:
+//
+//	len(mockedStore.ListCompletionsCalls())
+func (mock *StoreMock) ListCompletionsCalls() []struct {
+	Ctx    context.Context
+	Limit  int
+	Offset int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Limit  int
+		Offset int
+	}
+	mock.lockListCompletions.RLock()
+	calls = mock.calls.ListCompletions
+	mock.lockListCompletions.RUnlock()
 	return calls
 }
 

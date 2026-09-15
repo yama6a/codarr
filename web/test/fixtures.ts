@@ -1,4 +1,5 @@
 import type {
+  Completion,
   ArrInstance,
   Dashboard,
   Job,
@@ -169,6 +170,23 @@ export function mediaDetail(overrides: Partial<MediaDetail> = {}): MediaDetail {
     fingerprint_algo: 'xxh3-128',
     codarr_output_fingerprint: 'xxh3-128:aaaa',
     latest_job_id: 1,
+    ...overrides,
+  };
+}
+
+export function completion(overrides: Partial<Completion> = {}): Completion {
+  return {
+    job_id: 7,
+    media_file_id: 10,
+    media_path: '/media/movies/Arrival (2016)/Arrival.mkv',
+    media_filename: 'Arrival.mkv',
+    kind: ['audio'],
+    skipped: false,
+    source_size: 10_000_000_000,
+    output_size: 8_000_000_000,
+    actual_seconds: 600,
+    fell_back: false,
+    at: '2026-08-01T09:00:00.000000000Z',
     ...overrides,
   };
 }

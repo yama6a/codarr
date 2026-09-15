@@ -47,6 +47,20 @@ func dashboardStore(h *harness) {
 		return out, total, nil
 	}
 
+	jobID := int64(4)
+	h.store.ListCompletionsFunc = func(context.Context, int, int) ([]domain.Completion, int, error) {
+		return []domain.Completion{
+			{
+				JobID: &jobID, MediaFileID: 40, Path: "/media/movies/file.mkv", Kind: domain.KindOf(domain.LabelAudio),
+				SourceSize: 100, OutputSize: 80, ActualSeconds: 30, At: testNow,
+			},
+			{
+				MediaFileID: 41, Path: "/media/movies/skipped.mkv", Kind: domain.KindSkip, Skipped: true,
+				At: testNow.Add(-time.Hour),
+			},
+		}, 419, nil
+	}
+
 	h.store.GetMediaFileFunc = func(_ context.Context, id int64) (domain.MediaFile, error) {
 		return domain.MediaFile{ID: id, Path: "/media/movies/file.mkv"}, nil
 	}
@@ -111,8 +125,17 @@ func TestGetDashboard_ReturnsEverythingThePollNeeds(t *testing.T) {
 	require.Equal(t, 90, got.AwaitingStreamEnd[0].WaitingSeconds)
 	require.NotNil(t, got.AwaitingStreamEnd[0].SessionUser)
 
-	require.Len(t, got.RecentCompletions, 1)
-	require.Equal(t, 1, got.CompletionsTotal)
+	require.Len(t, got.RecentCompletions, 2)
+	require.Equal(t, 419, got.CompletionsTotal)
+	require.Equal(t, gen.Completion{
+		ActualSeconds: ptrTo(30), At: testNow, JobId: ptrTo(int64(4)), Kind: gen.PlanKind{gen.PlanLabelAudio},
+		MediaFileId: 40, MediaFilename: "file.mkv", MediaPath: "/media/movies/file.mkv",
+		OutputSize: ptrTo(int64(80)), SourceSize: ptrTo(int64(100)),
+	}, got.RecentCompletions[0])
+	require.Equal(t, gen.Completion{
+		At: testNow.Add(-time.Hour), Kind: gen.PlanKind{}, MediaFileId: 41, MediaFilename: "skipped.mkv",
+		MediaPath: "/media/movies/skipped.mkv", Skipped: true,
+	}, got.RecentCompletions[1], "a skipped file carries no job and no sizes")
 	require.Len(t, got.Failures, 1)
 	require.Equal(t, 231, got.FailuresTotal, "the panel says how many exist beyond the capped list")
 	require.NotNil(t, got.Failures[0].FailureCode)
@@ -178,3 +201,29 @@ func TestPauseAndResumeQueue_GoThroughTheWorkerNotTheSettingsRow(t *testing.T) {
 	require.Len(t, h.queue.ResumeCalls(), 1)
 	require.Empty(t, h.store.UpdateSettingsCalls())
 }
+
+func TestListCompletions_PagesTheMergedList(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	dashboardStore(h)
+
+	var seenLimit, seenOffset int
+
+	h.store.ListCompletionsFunc = func(_ context.Context, limit, offset int) ([]domain.Completion, int, error) {
+		seenLimit, seenOffset = limit, offset
+
+		return []domain.Completion{{MediaFileID: 41, Path: "/media/movies/skipped.mkv", Skipped: true, At: testNow}}, 419, nil
+	}
+
+	got := decodeInto[gen.CompletionPage](t, h.do(t, "GET", "/api/completions?page=3&page_size=25", nil), 200)
+
+	require.Equal(t, 25, seenLimit)
+	require.Equal(t, 50, seenOffset)
+	require.Equal(t, 419, got.Total)
+	require.Equal(t, 3, got.Page)
+	require.Len(t, got.Items, 1)
+	require.True(t, got.Items[0].Skipped)
+}
+
+func ptrTo[T any](v T) *T { return &v }

@@ -12,7 +12,7 @@ import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { toast } from '../components/ui/Toast';
 import { usePolling } from '../hooks/usePolling';
 import { formatTime } from '../lib/format';
-import type { JobState, JobSummary } from '../api/types';
+import type { Completion, JobSummary } from '../api/types';
 
 interface Selection {
   mediaFileId: number;
@@ -21,15 +21,34 @@ interface Selection {
 
 const PAGE_SIZE = 25;
 
-/** mergeById appends rows the list does not hold yet; the polled first page shifts under the extra pages. */
-function mergeById(base: JobSummary[], extra: JobSummary[]): JobSummary[] {
-  const seen = new Set(base.map((job) => job.id));
-  return [...base, ...extra.filter((job) => !seen.has(job.id))];
+/** mergeByKey appends rows the list does not hold yet; the polled first page shifts under the extra pages. */
+function mergeByKey<T>(base: T[], extra: T[], key: (item: T) => string): T[] {
+  const seen = new Set(base.map(key));
+  return [...base, ...extra.filter((item) => !seen.has(key(item)))];
 }
 
-/** useMorePages loads further pages of one terminal state below the dashboard's capped list. */
-function useMorePages(state: JobState, base: number, resetKey: number) {
-  const [extra, setExtra] = useState<JobSummary[]>([]);
+const jobKey = (job: JobSummary) => `job-${job.id}`;
+const completionKey = (item: Completion) =>
+  item.job_id ? `job-${item.job_id}` : `media-${item.media_file_id}`;
+
+const failedPage = (page: number) =>
+  unwrap(
+    api.GET('/api/jobs', { params: { query: { state: 'failed', page, page_size: PAGE_SIZE } } }),
+  ).then((res) => res.items);
+
+const completionsPage = (page: number) =>
+  unwrap(api.GET('/api/completions', { params: { query: { page, page_size: PAGE_SIZE } } })).then(
+    (res) => res.items,
+  );
+
+/** useMorePages loads further pages below one of the dashboard's capped lists. */
+function useMorePages<T>(
+  fetchPage: (page: number) => Promise<T[]>,
+  key: (item: T) => string,
+  base: number,
+  resetKey: number,
+) {
+  const [extra, setExtra] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -39,18 +58,8 @@ function useMorePages(state: JobState, base: number, resetKey: number) {
   const loadMore = async () => {
     setLoading(true);
     try {
-      const page = await unwrap(
-        api.GET('/api/jobs', {
-          params: {
-            query: {
-              state,
-              page: Math.floor((base + extra.length) / PAGE_SIZE) + 1,
-              page_size: PAGE_SIZE,
-            },
-          },
-        }),
-      );
-      setExtra((prev) => mergeById(prev, page.items));
+      const items = await fetchPage(Math.floor((base + extra.length) / PAGE_SIZE) + 1);
+      setExtra((prev) => mergeByKey(prev, items, key));
     } catch {
       // Already toasted by the client middleware.
     } finally {
@@ -73,10 +82,15 @@ export default function Dashboard() {
 
   const baseFailures = data?.failures ?? [];
   const baseCompletions = data?.recent_completions ?? [];
-  const moreFailures = useMorePages('failed', baseFailures.length, resetKey);
-  const moreCompletions = useMorePages('done', baseCompletions.length, resetKey);
-  const failures = mergeById(baseFailures, moreFailures.extra);
-  const completions = mergeById(baseCompletions, moreCompletions.extra);
+  const moreFailures = useMorePages(failedPage, jobKey, baseFailures.length, resetKey);
+  const moreCompletions = useMorePages(
+    completionsPage,
+    completionKey,
+    baseCompletions.length,
+    resetKey,
+  );
+  const failures = mergeByKey(baseFailures, moreFailures.extra, jobKey);
+  const completions = mergeByKey(baseCompletions, moreCompletions.extra, completionKey);
 
   const togglePause = async () => {
     if (!data) {
@@ -177,11 +191,13 @@ export default function Dashboard() {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <CompletionsPanel
-          jobs={completions}
+          items={completions}
           total={data.completions_total}
           loadingMore={moreCompletions.loading}
           onLoadMore={moreCompletions.loadMore}
-          onOpen={(job) => setSelection({ mediaFileId: job.media_file_id, jobId: job.id })}
+          onOpen={(item) =>
+            setSelection({ mediaFileId: item.media_file_id, jobId: item.job_id ?? undefined })
+          }
         />
         <FailuresPanel
           jobs={failures}

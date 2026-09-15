@@ -37,7 +37,7 @@ func (s *Server) dashboard(ctx context.Context) (gen.Dashboard, error) {
 
 	cache := newMediaCache(s.store)
 
-	completions, completionsTotal, err := s.listState(ctx, cache, DashboardListSize, domain.JobDone)
+	completions, completionsTotal, err := s.completions(ctx, DashboardListSize, 0)
 	if err != nil {
 		return gen.Dashboard{}, err
 	}
@@ -202,6 +202,55 @@ func labelFilters() []string {
 
 	for _, l := range labels {
 		out = append(out, string(l))
+	}
+
+	return out
+}
+
+// ListCompletions is the paged view behind the dashboard's Load more.
+func (s *Server) ListCompletions(
+	ctx context.Context, req gen.ListCompletionsRequestObject,
+) (gen.ListCompletionsResponseObject, error) {
+	limit, offset, pageNo, pageSize := page(req.Params.Page, req.Params.PageSize)
+
+	items, total, err := s.completions(ctx, limit, offset)
+	if err != nil {
+		return gen.ListCompletionsdefaultJSONResponse(s.fail(err)), nil
+	}
+
+	return gen.ListCompletions200JSONResponse{Items: items, Page: pageNo, PageSize: pageSize, Total: total}, nil
+}
+
+func (s *Server) completions(ctx context.Context, limit, offset int) ([]gen.Completion, int, error) {
+	rows, total, err := s.store.ListCompletions(ctx, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list completions: %w", err)
+	}
+
+	items := make([]gen.Completion, 0, len(rows))
+	for _, c := range rows {
+		items = append(items, completion(c))
+	}
+
+	return items, total, nil
+}
+
+func completion(c domain.Completion) gen.Completion {
+	out := gen.Completion{
+		At:            c.At,
+		FellBack:      c.FellBack,
+		JobId:         c.JobID,
+		Kind:          planKind(c.Kind),
+		MediaFileId:   c.MediaFileID,
+		MediaFilename: filename(c.Path),
+		MediaPath:     c.Path,
+		Skipped:       c.Skipped,
+	}
+
+	if !c.Skipped {
+		out.ActualSeconds = intPtr(c.ActualSeconds)
+		out.OutputSize = int64Ptr(c.OutputSize)
+		out.SourceSize = int64Ptr(c.SourceSize)
 	}
 
 	return out

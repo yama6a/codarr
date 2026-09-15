@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Dashboard from '../Dashboard';
-import { dashboard, jobSummary } from '../../../test/fixtures';
+import { completion, dashboard, jobSummary } from '../../../test/fixtures';
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
@@ -152,5 +152,33 @@ describe('Dashboard', () => {
     expect(mocks.get).toHaveBeenCalledWith('/api/jobs', {
       params: { query: { state: 'failed', page: 1, page_size: 25 } },
     });
+  });
+
+  it('lists skipped files among the completions with their analysis time', async () => {
+    mocks.get.mockResolvedValue({
+      data: dashboard({
+        recent_completions: [
+          completion(),
+          completion({
+            job_id: null,
+            media_file_id: 11,
+            media_filename: 'Dune.mkv',
+            kind: [],
+            skipped: true,
+            source_size: null,
+            output_size: null,
+            actual_seconds: null,
+          }),
+        ],
+        completions_total: 2,
+      }),
+    });
+    renderDashboard();
+
+    expect(await screen.findByText('Completions (2)')).toBeInTheDocument();
+    expect(screen.getByText('Dune.mkv')).toBeInTheDocument();
+    expect(screen.getByText('Skipped')).toBeInTheDocument();
+    expect(screen.getByText('nothing to do')).toBeInTheDocument();
+    expect(screen.getByText('took 10m 00s')).toBeInTheDocument();
   });
 });

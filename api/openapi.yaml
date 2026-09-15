@@ -1048,6 +1048,39 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /api/completions:
+    get:
+      operationId: listCompletions
+      tags: [dashboard]
+      summary: Done jobs and skipped analyses, newest first.
+      description: |
+        The dashboard's completions list beyond its first page. A skipped file
+        never gets a job, so it appears here by its analysis time with no job id.
+      parameters:
+        - name: page
+          in: query
+          description: One-based.
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 50
+      responses:
+        '200':
+          description: One page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompletionPage'
+        default:
+          $ref: '#/components/responses/Error'
+
   /api/dashboard:
     get:
       operationId: getDashboard
@@ -2637,6 +2670,61 @@ components:
           format: date-time
           nullable: true
 
+    Completion:
+      type: object
+      description: A done job, or a skipped file with no job behind it.
+      required: [media_file_id, media_path, media_filename, kind, skipped, fell_back, at]
+      properties:
+        job_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: Null for a skipped file.
+        media_file_id:
+          type: integer
+          format: int64
+        media_path:
+          type: string
+        media_filename:
+          type: string
+        kind:
+          $ref: '#/components/schemas/PlanKind'
+        skipped:
+          type: boolean
+          description: True when the analysis found nothing to do, so nothing was written.
+        source_size:
+          type: integer
+          format: int64
+          nullable: true
+        output_size:
+          type: integer
+          format: int64
+          nullable: true
+        actual_seconds:
+          type: integer
+          nullable: true
+        fell_back:
+          type: boolean
+        at:
+          type: string
+          format: date-time
+          description: When the job finished, or when the skipped file was analysed.
+
+    CompletionPage:
+      type: object
+      required: [items, total, page, page_size]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Completion'
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+
     JobPage:
       type: object
       required: [items, total, page, page_size]
@@ -3266,9 +3354,9 @@ components:
             $ref: '#/components/schemas/AwaitingStreamEnd'
         recent_completions:
           type: array
-          description: Newest finished first, capped; `completions_total` says how many exist.
+          description: Done jobs and skipped analyses, newest first, capped; `completions_total` says how many exist.
           items:
-            $ref: '#/components/schemas/JobSummary'
+            $ref: '#/components/schemas/Completion'
         completions_total:
           type: integer
         failures:

@@ -262,6 +262,7 @@ type Store interface { //nolint:interfacebloat // one database, one mock; splitt
 	EnqueueJob(ctx context.Context, j domain.Job) (domain.Job, bool, error)
 	GetJob(ctx context.Context, id int64) (domain.Job, error)
 	ListJobs(ctx context.Context, f JobFilter) ([]domain.Job, int, error)
+	ListCompletions(ctx context.Context, limit, offset int) ([]domain.Completion, int, error)
 	ActiveJobForMedia(ctx context.Context, mediaFileID int64) (domain.Job, bool, error)
 	ClaimNextJob(ctx context.Context) (domain.Job, bool, error)
 	SetJobState(ctx context.Context, id int64, state domain.JobState) error

@@ -1654,7 +1654,11 @@ client generated from `api/openapi.yaml`.
 - **Queue:** ordered, each row showing plan kind and estimated duration, plus an
   attempt badge when a job was auto-requeued after an interruption
 - **Awaiting stream end:** which file, which Plex session blocks it, how long
-- **Recent completions:** before/after size and delta, actual duration
+- **Recent completions:** before/after size and delta, actual duration, and
+  when it finished. Files the analysis found nothing to do for appear in the
+  same list by their analysis time, marked skipped, because a file the policy
+  already accepts is a completion too. Newest first, "latest 25 of N", paged
+  further through `GET /api/completions`.
 - **Failures** needing attention
 - **Stats:** total space saved, files done, encode hours
 - **Compatibility summary:** how many files still need work, broken down by reason
@@ -1920,7 +1924,8 @@ GET    /api/stats
 GET    /api/events                    level, category, since_id, before_id, limit
 
 GET    /api/dashboard                 single call for the polled dashboard:
-                                      current job, queue, recent completions,
+                                      current job, queue, recent completions
+                                      (done jobs and skipped files),
                                       failures, stats, compatibility summary
 
 GET    /metrics                       prometheus, outside /api

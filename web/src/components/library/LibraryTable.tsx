@@ -5,7 +5,7 @@ import {
   codecCounts,
   formatBitrate,
   formatBytes,
-  formatDateTime,
+  formatDateParts,
   formatResolution,
   humanise,
   provenanceLabel,
@@ -38,6 +38,24 @@ const columns: { key: string; label: string; sort?: MediaSort }[] = [
   { key: 'provenance', label: 'Provenance', sort: 'provenance' },
   { key: 'completed', label: 'Completed', sort: 'codarr_processed_at' },
 ];
+
+/** completedAt is when Codarr last wrote the file, or for a skipped file when it decided nothing was needed. */
+function completedAt(item: MediaListItem): string | null | undefined {
+  return item.codarr_processed_at ?? (item.status === 'skipped' ? item.analyzed_at : null);
+}
+
+function DateTimeCell({ iso }: { iso: string | null | undefined }) {
+  const [date, time] = formatDateParts(iso);
+  if (!time) {
+    return <span>{date}</span>;
+  }
+  return (
+    <span className="block">
+      <span className="block">{date}</span>
+      <span className="block text-slate-500">{time}</span>
+    </span>
+  );
+}
 
 function nextSort(current: MediaSort, column: MediaSort): MediaSort {
   return current === column ? (`-${column}` as MediaSort) : column;
@@ -110,7 +128,7 @@ export function LibraryTable({
                   />
                 </td>
                 <td className="max-w-xs px-3 py-2.5">
-                  <span className="block truncate text-slate-100" title={item.path}>
+                  <span className="block break-words text-slate-100" title={item.path}>
                     {titleFromPath(item.filename)}
                   </span>
                 </td>
@@ -164,7 +182,7 @@ export function LibraryTable({
                   </Badge>
                 </td>
                 <td className="px-3 py-2.5 text-xs whitespace-nowrap text-slate-400">
-                  {formatDateTime(item.codarr_processed_at)}
+                  <DateTimeCell iso={completedAt(item)} />
                 </td>
               </tr>
             );

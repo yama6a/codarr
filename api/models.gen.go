@@ -727,6 +727,37 @@ type CompatibilitySummary struct {
 	FilesUnanalyzed  int                  `json:"files_unanalyzed"`
 }
 
+// Completion A done job, or a skipped file with no job behind it.
+type Completion struct {
+	ActualSeconds *int `json:"actual_seconds,omitempty"`
+
+	// At When the job finished, or when the skipped file was analysed.
+	At       time.Time `json:"at"`
+	FellBack bool      `json:"fell_back"`
+
+	// JobId Null for a skipped file.
+	JobId *int64 `json:"job_id,omitempty"`
+
+	// Kind The work a file needs, as the set of labels it carries in fixed order. Empty means every stream is already compatible; the UI renders that as "skipped".
+	Kind          PlanKind `json:"kind"`
+	MediaFileId   int64    `json:"media_file_id"`
+	MediaFilename string   `json:"media_filename"`
+	MediaPath     string   `json:"media_path"`
+	OutputSize    *int64   `json:"output_size,omitempty"`
+
+	// Skipped True when the analysis found nothing to do, so nothing was written.
+	Skipped    bool   `json:"skipped"`
+	SourceSize *int64 `json:"source_size,omitempty"`
+}
+
+// CompletionPage defines model for CompletionPage.
+type CompletionPage struct {
+	Items    []Completion `json:"items"`
+	Page     int          `json:"page"`
+	PageSize int          `json:"page_size"`
+	Total    int          `json:"total"`
+}
+
 // ContainerFamily The output muxer family. Codarr only ever writes these two.
 type ContainerFamily string
 
@@ -756,8 +787,8 @@ type Dashboard struct {
 	QueueDepth  int          `json:"queue_depth"`
 	QueuePaused bool         `json:"queue_paused"`
 
-	// RecentCompletions Newest finished first, capped; `completions_total` says how many exist.
-	RecentCompletions []JobSummary `json:"recent_completions"`
+	// RecentCompletions Done jobs and skipped analyses, newest first, capped; `completions_total` says how many exist.
+	RecentCompletions []Completion `json:"recent_completions"`
 	Stats             Stats        `json:"stats"`
 }
 
@@ -1972,6 +2003,13 @@ type ID = int64
 
 // PinID defines model for PinID.
 type PinID = int64
+
+// ListCompletionsParams defines parameters for ListCompletions.
+type ListCompletionsParams struct {
+	// Page One-based.
+	Page     *int `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *int `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
 
 // ListEventsParams defines parameters for ListEvents.
 type ListEventsParams struct {

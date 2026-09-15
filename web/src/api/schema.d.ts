@@ -823,6 +823,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/completions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Done jobs and skipped analyses, newest first.
+         * @description The dashboard's completions list beyond its first page. A skipped file
+         *     never gets a job, so it appears here by its analysis time with no job id.
+         */
+        get: operations["listCompletions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard": {
         parameters: {
             query?: never;
@@ -1638,6 +1659,38 @@ export interface components {
             /** Format: date-time */
             finished_at?: string | null;
         };
+        /** @description A done job, or a skipped file with no job behind it. */
+        Completion: {
+            /**
+             * Format: int64
+             * @description Null for a skipped file.
+             */
+            job_id?: number | null;
+            /** Format: int64 */
+            media_file_id: number;
+            media_path: string;
+            media_filename: string;
+            kind: components["schemas"]["PlanKind"];
+            /** @description True when the analysis found nothing to do, so nothing was written. */
+            skipped: boolean;
+            /** Format: int64 */
+            source_size?: number | null;
+            /** Format: int64 */
+            output_size?: number | null;
+            actual_seconds?: number | null;
+            fell_back: boolean;
+            /**
+             * Format: date-time
+             * @description When the job finished, or when the skipped file was analysed.
+             */
+            at: string;
+        };
+        CompletionPage: {
+            items: components["schemas"]["Completion"][];
+            total: number;
+            page: number;
+            page_size: number;
+        };
         JobPage: {
             items: components["schemas"]["JobSummary"][];
             total: number;
@@ -1957,8 +2010,8 @@ export interface components {
             /** @description In execution order. */
             queue: components["schemas"]["JobSummary"][];
             awaiting_stream_end: components["schemas"]["AwaitingStreamEnd"][];
-            /** @description Newest finished first, capped; `completions_total` says how many exist. */
-            recent_completions: components["schemas"]["JobSummary"][];
+            /** @description Done jobs and skipped analyses, newest first, capped; `completions_total` says how many exist. */
+            recent_completions: components["schemas"]["Completion"][];
             completions_total: number;
             /** @description Failed jobs needing attention, newest first, capped; `failures_total` says how many exist. */
             failures: components["schemas"]["JobSummary"][];
@@ -3346,6 +3399,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EventPage"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listCompletions: {
+        parameters: {
+            query?: {
+                /** @description One-based. */
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompletionPage"];
                 };
             };
             default: components["responses"]["Error"];

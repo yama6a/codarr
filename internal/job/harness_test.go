@@ -3,7 +3,6 @@ package job_test
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -24,6 +23,7 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/fsx"
 	"github.com/yama6a/codarr/internal/promote"
+	"go.uber.org/zap"
 )
 
 const (
@@ -162,7 +162,7 @@ func newHarnessWith(t *testing.T, mx *fakeMetrics) *harness {
 		Analyzer:      h.analyzer,
 		NewEncoder:    func(time.Duration) job.Encoder { return h.encoder },
 		Clock:         clk,
-		Logger:        slog.New(slog.DiscardHandler),
+		Logger:        zap.NewNop(),
 		Version:       "1.2.3",
 		IdlePoll:      time.Millisecond,
 	}

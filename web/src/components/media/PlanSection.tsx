@@ -18,7 +18,8 @@ function target(stream: StreamPlan): string {
   const parts: string[] = [];
   if (stream.target_codec) parts.push(stream.target_codec);
   if (stream.target_channels) parts.push(`${stream.target_channels} ch`);
-  if (stream.target_bitrate_bps) parts.push(formatBitrate(Math.round(stream.target_bitrate_bps / 1000)));
+  if (stream.target_bitrate_bps)
+    parts.push(formatBitrate(Math.round(stream.target_bitrate_bps / 1000)));
   return parts.length > 0 ? parts.join(', ') : 'unchanged';
 }
 
@@ -38,7 +39,9 @@ export function PlanSection({ plan }: { plan: Plan }) {
         {plan.level_rewrite && <Badge tone="info">H.264 level rewrite</Badge>}
         {plan.deinterlace && <Badge tone="warning">Deinterlace</Badge>}
         {plan.hdr && <Badge tone="warning">HDR</Badge>}
-        {plan.dolby_vision && <Badge tone="warning">Dolby Vision profile {plan.dolby_vision_profile ?? '?'}</Badge>}
+        {plan.dolby_vision && (
+          <Badge tone="warning">Dolby Vision profile {plan.dolby_vision_profile ?? '?'}</Badge>
+        )}
       </div>
 
       {plan.reasons.length > 0 && (
@@ -64,7 +67,10 @@ export function PlanSection({ plan }: { plan: Plan }) {
           </thead>
           <tbody className="text-slate-300">
             {plan.streams.map((stream) => (
-              <tr key={`${stream.type}-${stream.source_index}`} className="border-b border-slate-800/60">
+              <tr
+                key={`${stream.type}-${stream.source_index}`}
+                className="border-b border-slate-800/60"
+              >
                 <td className="py-2 pr-3">{stream.type}</td>
                 <td className="py-2 pr-3">{stream.source_index}</td>
                 <td className="py-2 pr-3">{stream.output_index ?? 'none'}</td>

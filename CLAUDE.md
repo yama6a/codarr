@@ -9,10 +9,10 @@ This file covers how the repo is built, not what it does.
 - **Language**: Go 1.27+, one binary, CGO off
 - **HTTP**: `go-chi/v5`, handlers generated from `api/openapi.yaml` by `oapi-codegen`
 - **DB**: SQLite via `modernc.org/sqlite` (pure Go), migrations via `rubenv/sql-migrate`
-- **Logging**: `log/slog`, JSON to stdout, plus a sink into the `events` table
+- **Logging**: `go.uber.org/zap` with typed fields, JSON to stdout, plus a sink into the `events` table
 - **Mocks**: `matryer/moq`
 - **Frontend**: Vite + React 19 + TypeScript + Tailwind v4, embedded via `go:embed`
-- **Linting**: golangci-lint v2, strict config in `.golangci.yaml`
+- **Linting**: golangci-lint v2, the shared config from yama6a/gha with `.golangci.local.yaml` merged over it
 
 ## Project structure
 
@@ -41,8 +41,9 @@ Shared code lives under `internal/pkg/`. There is no root `pkg/`.
 ## Commands
 
 ```bash
-make ci            # fumpt, generate, lint, vet, govulncheck, go test ./...
-make cover         # coverage for decide and ffmpeg, which must stay near 100%
+make ci            # tidy, generate, fmt, lint, vet, test, govulncheck
+make fmt           # rewrite formatting in place
+make cover-core    # coverage for decide and ffmpeg, which must stay near 100%
 make build         # builds the frontend, then the binary with it embedded
 make run           # run against CODARR_DB (default ./data/codarr.db)
 make web-dev       # Vite dev server, proxies /api to the Go server

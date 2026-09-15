@@ -15,6 +15,7 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/clock"
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/pathmap"
+	"go.uber.org/zap"
 )
 
 const testAPIKey = "PLACEHOLDER0API0KEY0000000000000"
@@ -155,6 +156,7 @@ func newClient(t *testing.T, s *server, instance domain.ArrInstance, mapper *pat
 		Mapper:   mapper,
 		Clock:    clock.NewFake(time.Date(2026, 9, 1, 10, 0, 0, 0, time.UTC)),
 		Retry:    arr.Retry{Attempts: 3, Base: time.Millisecond, Max: time.Millisecond},
+		Logger:   zap.NewNop(),
 	})
 	require.NoError(t, err)
 

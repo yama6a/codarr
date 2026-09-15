@@ -15,7 +15,7 @@ func (s *Server) GetHardware(
 ) (gen.GetHardwareResponseObject, error) {
 	caps, err := s.hardware.Capabilities(ctx)
 	if err != nil {
-		return gen.GetHardwaredefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.GetHardwaredefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.GetHardware200JSONResponse(hardwareView(caps)), nil
@@ -27,7 +27,7 @@ func (s *Server) ProbeHardware(
 ) (gen.ProbeHardwareResponseObject, error) {
 	caps, err := s.hardware.Probe(ctx)
 	if err != nil {
-		return gen.ProbeHardwaredefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ProbeHardwaredefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.ProbeHardware200JSONResponse(hardwareView(caps)), nil

@@ -4,10 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/yama6a/codarr/internal/pkg/domain"
+	"go.uber.org/zap"
 )
 
 const jobColumns = `id, media_file_id, kind, origin, priority, state, attempt, transform_json,
@@ -63,7 +63,7 @@ func (s *store) EnqueueJob(ctx context.Context, j domain.Job) (domain.Job, bool,
 
 	if !created {
 		s.logger.Info("enqueue skipped, file already has an active job",
-			slog.Int64("media_file_id", j.MediaFileID), slog.String("origin", string(j.Origin)))
+			zap.Int64("media_file_id", j.MediaFileID), zap.String("origin", string(j.Origin)))
 
 		return domain.Job{}, false, nil
 	}

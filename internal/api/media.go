@@ -47,12 +47,12 @@ func (s *Server) ListMedia(ctx context.Context, req gen.ListMediaRequestObject) 
 
 	rows, total, err := s.store.ListMediaFiles(ctx, filter)
 	if err != nil {
-		return gen.ListMediadefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ListMediadefaultJSONResponse(s.fail(err)), nil
 	}
 
 	names, err := s.instanceNames(ctx)
 	if err != nil {
-		return gen.ListMediadefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.ListMediadefaultJSONResponse(s.fail(err)), nil
 	}
 
 	items := make([]gen.MediaListItem, 0, len(rows))
@@ -70,7 +70,7 @@ func (s *Server) GetMediaFile(
 ) (gen.GetMediaFileResponseObject, error) {
 	out, err := s.mediaView(ctx, req.Id)
 	if err != nil {
-		return gen.GetMediaFiledefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.GetMediaFiledefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.GetMediaFile200JSONResponse(out), nil
@@ -82,20 +82,20 @@ func (s *Server) AnalyzeMediaFile(
 ) (gen.AnalyzeMediaFileResponseObject, error) {
 	media, err := s.store.GetMediaFile(ctx, req.Id)
 	if err != nil {
-		return gen.AnalyzeMediaFiledefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.AnalyzeMediaFiledefaultJSONResponse(s.fail(err)), nil
 	}
 
 	if _, err := s.underRoots(ctx, media.Path); err != nil {
-		return gen.AnalyzeMediaFiledefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.AnalyzeMediaFiledefaultJSONResponse(s.fail(err)), nil
 	}
 
 	if _, err := s.analyzer.Analyze(ctx, media.Path, domain.OriginManual); err != nil {
-		return gen.AnalyzeMediaFiledefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.AnalyzeMediaFiledefaultJSONResponse(s.fail(err)), nil
 	}
 
 	out, err := s.mediaView(ctx, req.Id)
 	if err != nil {
-		return gen.AnalyzeMediaFiledefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.AnalyzeMediaFiledefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.AnalyzeMediaFile200JSONResponse(out), nil
@@ -108,7 +108,7 @@ func (s *Server) QueueMediaFile(
 ) (gen.QueueMediaFileResponseObject, error) {
 	res, err := s.queue.Enqueue(ctx, req.Id, domain.OriginManual)
 	if err != nil {
-		return gen.QueueMediaFiledefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.QueueMediaFiledefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.QueueMediaFile200JSONResponse{
@@ -126,7 +126,7 @@ func (s *Server) IgnoreMediaFile(
 ) (gen.IgnoreMediaFileResponseObject, error) {
 	out, err := s.setIgnored(ctx, req.Id, true)
 	if err != nil {
-		return gen.IgnoreMediaFiledefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.IgnoreMediaFiledefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.IgnoreMediaFile200JSONResponse(out), nil
@@ -138,7 +138,7 @@ func (s *Server) UnignoreMediaFile(
 ) (gen.UnignoreMediaFileResponseObject, error) {
 	out, err := s.setIgnored(ctx, req.Id, false)
 	if err != nil {
-		return gen.UnignoreMediaFiledefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.UnignoreMediaFiledefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.UnignoreMediaFile200JSONResponse(out), nil

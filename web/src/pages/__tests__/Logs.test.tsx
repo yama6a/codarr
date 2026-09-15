@@ -82,7 +82,15 @@ describe('Logs', () => {
 
     expect(await screen.findByText('an older line')).toBeInTheDocument();
     expect(mocks.get).toHaveBeenLastCalledWith('/api/events', {
-      params: { query: { level: undefined, category: undefined, since_id: undefined, before_id: 7, limit: 200 } },
+      params: {
+        query: {
+          level: undefined,
+          category: undefined,
+          since_id: undefined,
+          before_id: 7,
+          limit: 200,
+        },
+      },
     });
     const rows = screen.getAllByRole('listitem');
     expect(rows[0]).toHaveTextContent('deferred, Plex is streaming the file');

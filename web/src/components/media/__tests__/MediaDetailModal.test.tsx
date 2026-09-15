@@ -97,7 +97,9 @@ describe('MediaDetailModal', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Retry' })[0]);
     await vi.waitFor(() =>
-      expect(mocks.post).toHaveBeenCalledWith('/api/jobs/{id}/restart', { params: { path: { id: 1 } } }),
+      expect(mocks.post).toHaveBeenCalledWith('/api/jobs/{id}/restart', {
+        params: { path: { id: 1 } },
+      }),
     );
   });
 
@@ -147,11 +149,16 @@ describe('MediaDetailModal', () => {
   });
 
   it('shouts when the encoder fell back to software', async () => {
-    stub(mediaDetail(), job({ fell_back: true, encoder_used: 'libx265', fallback_reason: 'QSV busy' }));
+    stub(
+      mediaDetail(),
+      job({ fell_back: true, encoder_used: 'libx265', fallback_reason: 'QSV busy' }),
+    );
     renderModal();
 
     const alerts = await screen.findAllByRole('alert');
-    const fallback = alerts.find((node) => node.textContent?.includes('Fell back to a software encoder.'));
+    const fallback = alerts.find((node) =>
+      node.textContent?.includes('Fell back to a software encoder.'),
+    );
     expect(fallback).toBeDefined();
     expect(within(fallback as HTMLElement).getByText(/QSV busy/)).toBeInTheDocument();
   });

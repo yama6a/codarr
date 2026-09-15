@@ -30,7 +30,13 @@ export function CompareRow({ label, sublabel, action, reason, before, after }: C
   );
 }
 
-export function CompareHeader({ afterLabel, afterHint }: { afterLabel: string; afterHint: string }) {
+export function CompareHeader({
+  afterLabel,
+  afterHint,
+}: {
+  afterLabel: string;
+  afterHint: string;
+}) {
   return (
     <div className="grid gap-2 pb-2 sm:grid-cols-2">
       <div>

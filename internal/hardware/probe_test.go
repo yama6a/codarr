@@ -3,7 +3,6 @@ package hardware_test
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -15,12 +14,13 @@ import (
 	"github.com/yama6a/codarr/internal/hardware/mock"
 	"github.com/yama6a/codarr/internal/pkg/clock"
 	"github.com/yama6a/codarr/internal/pkg/domain"
+	"go.uber.org/zap"
 )
 
 const versionOutput = "ffmpeg version 7.1.4-Jellyfin Copyright (c) 2000-2025 the FFmpeg developers\n" +
 	"built with gcc 12\n"
 
-func discard() *slog.Logger { return slog.New(slog.DiscardHandler) }
+func discard() *zap.Logger { return zap.NewNop() }
 
 // script routes a probe invocation to a canned answer keyed on what the args
 // say the run is for, so a test states the matrix rather than a call order.

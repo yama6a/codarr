@@ -3,19 +3,19 @@ package events_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
-	"log/slog"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-
 	"github.com/yama6a/codarr/internal/pkg/clock"
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/events"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 var errSinkDown = errors.New("events table is unavailable")
@@ -59,23 +59,34 @@ func (f *fakeSink) events() []domain.Event {
 	return append([]domain.Event(nil), f.rows...)
 }
 
-func TestHandler_WritesStdoutAndTheEventsTable(t *testing.T) {
-	t.Parallel()
+// newObserved builds the same two-core tee events.New builds, with the console core
+// replaced by an observer so the fields it received can be asserted on.
+func newObserved(t *testing.T, sink events.Store, onErr func(error)) (*zap.Logger, *observer.ObservedLogs) {
+	t.Helper()
 
-	var (
-		out  bytes.Buffer
-		sink = &fakeSink{}
+	core, logs := observer.New(zapcore.DebugLevel)
+	tee := zapcore.NewTee(
+		events.Redacting(core),
+		events.NewStoreCore(sink, clock.System(), zapcore.DebugLevel, onErr),
 	)
 
-	log := events.New(events.Options{Out: &out, Store: sink, Clock: clock.System()})
-	log.With(slog.String("component", "job"), slog.Int64("job_id", 7)).
-		Info("promotion complete", slog.Int64("media_file_id", 42))
+	return zap.New(tee), logs
+}
 
-	var line map[string]any
-	require.NoError(t, json.Unmarshal(out.Bytes(), &line))
-	require.Equal(t, "promotion complete", line["msg"])
-	require.Equal(t, "INFO", line["level"])
-	require.InDelta(t, float64(7), line["job_id"], 0)
+func TestStoreCore_WritesConsoleAndTheEventsTable(t *testing.T) {
+	t.Parallel()
+
+	sink := &fakeSink{}
+	log, logs := newObserved(t, sink, func(error) {})
+
+	log.With(zap.String("component", "job"), zap.Int64("job_id", 7)).
+		Info("promotion complete", zap.Int64("media_file_id", 42))
+
+	entries := logs.All()
+	require.Len(t, entries, 1)
+	require.Equal(t, "promotion complete", entries[0].Message)
+	require.Equal(t, zapcore.InfoLevel, entries[0].Level)
+	require.Equal(t, int64(7), entries[0].ContextMap()["job_id"])
 
 	rows := sink.events()
 	require.Len(t, rows, 1)
@@ -90,78 +101,78 @@ func TestHandler_WritesStdoutAndTheEventsTable(t *testing.T) {
 
 // plan.md 24: stdout is the source of truth and a database failure must never
 // prevent the line being emitted.
-func TestHandler_DatabaseFailureStillEmitsStdout(t *testing.T) {
+func TestStoreCore_DatabaseFailureStillEmitsConsole(t *testing.T) {
 	t.Parallel()
 
 	var (
-		out    bytes.Buffer
-		sink   = &fakeSink{err: errSinkDown}
-		seen   []error
-		logger = events.New(events.Options{
-			Out:         &out,
-			Store:       sink,
-			Clock:       clock.System(),
-			OnSinkError: func(err error) { seen = append(seen, err) },
-		})
+		seen []error
+		sink = &fakeSink{err: errSinkDown}
 	)
 
-	logger.Error("the sky is falling")
+	log, logs := newObserved(t, sink, func(err error) { seen = append(seen, err) })
+	log.Error("the sky is falling")
 
-	var line map[string]any
-	require.NoError(t, json.Unmarshal(out.Bytes(), &line))
-	require.Equal(t, "the sky is falling", line["msg"])
-
+	require.Equal(t, 1, logs.FilterMessage("the sky is falling").Len())
 	require.Empty(t, sink.events())
 	require.Len(t, seen, 1)
 	require.ErrorIs(t, seen[0], errSinkDown)
 }
 
-func TestHandler_DebugNeverReachesTheTable(t *testing.T) {
+func TestStoreCore_DebugNeverReachesTheTable(t *testing.T) {
 	t.Parallel()
 
-	var (
-		out  bytes.Buffer
-		sink = &fakeSink{}
-	)
+	sink := &fakeSink{}
+	log, logs := newObserved(t, sink, func(error) {})
 
-	log := events.New(events.Options{Out: &out, Level: slog.LevelDebug, Store: sink, Clock: clock.System()})
 	log.Debug("noisy")
 	log.Info("kept")
 
-	require.Contains(t, out.String(), "noisy")
+	require.Equal(t, 1, logs.FilterMessage("noisy").Len())
 
 	rows := sink.events()
 	require.Len(t, rows, 1)
 	require.Equal(t, "kept", rows[0].Message)
 }
 
-func TestHandler_RedactsSecretsEverywhere(t *testing.T) {
+func TestRedacting_MasksSecretsInBothSinks(t *testing.T) {
 	t.Parallel()
 
-	var (
-		out  bytes.Buffer
-		sink = &fakeSink{}
-	)
+	sink := &fakeSink{}
+	log, logs := newObserved(t, sink, func(error) {})
 
-	log := events.New(events.Options{Out: &out, Store: sink, Clock: clock.System()})
-	log.With(slog.String("token", "plex-secret-token")).
-		Info("calling plex", slog.String("api_key", "radarr-secret-key"))
+	log.With(zap.String("token", "plex-secret-token")).
+		Info("calling plex", zap.String("api_key", "radarr-secret-key"))
 
-	require.NotContains(t, out.String(), "plex-secret-token")
-	require.NotContains(t, out.String(), "radarr-secret-key")
-	require.Contains(t, out.String(), domain.MaskedSecret)
+	fields := logs.All()[0].ContextMap()
+	require.Equal(t, domain.MaskedSecret, fields["token"])
+	require.Equal(t, domain.MaskedSecret, fields["api_key"])
 }
 
-func TestHandler_GroupedAttributesDoNotClaimColumns(t *testing.T) {
+// A secret nested under a map is still a secret, so redaction walks into it.
+func TestRedacting_MasksNestedSecrets(t *testing.T) {
 	t.Parallel()
 
-	var (
-		out  bytes.Buffer
-		sink = &fakeSink{}
-	)
+	sink := &fakeSink{}
+	log, logs := newObserved(t, sink, func(error) {})
 
-	log := events.New(events.Options{Out: &out, Store: sink, Clock: clock.System()})
-	log.WithGroup("plex").Info("nested", slog.Int64("job_id", 9))
+	log.Info("calling radarr", zap.Any("headers", map[string]any{
+		"X-Api-Key": "radarr-secret-key",
+		"Accept":    "application/json",
+	}))
+
+	headers, ok := logs.All()[0].ContextMap()["headers"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, domain.MaskedSecret, headers["X-Api-Key"])
+	require.Equal(t, "application/json", headers["Accept"])
+}
+
+func TestStoreCore_NamespacedFieldsDoNotClaimColumns(t *testing.T) {
+	t.Parallel()
+
+	sink := &fakeSink{}
+	log, _ := newObserved(t, sink, func(error) {})
+
+	log.With(zap.Namespace("plex")).Info("nested", zap.Int64("job_id", 9))
 
 	rows := sink.events()
 	require.Len(t, rows, 1)
@@ -169,7 +180,7 @@ func TestHandler_GroupedAttributesDoNotClaimColumns(t *testing.T) {
 	require.Equal(t, events.DefaultCategory, rows[0].Category)
 }
 
-func TestHandler_WithoutAStoreIsPlainJSON(t *testing.T) {
+func TestNew_WithoutAStoreIsPlainJSON(t *testing.T) {
 	t.Parallel()
 
 	var out bytes.Buffer
@@ -178,28 +189,6 @@ func TestHandler_WithoutAStoreIsPlainJSON(t *testing.T) {
 
 	require.Contains(t, out.String(), `"msg":"hello"`)
 	require.Equal(t, 1, strings.Count(out.String(), "\n"))
-}
-
-func TestParseLevel_UnknownIsInfo(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		in   string
-		want slog.Level
-	}{
-		{"debug", slog.LevelDebug},
-		{"DEBUG", slog.LevelDebug},
-		{" warn ", slog.LevelWarn},
-		{"warning", slog.LevelWarn},
-		{"error", slog.LevelError},
-		{"info", slog.LevelInfo},
-		{"", slog.LevelInfo},
-		{"chatty", slog.LevelInfo},
-	}
-
-	for _, tc := range cases {
-		require.Equal(t, tc.want, events.ParseLevel(tc.in), tc.in)
-	}
 }
 
 func TestPruner_PrunesImmediatelyAndOnEveryTick(t *testing.T) {
@@ -214,7 +203,7 @@ func TestPruner_PrunesImmediatelyAndOnEveryTick(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan error, 1)
 
-	go func() { done <- events.NewPruner(sink, clk, slog.New(slog.DiscardHandler), time.Hour).Run(ctx) }()
+	go func() { done <- events.NewPruner(sink, clk, zap.NewNop(), time.Hour).Run(ctx) }()
 
 	require.Eventually(t, func() bool {
 		sink.mu.Lock()

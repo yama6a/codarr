@@ -1,15 +1,14 @@
 package api
 
 import (
-	"log/slog"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-
 	gen "github.com/yama6a/codarr/api"
 	"github.com/yama6a/codarr/internal/pkg/clock"
+	"go.uber.org/zap"
 )
 
 // DefaultPageSize is the library and job page size when a request names none.
@@ -41,7 +40,7 @@ type Server struct {
 	arr      ArrFactory
 	metrics  Metrics
 	clk      clock.Clock
-	log      *slog.Logger
+	log      *zap.Logger
 	build    Build
 	ffmpeg   string
 
@@ -54,10 +53,6 @@ var _ gen.StrictServerInterface = (*Server)(nil)
 
 // New returns the API server.
 func New(d Deps) *Server {
-	if d.Logger == nil {
-		d.Logger = slog.Default()
-	}
-
 	if d.Clock == nil {
 		d.Clock = clock.System()
 	}
@@ -77,7 +72,7 @@ func New(d Deps) *Server {
 		arr:      d.ArrFactory,
 		metrics:  d.Metrics,
 		clk:      d.Clock,
-		log:      d.Logger.With(slog.String("component", "api")),
+		log:      d.Logger.With(zap.String("component", "api")),
 		build:    d.Build,
 		ffmpeg:   d.FfmpegVersion,
 	}
@@ -93,17 +88,17 @@ func (s *Server) Router(r chi.Router) http.Handler {
 
 // serveSpec hands out the spec the client types are generated from, so the UI
 // and any operator can read what this binary actually serves.
-func (s *Server) serveSpec(w http.ResponseWriter, r *http.Request) {
+func (s *Server) serveSpec(w http.ResponseWriter, _ *http.Request) {
 	spec, err := gen.GetSpec()
 	if err != nil {
-		s.writeError(w, r, http.StatusInternalServerError, "spec_unavailable", err.Error())
+		s.writeError(w, http.StatusInternalServerError, "spec_unavailable", err.Error())
 
 		return
 	}
 
 	body, err := spec.MarshalJSON()
 	if err != nil {
-		s.writeError(w, r, http.StatusInternalServerError, "spec_unavailable", err.Error())
+		s.writeError(w, http.StatusInternalServerError, "spec_unavailable", err.Error())
 
 		return
 	}

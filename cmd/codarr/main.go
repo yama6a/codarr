@@ -6,10 +6,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"go.uber.org/zap"
 )
 
 // Bootstrap config is flags and environment only; everything else lives in SQLite (plan.md 21).
@@ -50,11 +51,11 @@ func run() error {
 	defer app.close()
 
 	app.logger.Info("starting codarr",
-		slog.String("listen", cfg.listen),
-		slog.String("db", cfg.db),
-		slog.String("version", app.build.Version),
-		slog.String("commit", app.build.Commit),
-		slog.String("policy_hash", app.policyHash))
+		zap.String("listen", cfg.listen),
+		zap.String("db", cfg.db),
+		zap.String("version", app.build.Version),
+		zap.String("commit", app.build.Commit),
+		zap.String("policy_hash", app.policyHash))
 
 	if err := app.serve(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		return err

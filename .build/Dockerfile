@@ -1,7 +1,7 @@
 # --- frontend ---
 # Built here rather than on the runner: go:embed needs internal/web/dist populated before `go build`,
 # and this image is single-arch so there is nothing to share across platforms.
-FROM node:24-alpine@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf AS web
+FROM node:24-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS web
 # The repo layout is mirrored so vite's outDir of ../internal/web/dist lands where the build stage
 # expects it.
 WORKDIR /src/web
@@ -30,6 +30,10 @@ RUN --mount=type=cache,target=/root/.cache/go-build,id=go-build-$TARGETARCH \
 
 # --- runtime ---
 FROM debian:bookworm-slim@sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171
+
+# The jellyfin key is fetched through a pipe, and the default /bin/sh -c would let curl fail
+# silently while gpg still succeeds.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # intel-media-va-driver-non-free lives in Debian's non-free component, which the stock image does not
 # enable. Without this sed the build fails at apt-get.

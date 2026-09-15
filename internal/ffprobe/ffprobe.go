@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/prober_mock.go -pkg mock . Prober
+//go:generate go tool moq -out mock/prober_mock.go -pkg mock . Prober
 
 // ErrProbeFailed is returned when the ffprobe process itself fails.
 var ErrProbeFailed = errors.New("ffprobe: probe failed")

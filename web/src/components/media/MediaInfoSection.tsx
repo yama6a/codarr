@@ -31,15 +31,21 @@ export function MediaInfoSection({ info }: { info: MediaInfo }) {
 
       {info.video && (
         <div>
-          <h4 className="mb-1 text-xs font-semibold tracking-wide text-slate-400 uppercase">Video</h4>
+          <h4 className="mb-1 text-xs font-semibold tracking-wide text-slate-400 uppercase">
+            Video
+          </h4>
           <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <KeyValue label="Codec">{info.video.codec}</KeyValue>
             <KeyValue label="Profile">
               {info.video.profile || 'unknown'}
               {info.video.level ? ` L${info.video.level}` : ''}
             </KeyValue>
-            <KeyValue label="Resolution">{formatResolution(info.video.width, info.video.height)}</KeyValue>
-            <KeyValue label="Frame rate">{info.video.fps ? `${info.video.fps.toFixed(3)} fps` : 'unknown'}</KeyValue>
+            <KeyValue label="Resolution">
+              {formatResolution(info.video.width, info.video.height)}
+            </KeyValue>
+            <KeyValue label="Frame rate">
+              {info.video.fps ? `${info.video.fps.toFixed(3)} fps` : 'unknown'}
+            </KeyValue>
             <KeyValue label="Bitrate">{formatBitrate(info.video.bitrate_kbps)}</KeyValue>
             <KeyValue label="Pixel format">{info.video.pix_fmt || 'unknown'}</KeyValue>
             <KeyValue label="Scan">{info.video.scan}</KeyValue>

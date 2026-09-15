@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
-	"log/slog"
 	"path/filepath"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/fsx"
 	"github.com/yama6a/codarr/internal/pkg/store"
+	"go.uber.org/zap"
 )
 
 // ScanReport is what one pass did. Every file is accounted for in exactly one
@@ -36,17 +36,17 @@ type Scanner struct {
 	store    ScanStore
 	analyzer FileAnalyzer
 	clock    clock.Clock
-	logger   *slog.Logger
+	logger   *zap.Logger
 }
 
 // NewScanner returns a Scanner.
-func NewScanner(fs FS, st ScanStore, analyzer FileAnalyzer, clk clock.Clock, logger *slog.Logger) *Scanner {
+func NewScanner(fs FS, st ScanStore, analyzer FileAnalyzer, clk clock.Clock, logger *zap.Logger) *Scanner {
 	return &Scanner{
 		fs:       fs,
 		store:    st,
 		analyzer: analyzer,
 		clock:    clk,
-		logger:   logger.With(slog.String("component", "ingest.scan")),
+		logger:   logger.With(zap.String("component", "ingest.scan")),
 	}
 }
 
@@ -73,8 +73,7 @@ func (s *Scanner) ScanAll(ctx context.Context) (ScanReport, error) {
 				return s.finish(report), fmt.Errorf("scan cancelled: %w", err)
 			}
 
-			s.logger.Error("root skipped",
-				slog.String("path", root.Path), slog.String("error", err.Error()))
+			s.logger.Error("root skipped", zap.String("path", root.Path), zap.Error(err))
 		}
 	}
 
@@ -121,11 +120,11 @@ func (s *Scanner) finish(r ScanReport) ScanReport {
 	r.FinishedAt = s.clock.Now()
 
 	s.logger.Info("scan complete",
-		slog.Int("roots", r.Roots), slog.Int("walked", r.Walked),
-		slog.Int("analyzed", r.Analyzed), slog.Int("queued", r.Queued),
-		slog.Int("unchanged", r.Unchanged), slog.Int("excluded", r.Excluded),
-		slog.Int("unstable", r.Unstable), slog.Int("missing", r.Missing),
-		slog.Int("failed", r.Failed))
+		zap.Int("roots", r.Roots), zap.Int("walked", r.Walked),
+		zap.Int("analyzed", r.Analyzed), zap.Int("queued", r.Queued),
+		zap.Int("unchanged", r.Unchanged), zap.Int("excluded", r.Excluded),
+		zap.Int("unstable", r.Unstable), zap.Int("missing", r.Missing),
+		zap.Int("failed", r.Failed))
 
 	return r
 }
@@ -176,8 +175,7 @@ func (s *Scanner) walk(ctx context.Context, root domain.Root, env Env, lim *limi
 				return walkErr
 			}
 
-			s.logger.Warn("walk error, continuing",
-				slog.String("path", path), slog.String("error", walkErr.Error()))
+			s.logger.Warn("walk error, continuing", zap.String("path", path), zap.Error(walkErr))
 
 			return nil
 		}
@@ -235,8 +233,7 @@ func (s *Scanner) visit(ctx context.Context, path string, info fsx.FileInfo, env
 	if err != nil {
 		report.Failed++
 
-		s.logger.Error("analysis failed",
-			slog.String("path", path), slog.String("error", err.Error()))
+		s.logger.Error("analysis failed", zap.String("path", path), zap.Error(err))
 
 		return nil
 	}

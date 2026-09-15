@@ -2,12 +2,12 @@ package job
 
 import (
 	"context"
-	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/yama6a/codarr/internal/decide"
 	"github.com/yama6a/codarr/internal/pkg/clock"
+	"go.uber.org/zap"
 )
 
 // DefaultIdlePoll is the backstop wait when the queue is empty or paused; every
@@ -27,7 +27,7 @@ type Deps struct {
 	Analyzer      Analyzer
 	NewEncoder    NewEncoder
 	Clock         clock.Clock
-	Logger        *slog.Logger
+	Logger        *zap.Logger
 
 	// Metrics is optional. A nil value records nothing and is safe everywhere.
 	Metrics Metrics
@@ -51,7 +51,7 @@ type Service struct {
 	analyzer Analyzer
 	newEnc   NewEncoder
 	clk      clock.Clock
-	log      *slog.Logger
+	log      *zap.Logger
 	mx       recorder
 	version  string
 	idlePoll time.Duration
@@ -78,15 +78,11 @@ type running struct {
 
 // New returns the queue.
 func New(d Deps) *Service {
-	if d.Logger == nil {
-		d.Logger = slog.Default()
-	}
-
 	if d.IdlePoll <= 0 {
 		d.IdlePoll = DefaultIdlePoll
 	}
 
-	log := d.Logger.With(slog.String("component", "job"))
+	log := d.Logger.With(zap.String("component", "job"))
 
 	return &Service{
 		store:    d.Store,

@@ -10,13 +10,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/url"
 	"time"
 
 	migrate "github.com/rubenv/sql-migrate"
 	"github.com/yama6a/codarr/data"
-
+	"go.uber.org/zap"
 	_ "modernc.org/sqlite" // pure-Go SQLite driver; the binary stays CGO-free
 )
 
@@ -92,13 +91,13 @@ func Open(ctx context.Context, path string) (*DB, error) {
 }
 
 // Migrate applies the embedded migrations through the write pool.
-func Migrate(db *DB, logger *slog.Logger) error {
+func Migrate(db *DB, logger *zap.Logger) error {
 	return MigrateMax(db, logger, 0)
 }
 
 // MigrateMax applies at most limit pending migrations, or every one when limit
 // is zero, so a test can seed rows under an older schema.
-func MigrateMax(db *DB, logger *slog.Logger, limit int) error {
+func MigrateMax(db *DB, logger *zap.Logger, limit int) error {
 	source := migrate.EmbedFileSystemMigrationSource{
 		FileSystem: data.FS,
 		Root:       migrationsRoot,
@@ -109,13 +108,13 @@ func MigrateMax(db *DB, logger *slog.Logger, limit int) error {
 		return fmt.Errorf("run migrations: %w", err)
 	}
 
-	logger.Info("migrations complete", slog.Int("applied", n))
+	logger.Info("migrations complete", zap.Int("applied", n))
 
 	return nil
 }
 
 // OpenAndMigrate is the wiring path in cmd/codarr: open, migrate, hand back.
-func OpenAndMigrate(ctx context.Context, path string, logger *slog.Logger) (*DB, error) {
+func OpenAndMigrate(ctx context.Context, path string, logger *zap.Logger) (*DB, error) {
 	db, err := Open(ctx, path)
 	if err != nil {
 		return nil, err

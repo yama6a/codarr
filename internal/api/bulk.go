@@ -22,7 +22,7 @@ func (s *Server) RecheckAllMedia(
 
 	res, err := s.queue.RecheckAll(ctx, confirm)
 	if err != nil {
-		return gen.RecheckAllMediadefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.RecheckAllMediadefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.RecheckAllMedia200JSONResponse(recheckResult(res)), nil
@@ -41,12 +41,12 @@ func (s *Server) RecheckSelectedMedia(
 
 	request, err := recheckRequest(*req.Body)
 	if err != nil {
-		return gen.RecheckSelectedMediadefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.RecheckSelectedMediadefaultJSONResponse(s.fail(err)), nil
 	}
 
 	res, err := s.queue.Recheck(ctx, request)
 	if err != nil {
-		return gen.RecheckSelectedMediadefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.RecheckSelectedMediadefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.RecheckSelectedMedia200JSONResponse(recheckResult(res)), nil
@@ -129,7 +129,7 @@ func (s *Server) PreviewSpaceSweep(
 ) (gen.PreviewSpaceSweepResponseObject, error) {
 	res, err := s.queue.SpaceSweepPreview(ctx)
 	if err != nil {
-		return gen.PreviewSpaceSweepdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.PreviewSpaceSweepdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.PreviewSpaceSweep200JSONResponse(sweepPreview(res)), nil
@@ -141,8 +141,8 @@ func (s *Server) RunSpaceSweep(
 	ctx context.Context, req gen.RunSpaceSweepRequestObject,
 ) (gen.RunSpaceSweepResponseObject, error) {
 	if req.Body == nil || !req.Body.Confirm {
-		return gen.RunSpaceSweepdefaultJSONResponse(s.fail(ctx, badRequest(
-			"the space reclaim sweep replaces every file it touches and cannot be undone; "+
+		return gen.RunSpaceSweepdefaultJSONResponse(s.fail(badRequest(
+			"the space reclaim sweep replaces every file it touches and cannot be undone; " +
 				"send confirm true to run it"))), nil
 	}
 
@@ -152,13 +152,13 @@ func (s *Server) RunSpaceSweep(
 	}
 
 	if len(ids) > MaxSelectionSize {
-		return gen.RunSpaceSweepdefaultJSONResponse(s.fail(ctx, badRequest(
+		return gen.RunSpaceSweepdefaultJSONResponse(s.fail(badRequest(
 			"at most %d media_file_ids", MaxSelectionSize))), nil
 	}
 
 	res, err := s.queue.SpaceSweepRun(ctx, ids, true)
 	if err != nil {
-		return gen.RunSpaceSweepdefaultJSONResponse(s.fail(ctx, err)), nil
+		return gen.RunSpaceSweepdefaultJSONResponse(s.fail(err)), nil
 	}
 
 	return gen.RunSpaceSweep200JSONResponse{

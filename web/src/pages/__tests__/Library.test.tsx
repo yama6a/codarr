@@ -88,7 +88,9 @@ describe('Library', () => {
     renderLibrary();
     await screen.findByText('Arrival');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show files changed after Codarr wrote them' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Show files changed after Codarr wrote them' }),
+    );
 
     await vi.waitFor(() =>
       expect(mocks.get).toHaveBeenCalledWith('/api/media', {
@@ -151,7 +153,9 @@ describe('Library', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Queue 120 jobs' }));
     await vi.waitFor(() =>
-      expect(mocks.post).toHaveBeenCalledWith('/api/media/recheck-all', { body: { confirm: true } }),
+      expect(mocks.post).toHaveBeenCalledWith('/api/media/recheck-all', {
+        body: { confirm: true },
+      }),
     );
   });
 });

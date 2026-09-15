@@ -21,7 +21,12 @@ export function QueuePanel({ queue, depth, paused, busy, onTogglePause, onOpen }
       title={`Queue (${depth})`}
       icon="list"
       actions={
-        <Button variant="secondary" icon={paused ? 'play' : 'pause'} loading={busy} onClick={onTogglePause}>
+        <Button
+          variant="secondary"
+          icon={paused ? 'play' : 'pause'}
+          loading={busy}
+          onClick={onTogglePause}
+        >
           {paused ? 'Resume' : 'Pause'}
         </Button>
       }
@@ -42,10 +47,16 @@ export function QueuePanel({ queue, depth, paused, busy, onTogglePause, onOpen }
                 onClick={() => onOpen(job)}
                 className="flex w-full items-center gap-3 py-2.5 text-left hover:bg-slate-800/50"
               >
-                <span className="w-6 flex-shrink-0 text-right text-xs text-slate-500">{index + 1}</span>
+                <span className="w-6 flex-shrink-0 text-right text-xs text-slate-500">
+                  {index + 1}
+                </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm text-slate-200">{job.media_filename}</span>
-                  <span className="block text-[11px] text-slate-500">queued {formatDateTime(job.queued_at)}</span>
+                  <span className="block truncate text-sm text-slate-200">
+                    {job.media_filename}
+                  </span>
+                  <span className="block text-[11px] text-slate-500">
+                    queued {formatDateTime(job.queued_at)}
+                  </span>
                 </span>
                 {job.attempt > 1 && (
                   <Badge tone="warning" title="Auto-requeued after an interruption">

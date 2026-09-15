@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yama6a/codarr/internal/pkg/clock"
 	"github.com/yama6a/codarr/internal/plex"
+	"go.uber.org/zap"
 )
 
 func TestNew_RejectsAnUnusableConfiguration(t *testing.T) {
@@ -75,6 +76,7 @@ func TestTest_ExplainsAnUnreachableServer(t *testing.T) {
 		Token:   testToken,
 		Clock:   clock.NewFake(time.Date(2026, 9, 1, 10, 0, 0, 0, time.UTC)),
 		Retry:   plex.Retry{Attempts: 1, Base: time.Millisecond, Max: time.Millisecond},
+		Logger:  zap.NewNop(),
 	})
 	require.NoError(t, err)
 

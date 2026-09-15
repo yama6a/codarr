@@ -17,7 +17,9 @@ export function PlanKindBreakdownList({ breakdown }: { breakdown: PlanKindBreakd
           <dd className="font-medium text-slate-100">{breakdown[row.key].toLocaleString()}</dd>
         </div>
       ))}
-      <p className="col-span-2 text-[11px] text-slate-500">A file counts under every label it carries.</p>
+      <p className="col-span-2 text-[11px] text-slate-500">
+        A file counts under every label it carries.
+      </p>
     </dl>
   );
 }

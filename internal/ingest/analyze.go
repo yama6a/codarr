@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"github.com/yama6a/codarr/internal/decide"
 	"github.com/yama6a/codarr/internal/ffprobe"
@@ -14,6 +13,7 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/fsx"
 	"github.com/yama6a/codarr/internal/pkg/pathmap"
 	"github.com/yama6a/codarr/internal/pkg/store"
+	"go.uber.org/zap"
 )
 
 // Result is what one analysis pass concluded. Everything the UI and the caller
@@ -54,7 +54,7 @@ type Analyzer struct {
 	engine decide.Engine
 	store  AnalysisStore
 	clock  clock.Clock
-	logger *slog.Logger
+	logger *zap.Logger
 }
 
 var _ FileAnalyzer = (*Analyzer)(nil)
@@ -62,7 +62,7 @@ var _ FileAnalyzer = (*Analyzer)(nil)
 // NewAnalyzer returns an Analyzer. The decision engine is stateless and
 // hard-coded, so it is constructed rather than injected.
 func NewAnalyzer(fs FS, fp Fingerprinter, prober ffprobe.Prober, st AnalysisStore,
-	clk clock.Clock, logger *slog.Logger,
+	clk clock.Clock, logger *zap.Logger,
 ) *Analyzer {
 	return &Analyzer{
 		fs:     fs,
@@ -71,7 +71,7 @@ func NewAnalyzer(fs FS, fp Fingerprinter, prober ffprobe.Prober, st AnalysisStor
 		engine: decide.New(),
 		store:  st,
 		clock:  clk,
-		logger: logger.With(slog.String("component", "ingest.analyzer")),
+		logger: logger.With(zap.String("component", "ingest.analyzer")),
 	}
 }
 
@@ -205,8 +205,7 @@ func (a *Analyzer) probe(ctx context.Context, path string, mediaFileID int64) (*
 // logged rather than returned: the original error is the interesting one.
 func (a *Analyzer) fail(ctx context.Context, mediaFileID int64, path string, cause error) {
 	if err := a.store.SetMediaStatus(ctx, mediaFileID, domain.MediaFailed, cause.Error()); err != nil {
-		a.logger.Error("could not record an analysis failure",
-			slog.String("path", path), slog.String("error", err.Error()))
+		a.logger.Error("could not record an analysis failure", zap.String("path", path), zap.Error(err))
 	}
 }
 
@@ -220,7 +219,7 @@ func (a *Analyzer) decide(ctx context.Context, res Result, env Env, row domain.M
 		// plan.md 12: the tag matches but the bytes do not, so something
 		// rewrote Codarr's output. Surface it rather than reprocessing quietly.
 		a.logger.Warn("file was modified after Codarr wrote it",
-			slog.String("path", res.Path), slog.Int64("media_file_id", row.ID))
+			zap.String("path", res.Path), zap.Int64("media_file_id", row.ID))
 	}
 
 	analysis, err := a.engine.Plan(probe, decide.Options{Path: res.Path})

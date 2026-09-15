@@ -172,8 +172,8 @@ export default function Logs() {
         <div>
           <h1 className="text-2xl font-bold text-white">Logs</h1>
           <p className="mt-1 text-sm text-slate-400">
-            {events.length.toLocaleString()} events held, newest first. New rows appear at the top every
-            10 seconds.
+            {events.length.toLocaleString()} events held, newest first. New rows appear at the top
+            every 10 seconds.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -207,12 +207,18 @@ export default function Logs() {
           <ul className="space-y-0.5">
             {events.map((event) => (
               <li key={event.id} className="flex gap-3 rounded px-2 py-1 hover:bg-slate-800/50">
-                <span className="flex-shrink-0 text-slate-600">{formatDateTime(event.created_at)}</span>
-                <span className={`w-12 flex-shrink-0 font-semibold uppercase ${levelClasses[event.level]}`}>
+                <span className="flex-shrink-0 text-slate-600">
+                  {formatDateTime(event.created_at)}
+                </span>
+                <span
+                  className={`w-12 flex-shrink-0 font-semibold uppercase ${levelClasses[event.level]}`}
+                >
                   {event.level}
                 </span>
                 <span className="w-32 flex-shrink-0 truncate text-blue-400">{event.category}</span>
-                <span className={`min-w-0 break-words ${levelClasses[event.level]}`}>{event.message}</span>
+                <span className={`min-w-0 break-words ${levelClasses[event.level]}`}>
+                  {event.message}
+                </span>
               </li>
             ))}
           </ul>

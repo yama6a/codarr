@@ -33,11 +33,15 @@ export function AwaitingPanel({ items, onOpen }: AwaitingPanelProps) {
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm text-slate-200">{item.filename}</span>
-                  <span className="block truncate text-xs text-amber-300">Blocked by {blockedBy(item)}</span>
+                  <span className="block truncate text-xs text-amber-300">
+                    Blocked by {blockedBy(item)}
+                  </span>
                 </span>
                 <span className="flex-shrink-0 text-right text-xs text-slate-400">
                   <span className="block">waiting {formatDuration(item.waiting_seconds)}</span>
-                  <span className="block text-[11px] text-slate-500">since {formatDateTime(item.waiting_since)}</span>
+                  <span className="block text-[11px] text-slate-500">
+                    since {formatDateTime(item.waiting_since)}
+                  </span>
                 </span>
               </button>
             </li>

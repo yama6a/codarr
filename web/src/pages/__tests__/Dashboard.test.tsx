@@ -124,11 +124,21 @@ describe('Dashboard', () => {
   });
 
   it('says how many failures exist beyond the capped list and pages them in', async () => {
-    const failed = jobSummary({ id: 9, state: 'failed', failure_code: 'ffmpeg_failed', failure_message: 'boom' });
+    const failed = jobSummary({
+      id: 9,
+      state: 'failed',
+      failure_code: 'ffmpeg_failed',
+      failure_message: 'boom',
+    });
     mocks.get.mockImplementation((path: string) => {
       if (path === '/api/jobs') {
         return Promise.resolve({
-          data: { items: [{ ...failed, id: 10, media_filename: 'Older.mkv' }], page: 2, page_size: 25, total: 26 },
+          data: {
+            items: [{ ...failed, id: 10, media_filename: 'Older.mkv' }],
+            page: 2,
+            page_size: 25,
+            total: 26,
+          },
         });
       }
       return Promise.resolve({ data: dashboard({ failures: [failed], failures_total: 26 }) });

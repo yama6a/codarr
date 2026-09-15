@@ -17,7 +17,10 @@ export function ProgressBar({ pct, tone = 'primary', label }: ProgressBarProps) 
       aria-label={label ?? 'Progress'}
       className="h-2.5 w-full overflow-hidden rounded-full bg-slate-800"
     >
-      <div className={`h-full rounded-full transition-[width] duration-700 ${fill}`} style={{ width: `${clamped}%` }} />
+      <div
+        className={`h-full rounded-full transition-[width] duration-700 ${fill}`}
+        style={{ width: `${clamped}%` }}
+      />
     </div>
   );
 }

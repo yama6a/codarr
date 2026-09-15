@@ -18,7 +18,13 @@ import { formatBytes, formatDateTime, humanise, planKindText } from '../../lib/f
 import { jobStateTone, mediaStatusTone } from '../../lib/tone';
 import type { IntegrityResult, Job, JobState, MediaDetail } from '../../api/types';
 
-const ACTIVE_STATES: JobState[] = ['queued', 'running', 'verifying', 'awaiting_stream_end', 'promoting'];
+const ACTIVE_STATES: JobState[] = [
+  'queued',
+  'running',
+  'verifying',
+  'awaiting_stream_end',
+  'promoting',
+];
 
 interface MediaDetailModalProps {
   mediaFileId: number;
@@ -27,7 +33,12 @@ interface MediaDetailModalProps {
   onChanged?: () => void;
 }
 
-export function MediaDetailModal({ mediaFileId, jobId, onClose, onChanged }: MediaDetailModalProps) {
+export function MediaDetailModal({
+  mediaFileId,
+  jobId,
+  onClose,
+  onChanged,
+}: MediaDetailModalProps) {
   const [media, setMedia] = useState<MediaDetail | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [integrity, setIntegrity] = useState<IntegrityResult | null>(null);
@@ -80,13 +91,19 @@ export function MediaDetailModal({ mediaFileId, jobId, onClose, onChanged }: Med
 
   const analyze = () =>
     run('analyze', async () => {
-      setMedia(await unwrap(api.POST('/api/media/{id}/analyze', { params: { path: { id: mediaFileId } } })));
+      setMedia(
+        await unwrap(
+          api.POST('/api/media/{id}/analyze', { params: { path: { id: mediaFileId } } }),
+        ),
+      );
       toast.success('Re-probed and re-planned.');
     });
 
   const enqueue = () =>
     run('queue', async () => {
-      const result = await unwrap(api.POST('/api/media/{id}/queue', { params: { path: { id: mediaFileId } } }));
+      const result = await unwrap(
+        api.POST('/api/media/{id}/queue', { params: { path: { id: mediaFileId } } }),
+      );
       if (result.enqueued) {
         toast.success(`Queued as ${planKindText(result.plan_kind)}.`);
       } else {
@@ -98,8 +115,12 @@ export function MediaDetailModal({ mediaFileId, jobId, onClose, onChanged }: Med
   const toggleIgnore = () =>
     run('ignore', async () => {
       const next = media?.ignored
-        ? await unwrap(api.DELETE('/api/media/{id}/ignore', { params: { path: { id: mediaFileId } } }))
-        : await unwrap(api.POST('/api/media/{id}/ignore', { params: { path: { id: mediaFileId } } }));
+        ? await unwrap(
+            api.DELETE('/api/media/{id}/ignore', { params: { path: { id: mediaFileId } } }),
+          )
+        : await unwrap(
+            api.POST('/api/media/{id}/ignore', { params: { path: { id: mediaFileId } } }),
+          );
       setMedia(next);
     });
 
@@ -117,7 +138,9 @@ export function MediaDetailModal({ mediaFileId, jobId, onClose, onChanged }: Med
       if (!job) {
         return;
       }
-      setJob(await unwrap(api.POST('/api/jobs/{id}/restart', { params: { path: { id: job.id } } })));
+      setJob(
+        await unwrap(api.POST('/api/jobs/{id}/restart', { params: { path: { id: job.id } } })),
+      );
       toast.success('Re-queued at the front.');
     });
 
@@ -169,7 +192,11 @@ export function MediaDetailModal({ mediaFileId, jobId, onClose, onChanged }: Med
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={mediaStatusTone(media.status)}>{humanise(media.status)}</Badge>
             {media.plan_kind && <PlanKindBadges kind={media.plan_kind} />}
-            {job && <Badge tone={jobStateTone(job.state)}>Job #{job.id} {humanise(job.state)}</Badge>}
+            {job && (
+              <Badge tone={jobStateTone(job.state)}>
+                Job #{job.id} {humanise(job.state)}
+              </Badge>
+            )}
             {media.ignored && <Badge tone="neutral">Ignored</Badge>}
             {media.is_hdr && <Badge tone="warning">HDR</Badge>}
           </div>
@@ -188,7 +215,9 @@ export function MediaDetailModal({ mediaFileId, jobId, onClose, onChanged }: Med
           <p className="font-mono text-xs break-all text-slate-500">{media.path}</p>
 
           {media.last_error && (
-            <p className="rounded-lg border border-red-800 bg-red-950/40 p-3 text-xs text-red-200">{media.last_error}</p>
+            <p className="rounded-lg border border-red-800 bg-red-950/40 p-3 text-xs text-red-200">
+              {media.last_error}
+            </p>
           )}
 
           {job && job.state === 'failed' && (
@@ -197,9 +226,14 @@ export function MediaDetailModal({ mediaFileId, jobId, onClose, onChanged }: Med
 
           {job && (
             <section>
-              <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">Execution</h3>
+              <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">
+                Execution
+              </h3>
               {job.fell_back && (
-                <div role="alert" className="mb-3 flex items-start gap-3 rounded-lg border-2 border-red-500 bg-red-950 p-3">
+                <div
+                  role="alert"
+                  className="mb-3 flex items-start gap-3 rounded-lg border-2 border-red-500 bg-red-950 p-3"
+                >
                   <Icon name="alert" size={20} className="mt-0.5 flex-shrink-0 text-red-400" />
                   <p className="text-sm text-red-100">
                     <span className="font-bold">Fell back to a software encoder.</span>{' '}
@@ -239,7 +273,9 @@ export function MediaDetailModal({ mediaFileId, jobId, onClose, onChanged }: Med
           </section>
 
           <section>
-            <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">Provenance</h3>
+            <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">
+              Provenance
+            </h3>
             <ProvenanceSection
               media={media}
               integrity={integrity}
@@ -250,13 +286,17 @@ export function MediaDetailModal({ mediaFileId, jobId, onClose, onChanged }: Med
 
           {media.media_info && (
             <section>
-              <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">Media info</h3>
+              <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">
+                Media info
+              </h3>
               <MediaInfoSection info={media.media_info} />
             </section>
           )}
 
           <section>
-            <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">Technical</h3>
+            <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">
+              Technical
+            </h3>
             <TechnicalSection
               argv={job?.ffmpeg_argv}
               sourceProbe={media.probe_json}

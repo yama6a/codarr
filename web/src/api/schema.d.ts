@@ -745,9 +745,11 @@ export interface paths {
         put?: never;
         /**
          * Re-run the encoder probe now.
-         * @description Runs a real one-second encode per backend and profile (plan.md 10.1).
-         *     Compiled-in support is not working support, so this is the only thing
-         *     that decides which encoder gets used.
+         * @description Runs a real one-second encode per backend and profile, plus a decode of
+         *     a synthesised VP9 and AV1 clip per backend (plan.md 10.1). Compiled-in
+         *     support is not working support, so this is the only thing that decides
+         *     which encoder gets used. AV1 is reported only; the hardware decode set
+         *     is unchanged.
          */
         post: operations["probeHardware"];
         delete?: never;
@@ -807,8 +809,10 @@ export interface paths {
         };
         /**
          * The log view, cursor-paginated.
-         * @description Ascending by id. Poll with `since_id` set to the last id seen; the
-         *     response carries the cursor to use next.
+         * @description Newest first by default, which is the initial page and every
+         *     `before_id` page. With `since_id` set the page is ascending from that
+         *     id, which is what polling appends; the response carries the cursor to
+         *     use next.
          */
         get: operations["listEvents"];
         put?: never;
@@ -1976,11 +1980,11 @@ export interface components {
             created_at: string;
         };
         EventPage: {
-            /** @description Ascending by id. */
+            /** @description Ascending by id when `since_id` was given, otherwise newest first. */
             items: components["schemas"]["Event"][];
             /**
              * Format: int64
-             * @description Pass as `since_id` on the next poll.
+             * @description The highest id in the page, to pass as `since_id` on the next poll.
              */
             next_since_id: number;
             /** @description More events matched than the limit allowed. */
@@ -3323,8 +3327,10 @@ export interface operations {
                 /** @description Minimum level, inclusive. */
                 level?: components["schemas"]["EventLevel"];
                 category?: string;
-                /** @description Return events with a strictly greater id. */
+                /** @description Return events with a strictly greater id, ascending. */
                 since_id?: number;
+                /** @description Return events with a strictly smaller id, newest first; for loading older rows. */
+                before_id?: number;
                 limit?: number;
             };
             header?: never;

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -13,9 +12,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-
 	gen "github.com/yama6a/codarr/api"
 	"github.com/yama6a/codarr/internal/web"
+	"go.uber.org/zap"
 )
 
 // DrainTimeout is how long in-flight requests get after SIGTERM; it must stay under the
@@ -48,8 +47,7 @@ func (a *app) serve(ctx context.Context) error {
 			defer wg.Done()
 
 			if err := b.run(ctx); err != nil && !errors.Is(err, context.Canceled) {
-				a.logger.Error("background task stopped",
-					slog.String("task", b.name), slog.String("error", err.Error()))
+				a.logger.Error("background task stopped", zap.String("task", b.name), zap.Error(err))
 			}
 		}()
 	}
@@ -78,13 +76,13 @@ func (a *app) serve(ctx context.Context) error {
 	case <-ctx.Done():
 	}
 
-	a.logger.Info("shutting down", slog.Duration("drain_timeout", DrainTimeout))
+	a.logger.Info("shutting down", zap.Duration("drain_timeout", DrainTimeout))
 
 	drainCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), DrainTimeout)
 	defer cancel()
 
 	if err := server.Shutdown(drainCtx); err != nil {
-		a.logger.Error("draining connections failed", slog.String("error", err.Error()))
+		a.logger.Error("draining connections failed", zap.Error(err))
 	}
 
 	wg.Wait()
@@ -97,23 +95,22 @@ func (a *app) serve(ctx context.Context) error {
 // only safe once crash recovery has claimed the staging files still in use.
 func (a *app) startup(ctx context.Context) {
 	if err := a.queue.Recover(ctx); err != nil {
-		a.logger.ErrorContext(ctx, "recovering interrupted jobs failed", slog.String("error", err.Error()))
+		a.logger.Error("recovering interrupted jobs failed", zap.Error(err))
 	}
 
 	// Cache-first, or every restart burns six ffmpeg invocations (plan.md 10.1).
 	caps, err := a.hardware.Capabilities(ctx)
 	if err != nil {
-		a.logger.ErrorContext(ctx, "reading the hardware capabilities failed",
-			slog.String("error", err.Error()))
+		a.logger.Error("reading the hardware capabilities failed", zap.Error(err))
 
 		return
 	}
 
-	a.logger.InfoContext(ctx, "hardware capabilities read",
-		slog.String("ffmpeg_version", caps.FfmpegVersion),
-		slog.String("device", caps.Device),
-		slog.String("encoder", string(caps.Select(false).Encoder)),
-		slog.Bool("software_fallback", caps.Select(false).Software))
+	a.logger.Info("hardware capabilities read",
+		zap.String("ffmpeg_version", caps.FfmpegVersion),
+		zap.String("device", caps.Device),
+		zap.String("encoder", string(caps.Select(false).Encoder)),
+		zap.Bool("software_fallback", caps.Select(false).Software))
 }
 
 // /healthz, /readyz and /metrics sit on a plain mux above the chi router so a
@@ -180,11 +177,11 @@ func (a *app) requestLogger(next http.Handler) http.Handler {
 
 		next.ServeHTTP(wrapped, r)
 
-		a.logger.DebugContext(r.Context(), "request",
-			slog.String("method", r.Method),
-			slog.String("path", r.URL.Path),
-			slog.Int("status", wrapped.Status()),
-			slog.Duration("took", time.Since(started)))
+		a.logger.Debug("request",
+			zap.String("method", r.Method),
+			zap.String("path", r.URL.Path),
+			zap.Int("status", wrapped.Status()),
+			zap.Duration("took", time.Since(started)))
 	})
 }
 

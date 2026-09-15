@@ -3,7 +3,6 @@ package job
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -16,6 +15,8 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/store"
 	"github.com/yama6a/codarr/internal/promote"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // task is one job's state as it walks the pipeline of plan.md 15.2.
@@ -70,8 +71,7 @@ func (s *Service) withRunning(parent context.Context, j domain.Job, run func(ctx
 	case s.cancelRequested(r):
 		return s.finishCancelled(ctx, j, s.stagingOf(r))
 	case ctx.Err() != nil:
-		s.log.WarnContext(parent, "job interrupted by shutdown, the startup sweep will pick it up",
-			slog.Int64("job_id", j.ID))
+		s.log.Warn("job interrupted by shutdown, the startup sweep will pick it up", zap.Int64("job_id", j.ID))
 
 		return nil
 	default:
@@ -237,8 +237,8 @@ func (s *Service) resolveBitrate(ctx context.Context, t *task) error {
 		}
 
 		s.mx.error(errorBitrateProb)
-		s.log.WarnContext(ctx, "the bitrate sample probe failed, falling back to the 8.2 formula",
-			slog.Int64("job_id", t.job.ID), slog.Any("error", err))
+		s.log.Warn("the bitrate sample probe failed, falling back to the 8.2 formula",
+			zap.Int64("job_id", t.job.ID), zap.Error(err))
 
 		t.plan.TargetVideoBitrate = ffmpeg.TargetFromFallback(in)
 
@@ -247,10 +247,10 @@ func (s *Service) resolveBitrate(ctx context.Context, t *task) error {
 
 	t.plan.TargetVideoBitrate = ffmpeg.TargetFromSamples([]int{base}, in)
 
-	s.log.InfoContext(ctx, "sample probe resolved the encode target",
-		slog.Int64("job_id", t.job.ID),
-		slog.Int("measured_bps", base),
-		slog.Int("target_bps", t.plan.TargetVideoBitrate))
+	s.log.Info("sample probe resolved the encode target",
+		zap.Int64("job_id", t.job.ID),
+		zap.Int("measured_bps", base),
+		zap.Int("target_bps", t.plan.TargetVideoBitrate))
 
 	return nil
 }
@@ -273,8 +273,7 @@ func (s *Service) sampleProbe(ctx context.Context, tempDir, name, path string, d
 
 	defer func() {
 		if err := s.fs.Remove(dir); err != nil {
-			s.log.WarnContext(ctx, "removing the sample probe directory failed",
-				slog.String("path", dir), slog.Any("error", err))
+			s.log.Warn("removing the sample probe directory failed", zap.String("path", dir), zap.Error(err))
 		}
 	}()
 
@@ -300,16 +299,16 @@ func (s *Service) resolveScan(ctx context.Context, t *task) error {
 		}
 
 		s.mx.error(errorIdet)
-		s.log.WarnContext(ctx, "the idet sample failed, treating the source as progressive",
-			slog.Int64("job_id", t.job.ID), slog.Any("error", err))
+		s.log.Warn("the idet sample failed, treating the source as progressive",
+			zap.Int64("job_id", t.job.ID), zap.Error(err))
 
 		return nil
 	}
 
 	scan := ffmpeg.ParseIdet(res.StderrTail)
 
-	s.log.InfoContext(ctx, "idet sample decided the scan type",
-		slog.Int64("job_id", t.job.ID), slog.String("scan", string(scan)))
+	s.log.Info("idet sample decided the scan type",
+		zap.Int64("job_id", t.job.ID), zap.String("scan", string(scan)))
 
 	return s.replan(t, scan)
 }
@@ -329,28 +328,28 @@ func (s *Service) selectEncoder(ctx context.Context, t *task) error {
 	}
 
 	t.selection = caps.Select(t.plan.HDR)
-	s.logSelection(ctx, t)
+	s.logSelection(t)
 
 	return nil
 }
 
-func (s *Service) logSelection(ctx context.Context, t *task) {
+func (s *Service) logSelection(t *task) {
 	if !t.selection.FellBack {
 		return
 	}
 
-	level := slog.LevelWarn
+	level := zapcore.WarnLevel
 	if t.selection.Software {
 		// plan.md 10.2: a silent software fallback turns a 20-minute job into a
 		// four-hour one, so it is never merely informational.
-		level = slog.LevelError
+		level = zapcore.ErrorLevel
 	}
 
-	s.log.Log(ctx, level, "the preferred encoder is not being used",
-		slog.Int64("job_id", t.job.ID),
-		slog.String("encoder", string(t.selection.Encoder)),
-		slog.Bool("software", t.selection.Software),
-		slog.String("reason", t.selection.Reason))
+	s.log.Log(level, "the preferred encoder is not being used",
+		zap.Int64("job_id", t.job.ID),
+		zap.String("encoder", string(t.selection.Encoder)),
+		zap.Bool("software", t.selection.Software),
+		zap.String("reason", t.selection.Reason))
 }
 
 // 17.2's "fill it in when the job starts": by here the sample probe has a target
@@ -399,7 +398,7 @@ func (s *Service) encode(ctx context.Context, t *task) error {
 		tried = append(tried, describeAttempt(t, cmd))
 		last, lastEr = res, runErr
 
-		if !s.stepBack(ctx, t, cmd, res) {
+		if !s.stepBack(t, cmd, res) {
 			return encodeExhausted(t, tried, last, lastEr)
 		}
 	}
@@ -407,7 +406,7 @@ func (s *Service) encode(ctx context.Context, t *task) error {
 
 // stepBack moves to the next thing worth trying; changing encoder re-arms the
 // decode retry, because a different backend fails differently.
-func (s *Service) stepBack(ctx context.Context, t *task, cmd ffmpeg.Command, res ffmpeg.RunResult) bool {
+func (s *Service) stepBack(t *task, cmd ffmpeg.Command, res ffmpeg.RunResult) bool {
 	if retry, ok := hardware.RetryInSoftware(cmd.DecodePath, t.decodeRetried); ok {
 		s.mx.decodeFallback()
 
@@ -416,8 +415,8 @@ func (s *Service) stepBack(ctx context.Context, t *task, cmd ffmpeg.Command, res
 		t.selection.FellBack = true
 		t.selection.Reason = strings.TrimSpace(t.selection.Reason + " " + retry.Reason)
 
-		s.log.WarnContext(ctx, "retrying the encode with software decode",
-			slog.Int64("job_id", t.job.ID), slog.String("stderr", lastLine(res.StderrTail)))
+		s.log.Warn("retrying the encode with software decode",
+			zap.Int64("job_id", t.job.ID), zap.String("stderr", lastLine(res.StderrTail)))
 
 		return true
 	}
@@ -437,7 +436,7 @@ func (s *Service) stepBack(ctx context.Context, t *task, cmd ffmpeg.Command, res
 	t.decodeRetried = false
 	t.forceSoftware = false
 
-	s.logSelection(ctx, t)
+	s.logSelection(t)
 
 	return true
 }
@@ -470,8 +469,7 @@ func (s *Service) runEncode(ctx context.Context, t *task, args []string) (ffmpeg
 	throttle := ffmpeg.NewThrottle(s.clk, ffmpeg.FlushInterval, func(p ffmpeg.Progress) {
 		if err := s.store.UpdateJobProgress(writeCtx, t.job.ID, p.Percent, p.Speed, p.FPS, t.estimate); err != nil {
 			s.mx.error(errorProgress)
-			s.log.WarnContext(writeCtx, "storing job progress failed",
-				slog.Int64("job_id", t.job.ID), slog.Any("error", err))
+			s.log.Warn("storing job progress failed", zap.Int64("job_id", t.job.ID), zap.Error(err))
 		}
 	})
 
@@ -595,14 +593,12 @@ func (s *Service) promoteRequest(ctx context.Context, t *task) promote.Request {
 func (s *Service) block(ctx context.Context, t *task, reason string) {
 	if err := s.store.SetJobState(ctx, t.job.ID, domain.JobAwaitingStreamEnd); err != nil {
 		s.mx.error(errorState)
-		s.log.WarnContext(ctx, "moving the job to awaiting_stream_end failed",
-			slog.Int64("job_id", t.job.ID), slog.Any("error", err))
+		s.log.Warn("moving the job to awaiting_stream_end failed", zap.Int64("job_id", t.job.ID), zap.Error(err))
 	}
 
 	if err := s.store.SetJobBlockedBy(ctx, t.job.ID, reason); err != nil {
 		s.mx.error(errorState)
-		s.log.WarnContext(ctx, "recording what the job is blocked by failed",
-			slog.Int64("job_id", t.job.ID), slog.Any("error", err))
+		s.log.Warn("recording what the job is blocked by failed", zap.Int64("job_id", t.job.ID), zap.Error(err))
 	}
 
 	s.observe(ctx, domain.JobAwaitingStreamEnd, t.plan.Kind, t.job.Origin)
@@ -627,8 +623,7 @@ func (s *Service) settle(ctx context.Context, t *task, out *ffprobe.Result, res 
 	if t.blocked {
 		if err := s.store.SetJobBlockedBy(ctx, t.job.ID, ""); err != nil {
 			s.mx.error(errorState)
-			s.log.WarnContext(ctx, "clearing blocked_by failed",
-				slog.Int64("job_id", t.job.ID), slog.Any("error", err))
+			s.log.Warn("clearing blocked_by failed", zap.Int64("job_id", t.job.ID), zap.Error(err))
 		}
 	}
 
@@ -637,14 +632,14 @@ func (s *Service) settle(ctx context.Context, t *task, out *ffprobe.Result, res 
 	s.observe(ctx, domain.JobDone, t.plan.Kind, t.job.Origin)
 
 	for _, w := range res.Warnings {
-		s.log.WarnContext(ctx, "promotion warning", slog.Int64("job_id", t.job.ID), slog.String("warning", w))
+		s.log.Warn("promotion warning", zap.Int64("job_id", t.job.ID), zap.String("warning", w))
 	}
 
-	s.log.InfoContext(ctx, "job promoted",
-		slog.Int64("job_id", t.job.ID),
-		slog.String("path", t.media.Path),
-		slog.Int("estimated_seconds", t.estimate),
-		slog.Int("actual_seconds", actual))
+	s.log.Info("job promoted",
+		zap.Int64("job_id", t.job.ID),
+		zap.String("path", t.media.Path),
+		zap.Int("estimated_seconds", t.estimate),
+		zap.Int("actual_seconds", actual))
 
 	return nil
 }

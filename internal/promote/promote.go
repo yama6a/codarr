@@ -5,16 +5,16 @@ package promote
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"path/filepath"
 	"time"
 
 	"github.com/yama6a/codarr/internal/pkg/clock"
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/fsx"
+	"go.uber.org/zap"
 )
 
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/promote_mock.go -pkg mock . Prober StreamGuard Fingerprinter Notifier Copier
+//go:generate go tool moq -out mock/promote_mock.go -pkg mock . Prober StreamGuard Fingerprinter Notifier Copier
 
 // DefaultStreamRetry is how long the job waits before re-asking Plex whether the
 // target is still being streamed (plan.md 15.2 step 4).
@@ -82,7 +82,7 @@ type Deps struct {
 	Fingerprinter Fingerprinter
 	Notifier      Notifier
 	Copier        Copier
-	Logger        *slog.Logger
+	Logger        *zap.Logger
 	TempDir       string
 	StreamRetry   time.Duration
 
@@ -99,7 +99,7 @@ type Promoter struct {
 	fp          Fingerprinter
 	notifier    Notifier
 	copier      Copier
-	log         *slog.Logger
+	log         *zap.Logger
 	mx          recorder
 	tempDir     string
 	streamRetry time.Duration
@@ -109,10 +109,6 @@ type Promoter struct {
 func New(d Deps) *Promoter {
 	if d.StreamRetry <= 0 {
 		d.StreamRetry = DefaultStreamRetry
-	}
-
-	if d.Logger == nil {
-		d.Logger = slog.Default()
 	}
 
 	return &Promoter{
@@ -200,7 +196,7 @@ func (p *Promoter) settle(
 	origin fsx.FileInfo,
 	warnings []string,
 ) (Result, error) {
-	restoreWarnings, restoreErr := p.restore(ctx, req.SourcePath, origin)
+	restoreWarnings, restoreErr := p.restore(req.SourcePath, origin)
 	warnings = append(warnings, restoreWarnings...)
 
 	// plan.md 15.2 step 9: after the metadata restore, because restoring mtime
@@ -221,8 +217,8 @@ func (p *Promoter) settle(
 		p.mx.error(ErrorNotify)
 		result.Warnings = append(result.Warnings,
 			"the file was promoted but notifying Plex and the *arr failed: "+err.Error())
-		p.log.WarnContext(ctx, "post-promotion notification failed",
-			slog.Int64("job_id", req.JobID), slog.String("path", req.SourcePath), slog.Any("error", err))
+		p.log.Warn("post-promotion notification failed",
+			zap.Int64("job_id", req.JobID), zap.String("path", req.SourcePath), zap.Error(err))
 	}
 
 	return result, nil
@@ -368,8 +364,8 @@ func (p *Promoter) deferReplace(ctx context.Context, req Request, reason string)
 		req.OnBlocked(reason)
 	}
 
-	p.log.InfoContext(ctx, "the replace is blocked, waiting",
-		slog.Int64("job_id", req.JobID), slog.String("path", req.SourcePath), slog.String("reason", reason))
+	p.log.Info("the replace is blocked, waiting",
+		zap.Int64("job_id", req.JobID), zap.String("path", req.SourcePath), zap.String("reason", reason))
 
 	select {
 	case <-ctx.Done():
@@ -413,14 +409,14 @@ func (p *Promoter) recheckAndRename(ctx context.Context, staging, dest string) (
 
 // plan.md 15.2 step 8: a chown failure is expected under root_squash and is never
 // a job failure, while mode and mtime need no privilege and must succeed.
-func (p *Promoter) restore(ctx context.Context, dest string, origin fsx.FileInfo) ([]string, error) {
+func (p *Promoter) restore(dest string, origin fsx.FileInfo) ([]string, error) {
 	var warnings []string
 
 	if err := p.fs.Chown(dest, origin.UID, origin.GID); err != nil {
 		warnings = append(warnings,
 			fmtf("ownership %d:%d was not restored on %s: %v (expected under root_squash)", origin.UID, origin.GID, dest, err))
-		p.log.WarnContext(ctx, "restoring ownership failed, continuing",
-			slog.String("path", dest), slog.Int("uid", origin.UID), slog.Int("gid", origin.GID), slog.Any("error", err))
+		p.log.Warn("restoring ownership failed, continuing",
+			zap.String("path", dest), zap.Int("uid", origin.UID), zap.Int("gid", origin.GID), zap.Error(err))
 	}
 
 	// Both are attempted even when the first fails, so the promoted file lands as

@@ -52,7 +52,9 @@ describe('Settings, Radarr and Sonarr', () => {
     stub();
     renderArr();
 
-    expect(await screen.findByText(`${window.location.origin}/api/webhook/abc123`)).toBeInTheDocument();
+    expect(
+      await screen.findByText(`${window.location.origin}/api/webhook/abc123`),
+    ).toBeInTheDocument();
   });
 
   it('sends the masked key straight back when only toggling enabled', async () => {

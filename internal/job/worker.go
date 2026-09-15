@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/store"
+	"go.uber.org/zap"
 )
 
 // Run consumes the queue until ctx is cancelled, returning nil on shutdown and
@@ -24,7 +24,7 @@ func (s *Service) Run(ctx context.Context) error {
 		ran, err := s.RunOnce(ctx)
 		if err != nil {
 			s.mx.error(errorWorker)
-			s.log.ErrorContext(ctx, "the worker could not take the next job", slog.Any("error", err))
+			s.log.Error("the worker could not take the next job", zap.Error(err))
 		}
 
 		if ran {
@@ -110,7 +110,7 @@ func (s *Service) setPaused(ctx context.Context, paused bool) error {
 		return fmt.Errorf("storing the queue settings: %w", err)
 	}
 
-	s.log.InfoContext(ctx, "queue pause changed", slog.Bool("paused", paused))
+	s.log.Info("queue pause changed", zap.Bool("paused", paused))
 
 	return nil
 }
@@ -137,7 +137,7 @@ func (s *Service) Cancel(ctx context.Context, jobID int64) error {
 	}
 
 	s.releaseMedia(ctx, j.MediaFileID)
-	s.removeStaging(ctx, j.StagingPath)
+	s.removeStaging(j.StagingPath)
 	s.observe(ctx, domain.JobCancelled, j.Kind, j.Origin)
 
 	return nil
@@ -178,7 +178,7 @@ func (s *Service) Restart(ctx context.Context, jobID int64) (domain.Job, error) 
 func (s *Service) finishCancelled(ctx context.Context, j domain.Job, stagingPath string) error {
 	ctx = context.WithoutCancel(ctx)
 
-	s.removeStaging(ctx, stagingPath)
+	s.removeStaging(stagingPath)
 
 	if err := s.store.CancelJob(ctx, j.ID); err != nil && !errors.Is(err, store.ErrNotFound) {
 		return fmt.Errorf("cancelling job %d: %w", j.ID, err)
@@ -186,7 +186,7 @@ func (s *Service) finishCancelled(ctx context.Context, j domain.Job, stagingPath
 
 	s.releaseMedia(ctx, j.MediaFileID)
 	s.observe(ctx, domain.JobCancelled, j.Kind, j.Origin)
-	s.log.InfoContext(ctx, "job cancelled", slog.Int64("job_id", j.ID))
+	s.log.Info("job cancelled", zap.Int64("job_id", j.ID))
 
 	return nil
 }
@@ -197,7 +197,7 @@ func (s *Service) finishFailed(ctx context.Context, j domain.Job, f *Error, stag
 	ctx = context.WithoutCancel(ctx)
 
 	if f.Code != domain.FailVerification {
-		s.removeStaging(ctx, stagingPath)
+		s.removeStaging(stagingPath)
 	}
 
 	if err := s.store.FailJob(ctx, j.ID, f.Code, f.Error(), f.StderrTail); err != nil {
@@ -207,10 +207,10 @@ func (s *Service) finishFailed(ctx context.Context, j domain.Job, f *Error, stag
 	s.mx.jobFailed(f.Code)
 	s.observe(ctx, domain.JobFailed, j.Kind, j.Origin)
 
-	s.log.ErrorContext(ctx, "job failed",
-		slog.Int64("job_id", j.ID),
-		slog.String("failure_code", string(f.Code)),
-		slog.String("failure_message", f.Error()))
+	s.log.Error("job failed",
+		zap.Int64("job_id", j.ID),
+		zap.String("failure_code", string(f.Code)),
+		zap.String("failure_message", f.Error()))
 
 	return nil
 }
@@ -220,23 +220,21 @@ func (s *Service) finishFailed(ctx context.Context, j domain.Job, f *Error, stag
 func (s *Service) releaseMedia(ctx context.Context, mediaFileID int64) {
 	if err := s.store.SetMediaStatus(ctx, mediaFileID, domain.MediaAnalyzed, ""); err != nil {
 		s.mx.error(errorState)
-		s.log.WarnContext(ctx, "resetting the media status failed",
-			slog.Int64("media_file_id", mediaFileID), slog.Any("error", err))
+		s.log.Warn("resetting the media status failed", zap.Int64("media_file_id", mediaFileID), zap.Error(err))
 	}
 }
 
-func (s *Service) removeStaging(ctx context.Context, path string) {
+func (s *Service) removeStaging(path string) {
 	if path == "" {
 		return
 	}
 
 	if err := s.fs.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 		s.mx.error(errorStaging)
-		s.log.WarnContext(ctx, "removing a staging file failed",
-			slog.String("path", path), slog.Any("error", err))
+		s.log.Warn("removing a staging file failed", zap.String("path", path), zap.Error(err))
 
 		return
 	}
 
-	s.log.InfoContext(ctx, "staging file removed", slog.String("path", path))
+	s.log.Info("staging file removed", zap.String("path", path))
 }

@@ -26,9 +26,14 @@ export function PathMappings({ value, onChange, remoteLabel }: PathMappingsProps
         <span>{remoteLabel}</span>
         <span />
       </div>
-      {value.length === 0 && <p className="text-xs text-slate-500">No mappings. Paths are used as they are.</p>}
+      {value.length === 0 && (
+        <p className="text-xs text-slate-500">No mappings. Paths are used as they are.</p>
+      )}
       {value.map((row, index) => (
-        <div key={row.id ?? `new-${index}`} className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2">
+        <div
+          key={row.id ?? `new-${index}`}
+          className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2"
+        >
           <TextInput
             value={row.local}
             onChange={(next) => update(index, { local: next })}

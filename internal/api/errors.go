@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	gen "github.com/yama6a/codarr/api"
@@ -14,6 +13,7 @@ import (
 	"github.com/yama6a/codarr/internal/job"
 	"github.com/yama6a/codarr/internal/pkg/store"
 	"github.com/yama6a/codarr/internal/plex"
+	"go.uber.org/zap"
 )
 
 // Error is the failure the API renders; the spec has one default response per operation,
@@ -54,12 +54,11 @@ type errBody struct {
 
 // fail turns any error into the response body, logging server-side faults.
 // Client mistakes are not logged: a 404 from a stale UI tab is not an incident.
-func (s *Server) fail(ctx context.Context, err error) errBody {
+func (s *Server) fail(err error) errBody {
 	status, code, message := classify(err)
 
 	if status >= http.StatusInternalServerError {
-		s.log.ErrorContext(ctx, "request failed",
-			slog.String("code", code), slog.String("error", err.Error()))
+		s.log.Error("request failed", zap.String("code", code), zap.Error(err))
 
 		if s.metrics != nil {
 			s.metrics.Error(code)
@@ -114,9 +113,8 @@ func classify(err error) (status int, code, message string) {
 
 // writeError is the escape hatch for the two handlers that write the response
 // themselves rather than returning a generated response object.
-func (s *Server) writeError(w http.ResponseWriter, r *http.Request, status int, code, message string) {
-	s.log.ErrorContext(r.Context(), "request failed",
-		slog.String("code", code), slog.String("error", message))
+func (s *Server) writeError(w http.ResponseWriter, status int, code, message string) {
+	s.log.Error("request failed", zap.String("code", code), zap.String("error", message))
 
 	body, err := json.Marshal(gen.Error{Error: code, Message: message})
 	if err != nil {

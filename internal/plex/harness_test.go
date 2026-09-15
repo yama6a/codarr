@@ -14,6 +14,7 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/pathmap"
 	"github.com/yama6a/codarr/internal/plex"
+	"go.uber.org/zap"
 )
 
 const testToken = "PLACEHOLDER-PLEX-TOKEN"
@@ -139,6 +140,7 @@ func newClient(t *testing.T, s *server, mutate func(*plex.Config)) *plex.Client 
 		RefreshAfter: true,
 		AnalyzeAfter: true,
 		Retry:        plex.Retry{Attempts: 3, Base: time.Millisecond, Max: time.Millisecond},
+		Logger:       zap.NewNop(),
 	}
 
 	if mutate != nil {

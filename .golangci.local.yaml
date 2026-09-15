@@ -1,0 +1,23 @@
+version: "2"
+linters:
+  settings:
+    tagliatelle:
+      case:
+        rules:
+          json: snake
+    ireturn:
+      allow:
+        - io.ReadSeekCloser
+        # fsx defines WriteSyncCloser, so every implementation of fsx.FS,
+        # including the test doubles, has to return it.
+        - fsx.WriteSyncCloser
+  exclusions:
+    rules:
+      # A constructor returning its own package's interface is the boundary pattern.
+      - path: internal/pkg/(clock|fsx|events)/
+        linters:
+          - ireturn
+      # The policy constants are deliberately package-level.
+      - path: internal/decide/policy\.go
+        linters:
+          - gochecknoglobals

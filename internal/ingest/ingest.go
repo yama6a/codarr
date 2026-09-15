@@ -15,12 +15,12 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/store"
 )
 
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/fs_mock.go -pkg mock . FS
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/fingerprinter_mock.go -pkg mock . Fingerprinter
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/analysis_store_mock.go -pkg mock . AnalysisStore
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/scan_store_mock.go -pkg mock . ScanStore
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/webhook_store_mock.go -pkg mock . WebhookStore
-//go:generate go run -mod=mod github.com/matryer/moq -out mock/file_analyzer_mock.go -pkg mock . FileAnalyzer
+//go:generate go tool moq -out mock/fs_mock.go -pkg mock . FS
+//go:generate go tool moq -out mock/fingerprinter_mock.go -pkg mock . Fingerprinter
+//go:generate go tool moq -out mock/analysis_store_mock.go -pkg mock . AnalysisStore
+//go:generate go tool moq -out mock/scan_store_mock.go -pkg mock . ScanStore
+//go:generate go tool moq -out mock/webhook_store_mock.go -pkg mock . WebhookStore
+//go:generate go tool moq -out mock/file_analyzer_mock.go -pkg mock . FileAnalyzer
 
 // Sentinel errors. Everything else is wrapped.
 var (

@@ -41,7 +41,13 @@ function useMorePages(state: JobState, base: number, resetKey: number) {
     try {
       const page = await unwrap(
         api.GET('/api/jobs', {
-          params: { query: { state, page: Math.floor((base + extra.length) / PAGE_SIZE) + 1, page_size: PAGE_SIZE } },
+          params: {
+            query: {
+              state,
+              page: Math.floor((base + extra.length) / PAGE_SIZE) + 1,
+              page_size: PAGE_SIZE,
+            },
+          },
         }),
       );
       setExtra((prev) => mergeById(prev, page.items));
@@ -78,7 +84,9 @@ export default function Dashboard() {
     }
     setBusy('pause');
     try {
-      await unwrap(data.queue_paused ? api.POST('/api/queue/resume') : api.POST('/api/queue/pause'));
+      await unwrap(
+        data.queue_paused ? api.POST('/api/queue/resume') : api.POST('/api/queue/pause'),
+      );
       toast.success(data.queue_paused ? 'Queue resumed.' : 'Queue paused.');
       refresh();
     } catch {
@@ -124,7 +132,9 @@ export default function Dashboard() {
     return (
       <div className="p-8">
         <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-        <p className="mt-2 text-sm text-red-400">{error?.message ?? 'The dashboard could not be loaded.'}</p>
+        <p className="mt-2 text-sm text-red-400">
+          {error?.message ?? 'The dashboard could not be loaded.'}
+        </p>
       </div>
     );
   }

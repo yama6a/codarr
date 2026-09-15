@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"path/filepath"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/store"
 	"github.com/yama6a/codarr/internal/promote"
+	"go.uber.org/zap"
 )
 
 // errUnknownSweepAction guards against the store growing a fourth outcome that
@@ -40,19 +40,18 @@ func (s *Service) Recover(ctx context.Context) error {
 	claimed := make([]string, 0, len(results))
 
 	for _, r := range results {
-		s.log.InfoContext(ctx, "interrupted job found",
-			slog.Int64("job_id", r.JobID),
-			slog.String("found_state", string(r.FoundState)),
-			slog.String("action", string(r.Action)),
-			slog.Int("attempt", r.Attempt))
+		s.log.Info("interrupted job found",
+			zap.Int64("job_id", r.JobID),
+			zap.String("found_state", string(r.FoundState)),
+			zap.String("action", string(r.Action)),
+			zap.Int("attempt", r.Attempt))
 
 		s.observeSweep(r.Action)
 
 		keep, err := s.recoverOne(ctx, r)
 		if err != nil {
 			s.mx.error(errorRecovery)
-			s.log.ErrorContext(ctx, "deciding what an interrupted job did failed",
-				slog.Int64("job_id", r.JobID), slog.Any("error", err))
+			s.log.Error("deciding what an interrupted job did failed", zap.Int64("job_id", r.JobID), zap.Error(err))
 
 			continue
 		}
@@ -87,7 +86,7 @@ func (s *Service) recoverOne(ctx context.Context, r store.SweepResult) (string, 
 	case store.SweepRequeued, store.SweepFailed:
 		// running and verifying: the store already applied the attempt cap, and any
 		// staging file here is a half-written encode.
-		s.removeStaging(ctx, r.StagingPath)
+		s.removeStaging(r.StagingPath)
 
 		return "", nil
 	case store.SweepNeedsCheck:
@@ -113,7 +112,7 @@ func (s *Service) recoverPromoting(ctx context.Context, r store.SweepResult) err
 
 	switch answer {
 	case verdictSourceIntact:
-		s.removeStaging(ctx, r.StagingPath)
+		s.removeStaging(r.StagingPath)
 
 		return s.requeue(ctx, r)
 	case verdictPromoted:
@@ -217,13 +216,13 @@ func (s *Service) markPromoted(
 	s.observe(ctx, domain.JobDone, j.Kind, j.Origin)
 	s.mx.transcodeDuration(j.Kind, j.EncoderUsed, float64(actual))
 
-	s.log.InfoContext(ctx, "an interrupted promotion had already completed, finishing it",
-		slog.Int64("job_id", j.ID), slog.String("path", media.Path))
+	s.log.Info("an interrupted promotion had already completed, finishing it",
+		zap.Int64("job_id", j.ID), zap.String("path", media.Path))
 
 	if err := s.notifier.NotifyPromoted(ctx, media.Path); err != nil {
 		s.mx.error(errorNotify)
-		s.log.WarnContext(ctx, "the deferred post-promotion notification failed",
-			slog.Int64("job_id", j.ID), slog.String("path", media.Path), slog.Any("error", err))
+		s.log.Warn("the deferred post-promotion notification failed",
+			zap.Int64("job_id", j.ID), zap.String("path", media.Path), zap.Error(err))
 	}
 
 	return nil
@@ -241,8 +240,8 @@ func (s *Service) failUndecidable(ctx context.Context, r store.SweepResult, medi
 
 	s.mx.jobFailed(domain.FailPromote)
 
-	s.log.ErrorContext(ctx, "an interrupted promotion could not be decided",
-		slog.Int64("job_id", r.JobID), slog.String("path", media.Path), slog.String("detail", detail))
+	s.log.Error("an interrupted promotion could not be decided",
+		zap.Int64("job_id", r.JobID), zap.String("path", media.Path), zap.String("detail", detail))
 
 	return nil
 }
@@ -257,8 +256,8 @@ func (s *Service) recoverAwaiting(ctx context.Context, r store.SweepResult) (str
 
 	if s.stagingVerifies(ctx, j) {
 		s.addPending(j.ID)
-		s.log.InfoContext(ctx, "resuming an interrupted promotion, its output still verifies",
-			slog.Int64("job_id", j.ID), slog.String("staging_path", j.StagingPath))
+		s.log.Info("resuming an interrupted promotion, its output still verifies",
+			zap.Int64("job_id", j.ID), zap.String("staging_path", j.StagingPath))
 
 		return j.StagingPath, nil
 	}
@@ -279,8 +278,8 @@ func (s *Service) stagingVerifies(ctx context.Context, j domain.Job) bool {
 
 	t, err := s.taskFromRow(ctx, j)
 	if err != nil {
-		s.log.WarnContext(ctx, "an interrupted promotion could not be rebuilt from its row",
-			slog.Int64("job_id", j.ID), slog.Any("error", err))
+		s.log.Warn("an interrupted promotion could not be rebuilt from its row",
+			zap.Int64("job_id", j.ID), zap.Error(err))
 
 		return false
 	}
@@ -297,15 +296,15 @@ func (s *Service) stagingVerifies(ctx context.Context, j domain.Job) bool {
 		FinalOutTimeSeconds: t.finalOut.Seconds(),
 	})
 	if err != nil {
-		s.log.WarnContext(ctx, "the staged output of an interrupted promotion no longer verifies",
-			slog.Int64("job_id", j.ID), slog.Any("error", err))
+		s.log.Warn("the staged output of an interrupted promotion no longer verifies",
+			zap.Int64("job_id", j.ID), zap.Error(err))
 
 		return false
 	}
 
 	for _, w := range warnings {
-		s.log.WarnContext(ctx, "verification warning on a resumed promotion",
-			slog.Int64("job_id", j.ID), slog.String("warning", w))
+		s.log.Warn("verification warning on a resumed promotion",
+			zap.Int64("job_id", j.ID), zap.String("warning", w))
 	}
 
 	return true
@@ -319,10 +318,10 @@ func (s *Service) requeue(ctx context.Context, r store.SweepResult) error {
 
 	s.observeSweep(res.Action)
 
-	s.log.InfoContext(ctx, "interrupted job resolved",
-		slog.Int64("job_id", r.JobID),
-		slog.String("action", string(res.Action)),
-		slog.Int("attempt", res.Attempt))
+	s.log.Info("interrupted job resolved",
+		zap.Int64("job_id", r.JobID),
+		zap.String("action", string(res.Action)),
+		zap.Int("attempt", res.Attempt))
 
 	return nil
 }
@@ -331,7 +330,7 @@ func (s *Service) sweepOrphans(ctx context.Context, claimed []string) {
 	roots, err := s.store.ListRoots(ctx)
 	if err != nil {
 		s.mx.error(errorOrphanSweep)
-		s.log.WarnContext(ctx, "the roots could not be read, skipping the orphan sweep", slog.Any("error", err))
+		s.log.Warn("the roots could not be read, skipping the orphan sweep", zap.Error(err))
 
 		return
 	}
@@ -344,11 +343,11 @@ func (s *Service) sweepOrphans(ctx context.Context, claimed []string) {
 	removed, err := s.promoter.Sweep(ctx, paths, claimed)
 	if err != nil {
 		s.mx.error(errorOrphanSweep)
-		s.log.WarnContext(ctx, "the orphan sweep did not complete cleanly", slog.Any("error", err))
+		s.log.Warn("the orphan sweep did not complete cleanly", zap.Error(err))
 	}
 
 	if len(removed) > 0 {
-		s.log.InfoContext(ctx, "orphan sweep finished", slog.Int("removed", len(removed)))
+		s.log.Info("orphan sweep finished", zap.Int("removed", len(removed)))
 	}
 }
 

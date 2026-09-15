@@ -92,9 +92,14 @@ describe('labels', () => {
   });
 
   it('counts codecs most frequent first', () => {
-    expect(codecCounts([{ codec: 'subrip' }, { codec: 'ass' }, { codec: 'subrip' }, { codec: 'subrip' }])).toBe(
-      '3x subrip, 1x ass',
-    );
+    expect(
+      codecCounts([
+        { codec: 'subrip' },
+        { codec: 'ass' },
+        { codec: 'subrip' },
+        { codec: 'subrip' },
+      ]),
+    ).toBe('3x subrip, 1x ass');
     expect(codecCounts([])).toBe('none');
   });
 

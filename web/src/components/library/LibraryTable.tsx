@@ -117,16 +117,23 @@ export function LibraryTable({
                 <td className="px-3 py-2.5 whitespace-nowrap text-slate-300">
                   {item.arr_instance_name ?? 'none'}
                 </td>
-                <td className="px-3 py-2.5 whitespace-nowrap text-slate-300">{item.container ?? 'unknown'}</td>
+                <td className="px-3 py-2.5 whitespace-nowrap text-slate-300">
+                  {item.container ?? 'unknown'}
+                </td>
                 <td className="px-3 py-2.5 whitespace-nowrap text-slate-300">
                   <span className="block">
                     {item.video_codec ?? 'unknown'}
                     {item.video_profile ? ` ${item.video_profile}` : ''}
                     {item.video_level ? ` L${item.video_level}` : ''}
-                    {item.is_hdr && <Badge tone="warning" className="ml-1.5">HDR</Badge>}
+                    {item.is_hdr && (
+                      <Badge tone="warning" className="ml-1.5">
+                        HDR
+                      </Badge>
+                    )}
                   </span>
                   <span className="block text-xs text-slate-500">
-                    {formatResolution(item.width, item.height)}, {formatBitrate(item.video_bitrate_kbps)}
+                    {formatResolution(item.width, item.height)},{' '}
+                    {formatBitrate(item.video_bitrate_kbps)}
                   </span>
                 </td>
                 <td className="px-3 py-2.5 text-xs text-slate-300">
@@ -137,7 +144,9 @@ export function LibraryTable({
                 <td className="px-3 py-2.5 text-xs text-slate-300">
                   {codecCounts(item.subtitles)}
                 </td>
-                <td className="px-3 py-2.5 whitespace-nowrap text-slate-300">{formatBytes(item.size_bytes)}</td>
+                <td className="px-3 py-2.5 whitespace-nowrap text-slate-300">
+                  {formatBytes(item.size_bytes)}
+                </td>
                 <td className="px-3 py-2.5">
                   {item.plan_kind ? (
                     <PlanKindBadges kind={item.plan_kind} />

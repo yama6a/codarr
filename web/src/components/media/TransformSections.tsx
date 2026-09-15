@@ -18,10 +18,12 @@ function VideoCell({ state }: { state?: VideoState }) {
   return (
     <ul className="space-y-0.5">
       <li>
-        {state.codec} {state.profile && `(${state.profile}${state.level ? ` L${state.level}` : ''})`}
+        {state.codec}{' '}
+        {state.profile && `(${state.profile}${state.level ? ` L${state.level}` : ''})`}
       </li>
       <li>
-        {formatResolution(state.width, state.height)}, {state.fps ? `${state.fps.toFixed(3)} fps` : 'unknown fps'}
+        {formatResolution(state.width, state.height)},{' '}
+        {state.fps ? `${state.fps.toFixed(3)} fps` : 'unknown fps'}
       </li>
       <li>{formatBitrate(state.bitrate_kbps)}</li>
       <li>
@@ -82,7 +84,9 @@ export function TransformSections({ transform, produced }: TransformSectionsProp
     <div className="space-y-6">
       <div
         className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
-          produced ? 'border-green-800 bg-green-950/50 text-green-200' : 'border-sky-800 bg-sky-950/50 text-sky-200'
+          produced
+            ? 'border-green-800 bg-green-950/50 text-green-200'
+            : 'border-sky-800 bg-sky-950/50 text-sky-200'
         }`}
       >
         <Icon name={produced ? 'check' : 'clock'} size={16} />
@@ -92,7 +96,9 @@ export function TransformSections({ transform, produced }: TransformSectionsProp
       </div>
 
       <section>
-        <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">Container</h3>
+        <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">
+          Container
+        </h3>
         <CompareHeader afterLabel={afterLabel} afterHint={afterHint} />
         <CompareRow
           label="Container"
@@ -113,7 +119,9 @@ export function TransformSections({ transform, produced }: TransformSectionsProp
 
       {transform.video && (
         <section>
-          <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">Video</h3>
+          <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">
+            Video
+          </h3>
           <CompareRow
             label="Video stream"
             action={transform.video.action}
@@ -167,14 +175,19 @@ export function TransformSections({ transform, produced }: TransformSectionsProp
       </section>
 
       <section>
-        <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">Size and duration</h3>
+        <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">
+          Size and duration
+        </h3>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-lg border border-slate-800 bg-slate-900/70 p-3">
             <p className="text-[11px] tracking-wide text-slate-500 uppercase">File size</p>
             <p className="mt-1 text-sm text-slate-200">
-              {formatBytes(transform.size.before_bytes)} to {formatBytes(transform.size.after_bytes)}
+              {formatBytes(transform.size.before_bytes)} to{' '}
+              {formatBytes(transform.size.after_bytes)}
             </p>
-            <p className={`mt-0.5 text-xs font-medium ${sizeDelta <= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <p
+              className={`mt-0.5 text-xs font-medium ${sizeDelta <= 0 ? 'text-green-400' : 'text-red-400'}`}
+            >
               {formatSignedBytes(sizeDelta)}
               {sizePct !== null ? ` (${sizePct > 0 ? '+' : ''}${sizePct.toFixed(1)}%)` : ''}
               {!produced && <span className="ml-1 text-slate-500">projected</span>}
@@ -186,7 +199,8 @@ export function TransformSections({ transform, produced }: TransformSectionsProp
               estimated {formatDuration(transform.duration_seconds.estimated)}
             </p>
             <p className="mt-0.5 text-xs text-slate-400">
-              {transform.duration_seconds.actual === null || transform.duration_seconds.actual === undefined ? (
+              {transform.duration_seconds.actual === null ||
+              transform.duration_seconds.actual === undefined ? (
                 <Badge tone="neutral">actual pending</Badge>
               ) : (
                 `actual ${formatDuration(transform.duration_seconds.actual)}`

@@ -235,15 +235,15 @@ func verifyDolbyVision(req Request, out Output) ([]string, error) {
 	)}, nil
 }
 
-// Full plans only: an audio_only plan legitimately grows a file when a 1.5 Mbps
-// DTS track becomes 640k AC3 (plan.md 15.3).
+// Video encodes only: a plan that copies video legitimately grows a file when a
+// 1.5 Mbps DTS track becomes 640k AC3 (plan.md 15.3).
 func verifySize(req Request, outputSize int64) error {
-	if req.Plan.Kind != domain.KindFull || outputSize <= req.Source.SizeBytes {
+	if !req.Plan.EncodesVideo() || outputSize <= req.Source.SizeBytes {
 		return nil
 	}
 
 	return fail(domain.FailVerification,
-		"the output is %s (%d bytes), larger than the %s (%d bytes) source, and the plan is a full transcode",
+		"the output is %s (%d bytes), larger than the %s (%d bytes) source, and the plan re-encodes video",
 		human(outputSize), outputSize, human(req.Source.SizeBytes), req.Source.SizeBytes)
 }
 

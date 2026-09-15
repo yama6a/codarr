@@ -97,7 +97,7 @@ func (p *Prober) Probe(ctx context.Context) (Capabilities, error) {
 	}
 
 	now := p.clock.Now()
-	entries := make([]domain.HWCapability, 0, len(Backends())*len(Profiles())+len(Backends()))
+	entries := make([]domain.HWCapability, 0, len(Backends())*(len(Profiles())+len(DecodeProbes())))
 
 	for _, b := range Backends() {
 		for _, prof := range Profiles() {
@@ -162,17 +162,29 @@ func (p *Prober) encodeEntry(ctx context.Context, b Backend, prof Profile, versi
 	return e
 }
 
-// The VP9 sample is synthesised once and decoded on each backend, because lavfi cannot
-// be fed to a hardware decoder (plan.md 10.1).
 func (p *Prober) decodeEntries(ctx context.Context, version string, now time.Time) []domain.HWCapability {
-	entries := make([]domain.HWCapability, 0, len(Backends()))
-	sample := filepath.Join(p.tempDir, ".codarr-vp9-probe.webm")
+	entries := make([]domain.HWCapability, 0, len(Backends())*len(DecodeProbes()))
 
-	sampleOut, sampleErr := p.runner.Run(ctx, VP9SampleArgs(sample))
+	for _, probe := range DecodeProbes() {
+		entries = append(entries, p.decodeCodec(ctx, probe, version, now)...)
+	}
+
+	return entries
+}
+
+// One sample per codec is synthesised and decoded on each backend, because lavfi
+// cannot be fed to a hardware decoder (plan.md 10.1).
+func (p *Prober) decodeCodec(
+	ctx context.Context, probe DecodeProbe, version string, now time.Time,
+) []domain.HWCapability {
+	entries := make([]domain.HWCapability, 0, len(Backends()))
+	sample := filepath.Join(p.tempDir, ".codarr-"+probe.Codec+"-probe"+probe.Ext)
+
+	sampleErr := p.synthesise(ctx, probe, sample)
 	if sampleErr == nil {
 		defer func() {
 			if err := p.fs.Remove(sample); err != nil {
-				p.logger.Warn("could not remove the VP9 probe sample",
+				p.logger.Warn("could not remove the decode probe sample",
 					slog.String("path", sample), slog.String("error", err.Error()))
 			}
 		}()
@@ -181,7 +193,7 @@ func (p *Prober) decodeEntries(ctx context.Context, version string, now time.Tim
 	for _, b := range Backends() {
 		e := domain.HWCapability{
 			Backend:       string(b),
-			Codec:         CodecVP9,
+			Codec:         probe.Codec,
 			Direction:     string(DirectionDecode),
 			FfmpegVersion: version,
 			ProbedAt:      now,
@@ -190,10 +202,10 @@ func (p *Prober) decodeEntries(ctx context.Context, version string, now time.Tim
 		switch {
 		case sampleErr != nil:
 			// Inconclusive rather than negative, but the schema has one flag, so the text says which.
-			e.Error = "inconclusive: could not synthesise a VP9 sample to decode: " +
-				failureText(sampleOut, sampleErr)
+			e.Error = "inconclusive: could not synthesise " + strings.ToUpper(probe.Codec) +
+				" sample to decode: " + sampleErr.Error()
 		default:
-			out, err := p.runner.Run(ctx, VP9DecodeArgs(b, p.device, sample))
+			out, err := p.runner.Run(ctx, DecodeArgs(b, p.device, sample))
 			if err != nil {
 				e.Error = failureText(out, err)
 			} else {
@@ -207,14 +219,34 @@ func (p *Prober) decodeEntries(ctx context.Context, version string, now time.Tim
 	return entries
 }
 
+// synthesise tries the probe's encoders in order and returns the last failure
+// when none of them is in this ffmpeg build.
+func (p *Prober) synthesise(ctx context.Context, probe DecodeProbe, sample string) error {
+	var last error
+
+	for _, enc := range probe.Encoders {
+		out, err := p.runner.Run(ctx, SampleArgs(enc, sample))
+		if err == nil {
+			return nil
+		}
+
+		last = fmt.Errorf("%s: %s", enc, failureText(out, err))
+	}
+
+	return last
+}
+
 // usable reports whether the cached rows were all produced by this ffmpeg
-// build. A mixed set means a probe was interrupted, so it is not trusted.
+// build and cover every codec the decode axis probes today. A mixed set means a
+// probe was interrupted, a missing codec means the matrix grew since the cache
+// was written; neither is trusted.
 func usable(cached []domain.HWCapability, version, device string) (Capabilities, bool) {
 	if len(cached) == 0 {
 		return Capabilities{}, false
 	}
 
 	probedAt := cached[0].ProbedAt
+	decoded := map[string]bool{}
 
 	for _, e := range cached {
 		if e.FfmpegVersion != version {
@@ -223,6 +255,16 @@ func usable(cached []domain.HWCapability, version, device string) (Capabilities,
 
 		if e.ProbedAt.After(probedAt) {
 			probedAt = e.ProbedAt
+		}
+
+		if e.Direction == string(DirectionDecode) {
+			decoded[e.Codec] = true
+		}
+	}
+
+	for _, probe := range DecodeProbes() {
+		if !decoded[probe.Codec] {
+			return Capabilities{}, false
 		}
 	}
 

@@ -27,12 +27,28 @@ func NewDB(t *testing.T) store.Store {
 func NewRawDB(t *testing.T) *store.DB {
 	t.Helper()
 
+	db := NewDBAt(t, 0)
+
+	require.NoError(t, store.Migrate(db, Logger()))
+
+	return db
+}
+
+// NewDBAt returns pools migrated through the first n migrations only, so a test
+// can seed rows the way an older binary wrote them before applying the rest.
+func NewDBAt(t *testing.T, n int) *store.DB {
+	t.Helper()
+
 	path := filepath.Join(t.TempDir(), "codarr.db")
 
-	db, err := store.OpenAndMigrate(t.Context(), path, Logger())
+	db, err := store.Open(t.Context(), path)
 	require.NoError(t, err)
 
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
+
+	if n > 0 {
+		require.NoError(t, store.MigrateMax(db, Logger(), n))
+	}
 
 	return db
 }

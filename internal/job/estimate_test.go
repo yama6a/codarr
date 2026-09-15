@@ -48,8 +48,8 @@ func TestService_TheEstimateIsRefinedWhenTheJobStarts(t *testing.T) {
 	h.store.putMedia(mediaFile(fullProbe()))
 	encoderWithSamples(h)
 
-	h.store.throughput[throughputKey(domain.KindFull, string(domain.EncoderQSV), "1080p")] = domain.ThroughputStat{
-		Kind: domain.KindFull, Encoder: string(domain.EncoderQSV), Resolution: "1080p",
+	h.store.throughput[throughputKey(domain.ThroughputVideo, string(domain.EncoderQSV), "1080p")] = domain.ThroughputStat{
+		Kind: domain.ThroughputVideo, Encoder: string(domain.EncoderQSV), Resolution: "1080p",
 		Samples: 4, AvgValue: 3,
 	}
 
@@ -70,11 +70,11 @@ func TestService_TheRollingAverageBlendsSuccessiveJobs(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	h.store.throughput[throughputKey(domain.KindAudioOnly, "", "")] = domain.ThroughputStat{
-		Kind: domain.KindAudioOnly, Samples: 1, AvgValue: 100 << 20,
+	h.store.throughput[throughputKey(domain.ThroughputIO, "", "")] = domain.ThroughputStat{
+		Kind: domain.ThroughputIO, Samples: 1, AvgValue: 100 << 20,
 	}
 
-	h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	h.encoder.RunFunc = func(_ context.Context, args []string, _ func(ffmpeg.Progress)) (ffmpeg.RunResult, error) {
@@ -87,7 +87,7 @@ func TestService_TheRollingAverageBlendsSuccessiveJobs(t *testing.T) {
 	_, err := h.svc.RunOnce(t.Context())
 	require.NoError(t, err)
 
-	stat, err := h.store.GetThroughputStat(t.Context(), domain.KindAudioOnly, "", "")
+	stat, err := h.store.GetThroughputStat(t.Context(), domain.ThroughputIO, "", "")
 	require.NoError(t, err)
 	require.Equal(t, 2, stat.Samples)
 
@@ -100,7 +100,7 @@ func TestService_BothTheEstimateAndTheMeasurementAreKept(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	h.encoder.RunFunc = func(_ context.Context, args []string, _ func(ffmpeg.Progress)) (ffmpeg.RunResult, error) {

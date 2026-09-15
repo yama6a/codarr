@@ -1,16 +1,16 @@
 import type { BadgeTone } from '../components/ui/Badge';
-import type { Decision, JobState, MediaStatus, PlanKind, Provenance } from '../api/types';
+import type { Decision, JobState, MediaStatus, PlanLabel, Provenance } from '../api/types';
 
-export function planKindTone(kind: PlanKind | undefined): BadgeTone {
-  switch (kind) {
-    case 'skip':
-      return 'neutral';
-    case 'remux':
-      return 'info';
-    case 'audio_only':
-      return 'accent';
-    case 'full':
+export function planLabelTone(label: PlanLabel): BadgeTone {
+  switch (label) {
+    case 'video':
       return 'warning';
+    case 'audio':
+      return 'accent';
+    case 'subtitles':
+      return 'info';
+    case 'remux':
+      return 'neutral';
     default:
       return 'neutral';
   }

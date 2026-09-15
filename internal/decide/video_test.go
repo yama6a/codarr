@@ -65,21 +65,21 @@ func TestEngine_VideoCopyTest(t *testing.T) {
 			stream:   video("h264", "High 10", withPixFmt("yuv420p10le")),
 			decision: domain.DecisionEncode,
 			reason:   `profile "High 10" is not on the copy list for h264`,
-			kind:     domain.KindFull,
+			kind:     domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:     "h264 high 4:2:2 fails profile and chroma",
 			stream:   video("h264", "High 4:2:2", withPixFmt("yuv422p10le")),
 			decision: domain.DecisionEncode,
 			reason:   `profile "High 4:2:2" is not on the copy list for h264, chroma 4:2:2 is not 4:2:0`,
-			kind:     domain.KindFull,
+			kind:     domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:     "unknown profile is default deny",
 			stream:   video("h264", ""),
 			decision: domain.DecisionEncode,
 			reason:   "profile is unknown",
-			kind:     domain.KindFull,
+			kind:     domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:     "hevc main",
@@ -107,7 +107,7 @@ func TestEngine_VideoCopyTest(t *testing.T) {
 			stream:   video("hevc", "Rext", withPixFmt("yuv444p10le")),
 			decision: domain.DecisionEncode,
 			reason:   `profile "Rext" is not on the copy list for hevc, chroma 4:4:4 is not 4:2:0`,
-			kind:     domain.KindFull,
+			kind:     domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:     "hevc has no level ceiling",
@@ -128,70 +128,70 @@ func TestEngine_VideoCopyTest(t *testing.T) {
 			stream:   video("h264", "High", withLevel(0)),
 			decision: domain.DecisionEncode,
 			reason:   "level is unknown",
-			kind:     domain.KindFull,
+			kind:     domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:     "monochrome is not 4:2:0",
 			stream:   video("h264", "High", withPixFmt("gray")),
 			decision: domain.DecisionEncode,
 			reason:   "chroma monochrome is not 4:2:0",
-			kind:     domain.KindFull,
+			kind:     domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:     "unknown pixel format is not 4:2:0",
 			stream:   video("h264", "High", withPixFmt("")),
 			decision: domain.DecisionEncode,
 			reason:   "chroma unknown is not 4:2:0",
-			kind:     domain.KindFull,
+			kind:     domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:     "mpeg2 dvd rip",
 			stream:   video("mpeg2video", "Main", withSize(720, 576), withFieldOrder("progressive")),
 			decision: domain.DecisionEncode,
 			reason:   "codec mpeg2video is not on the copy list",
-			kind:     domain.KindFull,
+			kind:     domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:     "vc1 blu-ray",
 			stream:   video("vc1", "Advanced", withFieldOrder("progressive")),
 			decision: domain.DecisionEncode,
 			reason:   "codec vc1 is not on the copy list",
-			kind:     domain.KindFull,
+			kind:     domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:     "av1 is re-encoded rather than added to the copy list",
 			stream:   video("av1", "Main", withPixFmt("yuv420p10le")),
 			decision: domain.DecisionEncode,
 			reason:   "codec av1 is not on the copy list",
-			kind:     domain.KindFull,
+			kind:     domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:     "vp9",
 			stream:   video("vp9", "Profile 0"),
 			decision: domain.DecisionEncode,
 			reason:   "codec vp9 is not on the copy list",
-			kind:     domain.KindFull,
+			kind:     domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:     "xvid",
 			stream:   video("mpeg4", "Simple Profile"),
 			decision: domain.DecisionEncode,
 			reason:   "codec mpeg4 is not on the copy list",
-			kind:     domain.KindFull,
+			kind:     domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:     "wmv",
 			stream:   video("wmv3", "Main"),
 			decision: domain.DecisionEncode,
 			reason:   "codec wmv3 is not on the copy list",
-			kind:     domain.KindFull,
+			kind:     domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:     "a codec ffprobe could not name",
 			stream:   video("", ""),
 			decision: domain.DecisionEncode,
 			reason:   "codec unknown is not on the copy list",
-			kind:     domain.KindFull,
+			kind:     domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:     "hdr hevc copies untouched",
@@ -233,91 +233,91 @@ func TestEngine_LevelRewriteCarveOut(t *testing.T) {
 			stream:  video("h264", "High", withLevel(51)),
 			rewrite: true,
 			reason:  "level 5.1 -> 4.2 flag rewrite (content fits 4.2, refs=3)",
-			kind:    domain.KindRemux,
+			kind:    domain.KindOf(domain.LabelRemux),
 		},
 		{
 			name:    "level 5.0 rewrites too",
 			stream:  video("h264", "High", withLevel(50), withRefs(4)),
 			rewrite: true,
 			reason:  "level 5.0 -> 4.2 flag rewrite (content fits 4.2, refs=4)",
-			kind:    domain.KindRemux,
+			kind:    domain.KindOf(domain.LabelRemux),
 		},
 		{
 			name:    "1088 tall still fits",
 			stream:  video("h264", "High", withLevel(51), withSize(1920, 1088)),
 			rewrite: true,
 			reason:  "level 5.1 -> 4.2 flag rewrite (content fits 4.2, refs=3)",
-			kind:    domain.KindRemux,
+			kind:    domain.KindOf(domain.LabelRemux),
 		},
 		{
 			name:    "60 fps still fits",
 			stream:  video("h264", "High", withLevel(51), withFPS("60/1")),
 			rewrite: true,
 			reason:  "level 5.1 -> 4.2 flag rewrite (content fits 4.2, refs=3)",
-			kind:    domain.KindRemux,
+			kind:    domain.KindOf(domain.LabelRemux),
 		},
 		{
 			name:    "refs above 4 needs the higher level",
 			stream:  video("h264", "High", withLevel(51), withRefs(5)),
 			rewrite: false,
 			reason:  "level 5.1 is above 4.2",
-			kind:    domain.KindFull,
+			kind:    domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:    "refs unknown is not a claim that it fits",
 			stream:  video("h264", "High", withLevel(51), withRefs(0)),
 			rewrite: false,
 			reason:  "level 5.1 is above 4.2",
-			kind:    domain.KindFull,
+			kind:    domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:    "4k is genuinely above 4.2",
 			stream:  video("h264", "High", withLevel(51), withSize(3840, 2160)),
 			rewrite: false,
 			reason:  "level 5.1 is above 4.2",
-			kind:    domain.KindFull,
+			kind:    domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:    "too tall",
 			stream:  video("h264", "High", withLevel(51), withSize(1920, 1200)),
 			rewrite: false,
 			reason:  "level 5.1 is above 4.2",
-			kind:    domain.KindFull,
+			kind:    domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:    "too wide",
 			stream:  video("h264", "High", withLevel(51), withSize(2048, 1080)),
 			rewrite: false,
 			reason:  "level 5.1 is above 4.2",
-			kind:    domain.KindFull,
+			kind:    domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:    "above 60 fps",
 			stream:  video("h264", "High", withLevel(51), withFPS("120/1")),
 			rewrite: false,
 			reason:  "level 5.1 is above 4.2",
-			kind:    domain.KindFull,
+			kind:    domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:    "no frame rate at all",
 			stream:  video("h264", "High", withLevel(51), withFPS("0/0")),
 			rewrite: false,
 			reason:  "level 5.1 is above 4.2",
-			kind:    domain.KindFull,
+			kind:    domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:    "no dimensions at all",
 			stream:  video("h264", "High", withLevel(51), withSize(0, 0)),
 			rewrite: false,
 			reason:  "level 5.1 is above 4.2",
-			kind:    domain.KindFull,
+			kind:    domain.KindOf(domain.LabelVideo),
 		},
 		{
 			name:    "the rewrite is for level-only failures",
 			stream:  video("h264", "High 10", withLevel(51), withPixFmt("yuv420p10le")),
 			rewrite: false,
 			reason:  `profile "High 10" is not on the copy list for h264, level 5.1 is above 4.2`,
-			kind:    domain.KindFull,
+			kind:    domain.KindOf(domain.LabelVideo),
 		},
 	}
 
@@ -341,7 +341,7 @@ func TestEngine_LevelRewriteCarveOut(t *testing.T) {
 	}
 }
 
-func TestEngine_LevelRewriteNeverProducesFull(t *testing.T) {
+func TestEngine_LevelRewriteNeverEncodesVideo(t *testing.T) {
 	t.Parallel()
 
 	a, err := decide.New().Plan(
@@ -350,7 +350,7 @@ func TestEngine_LevelRewriteNeverProducesFull(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.True(t, a.Plan.LevelRewrite)
-	require.Equal(t, domain.KindAudioOnly, a.Plan.Kind)
+	require.Equal(t, domain.KindOf(domain.LabelAudio, domain.LabelRemux), a.Plan.Kind)
 }
 
 func TestEngine_FieldOrder(t *testing.T) {
@@ -478,7 +478,7 @@ func TestEngine_InterlacedReasonNamesTheScan(t *testing.T) {
 	a := planOf(t, video("h264", "High", withFieldOrder("tt")))
 	v, _ := a.Plan.VideoStream()
 	require.Equal(t, "interlaced", v.Reason)
-	require.Equal(t, domain.KindFull, a.Plan.Kind)
+	require.Equal(t, domain.KindOf(domain.LabelVideo), a.Plan.Kind)
 }
 
 func TestEngine_DolbyVision(t *testing.T) {
@@ -529,7 +529,7 @@ func TestEngine_DolbyVision(t *testing.T) {
 			stream:   video("hevc", "Rext", withPixFmt("yuv422p10le"), withHDR(), withDolbyVision(7)),
 			decision: domain.DecisionEncode,
 			reason:   `profile "Rext" is not on the copy list for hevc, chroma 4:2:2 is not 4:2:0, Dolby Vision profile 7`,
-			kind:     domain.KindFull,
+			kind:     domain.KindOf(domain.LabelVideo),
 			profile:  7,
 		},
 	}
@@ -562,7 +562,7 @@ func TestEngine_DolbyVisionProfile5DowngradesToAudioOnly(t *testing.T) {
 		decide.Options{Path: mkvPath},
 	)
 	require.NoError(t, err)
-	require.Equal(t, domain.KindAudioOnly, a.Plan.Kind)
+	require.Equal(t, domain.KindOf(domain.LabelAudio), a.Plan.Kind)
 
 	v, _ := a.Plan.VideoStream()
 	require.Equal(t, domain.DecisionCopy, v.Decision)
@@ -641,7 +641,7 @@ func TestForceVideoEncode_TurnsACopiedStreamIntoTheEncodeTarget(t *testing.T) {
 
 	analysis, err := decide.New().Plan(probe, decide.Options{Path: "/media/a.mkv"})
 	require.NoError(t, err)
-	require.Equal(t, domain.KindAudioOnly, analysis.Plan.Kind)
+	require.Equal(t, domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), analysis.Plan.Kind)
 
 	video, ok := analysis.Plan.VideoStream()
 	require.True(t, ok)
@@ -649,7 +649,7 @@ func TestForceVideoEncode_TurnsACopiedStreamIntoTheEncodeTarget(t *testing.T) {
 
 	forced, ok := decide.ForceVideoEncode(analysis.Plan, "space reclaim sweep")
 	require.True(t, ok)
-	require.Equal(t, domain.KindFull, forced.Kind)
+	require.Equal(t, domain.KindOf(domain.LabelVideo, domain.LabelAudio, domain.LabelSubtitles), forced.Kind)
 	require.False(t, forced.LevelRewrite)
 
 	forcedVideo, ok := forced.VideoStream()
@@ -668,12 +668,12 @@ func TestForceVideoEncode_TurnsACopiedStreamIntoTheEncodeTarget(t *testing.T) {
 		"subtitle 1 (eng, subrip): COPY",
 		"subtitle 2 (swe, ass): CONVERT - ass to srt",
 		"container: matroska -> matroska",
-		"plan: FULL - video re-encoded to HEVC MAIN, 1 audio stream re-encoded, 1 subtitle stream converted, 1 subtitle stream dropped",
+		"plan: VIDEO|AUDIO|SUBTITLES - video re-encoded to HEVC MAIN, 1 audio stream re-encoded, 1 subtitle stream converted, 1 subtitle stream dropped",
 	}, forced.Reasons)
 
 	// The caller's plan is untouched: the streams are copied, not aliased.
 	require.Equal(t, domain.DecisionCopy, video.Decision)
-	require.Equal(t, domain.KindAudioOnly, analysis.Plan.Kind)
+	require.Equal(t, domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), analysis.Plan.Kind)
 }
 
 // plan.md 9: profile 5 has no HDR10 base layer, so no saving justifies

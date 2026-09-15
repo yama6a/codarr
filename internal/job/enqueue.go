@@ -16,6 +16,7 @@ type EnqueueResult struct {
 	Enqueued    bool
 	JobID       *int64
 	PlanKind    domain.Kind
+	Planned     bool
 	Reason      string
 }
 
@@ -31,7 +32,7 @@ func (s *Service) Enqueue(ctx context.Context, mediaFileID int64, origin domain.
 }
 
 func (s *Service) enqueue(ctx context.Context, media domain.MediaFile, origin domain.JobOrigin) (EnqueueResult, error) {
-	res := EnqueueResult{MediaFileID: media.ID, PlanKind: media.PlanKind}
+	res := EnqueueResult{MediaFileID: media.ID, PlanKind: media.PlanKind, Planned: media.Plan != nil}
 
 	if reason, ok := blockedFromQueue(media); !ok {
 		res.Reason = reason
@@ -94,7 +95,7 @@ func (s *Service) insert(
 		MediaFileID: media.ID,
 		Kind:        plan.Kind,
 		Origin:      origin,
-		Priority:    priorityFor(plan.Kind, settings.PrioritiseQuickJobs),
+		Priority:    domain.PriorityFor(plan.Kind, settings.PrioritiseQuickJobs),
 		Transform:   decide.NewTransform(probe, plan, estimate),
 		QueuedAt:    s.clk.Now(),
 	})
@@ -128,7 +129,7 @@ func blockedFromQueue(m domain.MediaFile) (string, bool) {
 		return "the file has not been analysed yet", false
 	case m.Status == domain.MediaMissing:
 		return "the file is missing from disk", false
-	case m.PlanKind == domain.KindSkip:
+	case m.PlanKind.Skip():
 		return skipReason(m), false
 	default:
 		return "", true
@@ -154,23 +155,4 @@ func planFor(origin domain.JobOrigin, plan domain.Plan) (domain.Plan, bool) {
 	}
 
 	return decide.ForceVideoEncode(plan, sweepReason)
-}
-
-// priorityFor is plan.md 19: lower runs first, normal is 100, and the I/O bound
-// kinds go ahead of encodes so quick wins clear first.
-func priorityFor(kind domain.Kind, prioritiseQuick bool) int {
-	if !prioritiseQuick {
-		return domain.PriorityNormal
-	}
-
-	switch kind {
-	case domain.KindRemux, domain.KindAudioOnly:
-		return domain.PriorityQuick
-	case domain.KindFull:
-		return domain.PriorityFull
-	case domain.KindSkip:
-		return domain.PriorityNormal
-	default:
-		return domain.PriorityNormal
-	}
 }

@@ -108,9 +108,9 @@ func (s *store) ListJobs(ctx context.Context, f JobFilter) ([]domain.Job, int, e
 		limit = 50
 	}
 
-	//nolint:gosec // the only interpolation is placeholder lists built from constants
+	//nolint:gosec // the only interpolation is placeholder lists and an order clause built from constants
 	query := `SELECT ` + jobColumns + ` FROM jobs` + where +
-		` ORDER BY priority ASC, queued_at ASC, id ASC LIMIT ? OFFSET ?`
+		` ORDER BY ` + orderClause(f) + ` LIMIT ? OFFSET ?`
 
 	rows, err := s.db.read.QueryContext(ctx, query, append(args, limit, f.Offset)...)
 	if err != nil {
@@ -135,6 +135,57 @@ func (s *store) ListJobs(ctx context.Context, f JobFilter) ([]domain.Job, int, e
 	}
 
 	return out, total, nil
+}
+
+func orderClause(f JobFilter) string {
+	switch deriveOrder(f) {
+	case OrderQueue:
+		return "priority ASC, queued_at ASC, id ASC"
+	case OrderStarted:
+		return "started_at ASC, id ASC"
+	case OrderFinished:
+		return "finished_at DESC, id DESC"
+	case OrderNewest:
+		return "id DESC"
+	default:
+		return "id DESC"
+	}
+}
+
+func deriveOrder(f JobFilter) JobOrder {
+	if f.Order != "" {
+		return f.Order
+	}
+
+	if len(f.State) == 0 {
+		return OrderNewest
+	}
+
+	orders := map[JobOrder]int{}
+	for _, st := range f.State {
+		orders[naturalOrder(st)]++
+	}
+
+	for order, n := range orders {
+		if n == len(f.State) {
+			return order
+		}
+	}
+
+	return OrderNewest
+}
+
+func naturalOrder(st domain.JobState) JobOrder {
+	switch st {
+	case domain.JobDone, domain.JobFailed, domain.JobCancelled:
+		return OrderFinished
+	case domain.JobRunning, domain.JobVerifying, domain.JobAwaitingStreamEnd, domain.JobPromoting:
+		return OrderStarted
+	case domain.JobQueued:
+		return OrderQueue
+	default:
+		return OrderNewest
+	}
 }
 
 func (s *store) ActiveJobForMedia(ctx context.Context, mediaFileID int64) (domain.Job, bool, error) {

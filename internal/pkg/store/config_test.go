@@ -258,13 +258,13 @@ func TestThroughputStore_UpsertKeysOnKindEncoderResolution(t *testing.T) {
 	s := storetest.NewDB(t)
 
 	stat := domain.ThroughputStat{
-		Kind: domain.KindFull, Encoder: "hevc_qsv", Resolution: "1080p",
+		Kind: domain.ThroughputVideo, Encoder: "hevc_qsv", Resolution: "1080p",
 		Samples: 3, AvgValue: 120.5, UpdatedAt: testTime(),
 	}
 
 	require.NoError(t, s.UpsertThroughputStat(t.Context(), stat))
 
-	got, err := s.GetThroughputStat(t.Context(), domain.KindFull, "hevc_qsv", "1080p")
+	got, err := s.GetThroughputStat(t.Context(), domain.ThroughputVideo, "hevc_qsv", "1080p")
 	require.NoError(t, err)
 	require.Equal(t, stat.Samples, got.Samples)
 	require.InEpsilon(t, stat.AvgValue, got.AvgValue, 0.0001)
@@ -279,7 +279,7 @@ func TestThroughputStore_UpsertKeysOnKindEncoderResolution(t *testing.T) {
 	require.Equal(t, 4, all[0].Samples)
 	require.InEpsilon(t, 118.25, all[0].AvgValue, 0.0001)
 
-	_, err = s.GetThroughputStat(t.Context(), domain.KindRemux, "", "")
+	_, err = s.GetThroughputStat(t.Context(), domain.ThroughputIO, "", "")
 	require.ErrorIs(t, err, store.ErrNotFound)
 }
 
@@ -290,7 +290,7 @@ func TestStatsStore_SumsCompletedJobs(t *testing.T) {
 
 	for i, path := range []string{"/library/one.mkv", "/library/two.mkv"} {
 		media := seedMedia(t, s, path)
-		job := seedJob(t, s, media.ID, domain.KindFull, domain.PriorityFull)
+		job := seedJob(t, s, media.ID, domain.KindOf(domain.LabelVideo), domain.PriorityFull)
 
 		require.NoError(t, s.UpdateJobExecution(t.Context(), store.ExecutionUpdate{
 			JobID: job.ID, SourceSize: 1000, EstimatedSeconds: 100,

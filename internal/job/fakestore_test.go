@@ -593,12 +593,12 @@ func (f *fakeStore) UpdateSettings(_ context.Context, s domain.Settings) error {
 	return nil
 }
 
-func throughputKey(kind domain.Kind, encoder, resolution string) string {
+func throughputKey(kind domain.ThroughputKind, encoder, resolution string) string {
 	return string(kind) + "|" + encoder + "|" + resolution
 }
 
 func (f *fakeStore) GetThroughputStat(
-	_ context.Context, kind domain.Kind, encoder, resolution string,
+	_ context.Context, kind domain.ThroughputKind, encoder, resolution string,
 ) (domain.ThroughputStat, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

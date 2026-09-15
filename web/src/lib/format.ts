@@ -1,3 +1,4 @@
+import type { PlanKind } from '../api/types';
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
 
 export function formatBytes(bytes: number, digits = 1): string {
@@ -141,6 +142,26 @@ export function provenanceLabel(value: string | undefined): string {
 export function titleFromPath(path: string): string {
   const base = path.split('/').pop() ?? path;
   return base.replace(/\.[^.]+$/, '');
+}
+
+/** planKindText names a label set for prose, where an empty set reads as skipped. */
+export function planKindText(kind: PlanKind | null | undefined): string {
+  return kind && kind.length > 0 ? kind.join(', ') : 'skipped';
+}
+
+/** codecCounts collapses a track list into "23x subrip, 2x ass", most frequent first. */
+export function codecCounts(tracks: { codec: string }[]): string {
+  if (tracks.length === 0) {
+    return 'none';
+  }
+  const counts = new Map<string, number>();
+  for (const track of tracks) {
+    counts.set(track.codec, (counts.get(track.codec) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([codec, n]) => `${n}x ${codec}`)
+    .join(', ');
 }
 
 /** humanise turns a snake_case enum value into something readable without a lookup table. */

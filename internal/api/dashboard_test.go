@@ -19,18 +19,18 @@ func dashboardStore(h *harness) {
 	started := testNow.Add(-90 * time.Second)
 
 	jobs := map[domain.JobState][]domain.Job{
-		domain.JobQueued: {{ID: 2, MediaFileID: 20, Kind: domain.KindRemux, State: domain.JobQueued, Priority: 90}},
+		domain.JobQueued: {{ID: 2, MediaFileID: 20, Kind: domain.KindOf(domain.LabelRemux), State: domain.JobQueued, Priority: 90}},
 		domain.JobRunning: {{
-			ID: 1, MediaFileID: 10, Kind: domain.KindFull, State: domain.JobRunning,
+			ID: 1, MediaFileID: 10, Kind: domain.KindOf(domain.LabelVideo), State: domain.JobRunning,
 			StartedAt: &started, ProgressPct: 42.5, ProgressSpeed: 3.1,
 			EncoderUsed: domain.EncoderQSV, DecodePath: domain.DecodeHardware,
 		}},
 		domain.JobAwaitingStreamEnd: {{
-			ID: 3, MediaFileID: 30, Kind: domain.KindFull, State: domain.JobAwaitingStreamEnd,
+			ID: 3, MediaFileID: 30, Kind: domain.KindOf(domain.LabelVideo), State: domain.JobAwaitingStreamEnd,
 			BlockedBy: "alice is watching Dune on Apple TV", StartedAt: &started,
 		}},
-		domain.JobDone:   {{ID: 4, MediaFileID: 40, Kind: domain.KindAudioOnly, State: domain.JobDone}},
-		domain.JobFailed: {{ID: 5, MediaFileID: 50, Kind: domain.KindFull, State: domain.JobFailed, FailureCode: domain.FailFfmpeg, FailureMessage: "encoder died"}},
+		domain.JobDone:   {{ID: 4, MediaFileID: 40, Kind: domain.KindOf(domain.LabelAudio), State: domain.JobDone}},
+		domain.JobFailed: {{ID: 5, MediaFileID: 50, Kind: domain.KindOf(domain.LabelVideo), State: domain.JobFailed, FailureCode: domain.FailFfmpeg, FailureMessage: "encoder died"}},
 	}
 
 	h.store.ListJobsFunc = func(_ context.Context, f store.JobFilter) ([]domain.Job, int, error) {
@@ -39,7 +39,12 @@ func dashboardStore(h *harness) {
 			out = append(out, jobs[state]...)
 		}
 
-		return out, len(out), nil
+		total := len(out)
+		if len(f.State) == 1 && f.State[0] == domain.JobFailed {
+			total = 231
+		}
+
+		return out, total, nil
 	}
 
 	h.store.GetMediaFileFunc = func(_ context.Context, id int64) (domain.MediaFile, error) {
@@ -55,7 +60,7 @@ func dashboardStore(h *harness) {
 	}
 
 	h.store.CountMediaByPlanKindFunc = func(context.Context) (map[domain.Kind]int, error) {
-		return map[domain.Kind]int{domain.KindSkip: 900, domain.KindFull: 60, domain.KindRemux: 30}, nil
+		return map[domain.Kind]int{domain.KindSkip: 900, domain.KindOf(domain.LabelVideo): 60, domain.KindOf(domain.LabelRemux): 30}, nil
 	}
 
 	h.store.StatsFunc = func(context.Context) (store.Stats, error) {
@@ -107,7 +112,9 @@ func TestGetDashboard_ReturnsEverythingThePollNeeds(t *testing.T) {
 	require.NotNil(t, got.AwaitingStreamEnd[0].SessionUser)
 
 	require.Len(t, got.RecentCompletions, 1)
+	require.Equal(t, 1, got.CompletionsTotal)
 	require.Len(t, got.Failures, 1)
+	require.Equal(t, 231, got.FailuresTotal, "the panel says how many exist beyond the capped list")
 	require.NotNil(t, got.Failures[0].FailureCode)
 	require.Equal(t, gen.FailureCodeFfmpegFailed, *got.Failures[0].FailureCode)
 
@@ -119,7 +126,7 @@ func TestGetDashboard_ReturnsEverythingThePollNeeds(t *testing.T) {
 	require.Equal(t, 900, got.Compatibility.FilesCompatible)
 	require.Equal(t, 90, got.Compatibility.FilesNeedingWork)
 	require.Equal(t, 10, got.Compatibility.FilesUnanalyzed)
-	require.Equal(t, gen.PlanKindBreakdown{Full: 60, Remux: 30, Skip: 900}, got.Compatibility.ByPlanKind)
+	require.Equal(t, gen.PlanKindBreakdown{Video: 60, Remux: 30, Skip: 900}, got.Compatibility.ByPlanKind)
 	require.Equal(t, gen.CompatibilityReasons{Audio: 2, Container: 1, Subtitles: 1, Video: 1}, got.Compatibility.ByReason)
 	require.Equal(t, testNow, got.GeneratedAt.UTC())
 }

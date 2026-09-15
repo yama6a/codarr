@@ -138,6 +138,7 @@ func mediaListItem(m domain.MediaFile, instanceName string) gen.MediaListItem {
 
 	return gen.MediaListItem{
 		AnalyzedAt:         m.AnalyzedAt,
+		CodarrProcessedAt:  m.CodarrProcessedAt,
 		ArrInstanceId:      m.ArrInstanceID,
 		ArrInstanceName:    strPtr(instanceName),
 		Audio:              sum.Audio,
@@ -149,7 +150,7 @@ func mediaListItem(m domain.MediaFile, instanceName string) gen.MediaListItem {
 		Ignored:            m.Ignored,
 		IsHdr:              m.IsHDR,
 		Path:               m.Path,
-		PlanKind:           planKindPtr(m.PlanKind),
+		PlanKind:           planKindPtr(m.Plan != nil, m.PlanKind),
 		Provenance:         gen.Provenance(m.Provenance),
 		RootId:             m.RootID,
 		SizeBytes:          m.SizeBytes,
@@ -199,7 +200,7 @@ func mediaDetail(m domain.MediaFile, instanceName string, latestJobID *int64) ge
 		Nlink:                   intPtr(m.NLink),
 		Path:                    m.Path,
 		Plan:                    plan(m.Plan),
-		PlanKind:                planKindPtr(m.PlanKind),
+		PlanKind:                planKindPtr(m.Plan != nil, m.PlanKind),
 		PlanReasons:             nonNilStrings(m.PlanReasons),
 		ProbeJson:               strPtr(m.ProbeJSON),
 		Provenance:              gen.Provenance(m.Provenance),
@@ -233,12 +234,12 @@ func heightOf(s probeSummary) int {
 	return s.Info.Video.Height
 }
 
-func planKindPtr(k domain.Kind) *gen.PlanKind {
-	if k == "" {
+func planKindPtr(planned bool, k domain.Kind) *gen.PlanKind {
+	if !planned {
 		return nil
 	}
 
-	return ptrOf(gen.PlanKind(k))
+	return ptrOf(planKind(k))
 }
 
 func bitrateSourcePtr(b domain.BitrateSource) *gen.BitrateSource {

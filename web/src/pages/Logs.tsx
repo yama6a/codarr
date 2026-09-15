@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api, unwrap } from '../api/client';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -10,7 +10,7 @@ import { formatDateTime } from '../lib/format';
 import type { EventItem, EventLevel } from '../api/types';
 
 const LIMIT = 200;
-// Keeps the DOM bounded on a long-lived tab. The cursor still moves forward; only the tail is kept.
+// Keeps the DOM bounded on a long-lived tab. The list is newest first, so trimming drops the oldest rows.
 const MAX_RETAINED = 2000;
 
 const levels = [
@@ -28,43 +28,86 @@ const levelClasses: Record<EventLevel, string> = {
   error: 'text-red-400',
 };
 
+interface Query {
+  level?: EventLevel;
+  category?: string;
+  since_id?: number;
+  before_id?: number;
+  limit: number;
+}
+
 export default function Logs() {
   const [level, setLevel] = useState<EventLevel | ''>('');
   const [category, setCategory] = useState('');
   const [events, setEvents] = useState<EventItem[]>([]);
-  const [hasMore, setHasMore] = useState(false);
+  const [hasOlder, setHasOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
 
   const debouncedCategory = useDebounced(category);
-  const sinceId = useRef<number | undefined>(undefined);
   const listRef = useRef<HTMLDivElement>(null);
-  const atBottom = useRef(true);
+  const atTop = useRef(true);
+  const pendingScroll = useRef<number | null>(null);
+  const newestId = useRef<number | undefined>(undefined);
 
-  const fetchPage = useCallback(async () => {
-    const page = await unwrap(
-      api.GET('/api/events', {
-        params: {
-          query: {
-            level: level || undefined,
-            category: debouncedCategory || undefined,
-            since_id: sinceId.current,
-            limit: LIMIT,
+  const fetchEvents = useCallback(
+    (extra: Partial<Query>) =>
+      unwrap(
+        api.GET('/api/events', {
+          params: {
+            query: {
+              level: level || undefined,
+              category: debouncedCategory || undefined,
+              since_id: undefined,
+              before_id: undefined,
+              limit: LIMIT,
+              ...extra,
+            },
           },
-        },
-      }),
-    );
-    sinceId.current = page.next_since_id;
-    setHasMore(page.has_more);
+        }),
+      ),
+    [level, debouncedCategory],
+  );
+
+  const loadNewest = useCallback(async () => {
+    const page = await fetchEvents({});
+    newestId.current = page.items[0]?.id;
+    setEvents(page.items);
+    setHasOlder(page.has_more);
+    return page;
+  }, [fetchEvents]);
+
+  // plan.md 18.6: the logs page polls GET /api/events?since_id=<newest> on the same 10s cadence and
+  // prepends what arrived. More than a page of new rows means the tail is gone; start over from the top.
+  const poll = useCallback(async () => {
+    if (newestId.current === undefined) {
+      return loadNewest();
+    }
+    const page = await fetchEvents({ since_id: newestId.current });
+    if (page.has_more) {
+      const fresh = await loadNewest();
+      setHasOlder(true);
+      return fresh;
+    }
+    if (page.items.length === 0) {
+      return page;
+    }
+    newestId.current = page.next_since_id;
+    const node = listRef.current;
+    if (node && !atTop.current) {
+      pendingScroll.current = node.scrollHeight - node.scrollTop;
+    }
     setEvents((prev) => {
-      // Ascending by id, so anything at or below the tail is a replay of a page already held.
-      const lastId = prev.length > 0 ? prev[prev.length - 1].id : 0;
-      const fresh = page.items.filter((event) => event.id > lastId);
-      return fresh.length > 0 ? [...prev, ...fresh].slice(-MAX_RETAINED) : prev;
+      const merged = [...[...page.items].reverse(), ...prev];
+      if (merged.length > MAX_RETAINED) {
+        setHasOlder(true);
+        return merged.slice(0, MAX_RETAINED);
+      }
+      return merged;
     });
     return page;
-  }, [level, debouncedCategory]);
+  }, [fetchEvents, loadNewest]);
 
-  // plan.md 18.6: the logs page polls GET /api/events?since_id=<last> on the same 10s cadence.
-  const { refresh } = usePolling(fetchPage);
+  const { refresh } = usePolling(poll);
 
   const mounted = useRef(false);
   useEffect(() => {
@@ -72,32 +115,54 @@ export default function Logs() {
       mounted.current = true;
       return;
     }
-    sinceId.current = undefined;
+    newestId.current = undefined;
     setEvents([]);
+    setHasOlder(false);
     refresh();
   }, [level, debouncedCategory, refresh]);
 
-  // Freeze the view when the user has scrolled up; resume following once they are back at the bottom.
-  useEffect(() => {
+  // A prepend while the user is reading further down must not move the row under the cursor.
+  useLayoutEffect(() => {
     const node = listRef.current;
-    if (node && atBottom.current) {
-      node.scrollTop = node.scrollHeight;
+    if (node && pendingScroll.current !== null) {
+      node.scrollTop = node.scrollHeight - pendingScroll.current;
+      pendingScroll.current = null;
     }
   }, [events]);
+
+  const loadOlder = async () => {
+    const oldest = events.at(-1);
+    if (!oldest) {
+      return;
+    }
+    setLoadingOlder(true);
+    try {
+      const page = await fetchEvents({ before_id: oldest.id });
+      setEvents((prev) => {
+        const seen = new Set(prev.map((event) => event.id));
+        return [...prev, ...page.items.filter((event) => !seen.has(event.id))];
+      });
+      setHasOlder(page.has_more);
+    } catch {
+      // Already toasted by the client middleware.
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
 
   const onScroll = () => {
     const node = listRef.current;
     if (!node) {
       return;
     }
-    atBottom.current = node.scrollHeight - node.scrollTop - node.clientHeight < 40;
+    atTop.current = node.scrollTop < 40;
   };
 
-  const jumpToBottom = () => {
+  const jumpToLatest = () => {
     const node = listRef.current;
     if (node) {
-      atBottom.current = true;
-      node.scrollTop = node.scrollHeight;
+      atTop.current = true;
+      node.scrollTop = 0;
     }
   };
 
@@ -107,8 +172,8 @@ export default function Logs() {
         <div>
           <h1 className="text-2xl font-bold text-white">Logs</h1>
           <p className="mt-1 text-sm text-slate-400">
-            {events.length.toLocaleString()} events held. Following the tail while you stay scrolled
-            to the bottom.
+            {events.length.toLocaleString()} events held, newest first. New rows appear at the top every
+            10 seconds.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -125,20 +190,11 @@ export default function Logs() {
             ariaLabel="Category"
             className="w-44"
           />
-          <Button variant="ghost" icon="chevron_down" onClick={jumpToBottom}>
+          <Button variant="ghost" icon="chevron_up" onClick={jumpToLatest}>
             Jump to latest
           </Button>
         </div>
       </header>
-
-      {hasMore && (
-        <div className="flex items-center justify-between rounded-lg border border-amber-800 bg-amber-950/50 px-3 py-2 text-xs text-amber-200">
-          <span>More events matched than one page holds. The next poll continues from the cursor.</span>
-          <Button variant="ghost" icon="refresh" onClick={refresh}>
-            Fetch now
-          </Button>
-        </div>
-      )}
 
       <div
         ref={listRef}
@@ -160,6 +216,13 @@ export default function Logs() {
               </li>
             ))}
           </ul>
+        )}
+        {hasOlder && (
+          <div className="flex justify-center pt-3">
+            <Button variant="ghost" icon="chevron_down" loading={loadingOlder} onClick={loadOlder}>
+              Load older
+            </Button>
+          </div>
         )}
       </div>
     </div>

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/yama6a/codarr/internal/decide"
 	"github.com/yama6a/codarr/internal/ffmpeg"
 	"github.com/yama6a/codarr/internal/pkg/domain"
 	"github.com/yama6a/codarr/internal/pkg/store"
@@ -32,28 +33,6 @@ const (
 // at once.
 const mediaPageSize = 500
 
-// PlanKindBreakdown is the count per plan kind every bulk preview reports, so
-// the confirmation can say exactly what it is about to do (19).
-type PlanKindBreakdown struct {
-	Skip      int
-	Remux     int
-	AudioOnly int
-	Full      int
-}
-
-func (b *PlanKindBreakdown) add(kind domain.Kind) {
-	switch kind {
-	case domain.KindSkip:
-		b.Skip++
-	case domain.KindRemux:
-		b.Remux++
-	case domain.KindAudioOnly:
-		b.AudioOnly++
-	case domain.KindFull:
-		b.Full++
-	}
-}
-
 // Recheck is one re-check request; an empty one selects nothing rather than
 // everything, so a mis-sent body cannot queue the library.
 type Recheck struct {
@@ -67,7 +46,7 @@ type RecheckResult struct {
 	DryRun       bool
 	Examined     int
 	Count        int
-	ByPlanKind   PlanKindBreakdown
+	ByPlanKind   domain.KindCounts
 	MediaFileIDs []int64
 	QueuedJobIDs []int64
 
@@ -124,7 +103,7 @@ func (s *Service) considerRecheck(ctx context.Context, m domain.MediaFile, confi
 	}
 
 	out.Count++
-	out.ByPlanKind.add(m.PlanKind)
+	out.ByPlanKind.Add(m.PlanKind)
 	out.MediaFileIDs = append(out.MediaFileIDs, m.ID)
 
 	if !confirm {
@@ -162,7 +141,7 @@ type SpaceSweepCandidate struct {
 type SpaceSweepPreview struct {
 	Count                int
 	Examined             int
-	ByPlanKind           PlanKindBreakdown
+	ByPlanKind           domain.KindCounts
 	CurrentBytes         int64
 	ProjectedBytes       int64
 	ProjectedSavingBytes int64
@@ -214,7 +193,7 @@ func (s *Service) spaceSweep(ctx context.Context, ids []int64, queue bool) (Spac
 		}
 
 		out.Count++
-		out.ByPlanKind.add(domain.KindFull)
+		out.ByPlanKind.Add(sweepKind(m))
 		out.Candidates = append(out.Candidates, candidate)
 		out.CurrentBytes += candidate.CurrentBytes
 		out.ProjectedBytes += candidate.ProjectedBytes
@@ -247,6 +226,18 @@ func (s *Service) queueSweep(ctx context.Context, m domain.MediaFile, queue bool
 	}
 
 	return nil
+}
+
+// sweepKind is what the sweep will queue the file as: its plan with the video
+// forced to an encode.
+func sweepKind(m domain.MediaFile) domain.Kind {
+	if m.Plan != nil {
+		if forced, ok := decide.ForceVideoEncode(*m.Plan, sweepReason); ok {
+			return forced.Kind
+		}
+	}
+
+	return domain.KindOf(domain.LabelVideo)
 }
 
 // The per-file half of plan.md 11: measure what HEVC would cost for this content.

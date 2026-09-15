@@ -92,6 +92,7 @@ func TestListEvents_PagesByCursorAndExpandsTheMinimumLevel(t *testing.T) {
 	require.Equal(t, []string{"warn", "error"}, seen.Level)
 	require.Equal(t, []string{"job"}, seen.Category)
 	require.Equal(t, int64(99), seen.SinceID)
+	require.False(t, seen.Descending, "a poll from a cursor reads forward")
 	require.Equal(t, 3, seen.Limit, "one row over the limit is what tells has_more from a full page")
 
 	require.Len(t, got.Items, 2)
@@ -113,6 +114,33 @@ func TestListEvents_EmptyPageKeepsTheCursor(t *testing.T) {
 	require.False(t, got.HasMore)
 	require.Empty(t, got.Items)
 	require.Equal(t, int64(42), got.NextSinceId)
+}
+
+// The initial page and every history page are newest first, and the cursor handed
+// back is still the highest id so the next poll reads forward from the top.
+func TestListEvents_HistoryReadsBackwardsNewestFirst(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+
+	var seen store.EventFilter
+
+	h.store.ListEventsFunc = func(_ context.Context, f store.EventFilter) ([]domain.Event, error) {
+		seen = f
+
+		return []domain.Event{
+			{ID: 41, Level: "info", Category: "job", Message: "b", CreatedAt: testNow},
+			{ID: 40, Level: "info", Category: "job", Message: "a", CreatedAt: testNow},
+		}, nil
+	}
+
+	got := decodeInto[gen.EventPage](t, h.do(t, "GET", "/api/events?before_id=42&limit=2", nil), 200)
+
+	require.True(t, seen.Descending)
+	require.Equal(t, int64(42), seen.BeforeID)
+	require.Equal(t, int64(0), seen.SinceID)
+	require.Equal(t, []int64{41, 40}, []int64{got.Items[0].Id, got.Items[1].Id})
+	require.Equal(t, int64(41), got.NextSinceId)
 }
 
 func TestGetSettings_AndUpdateSettings(t *testing.T) {
@@ -215,7 +243,7 @@ func TestListJobs_AndGetJobCarryTheTransformRecord(t *testing.T) {
 
 	actual := 1180
 	j := domain.Job{
-		ID: 4, MediaFileID: 7, Kind: domain.KindFull, Origin: domain.OriginIngest,
+		ID: 4, MediaFileID: 7, Kind: domain.KindOf(domain.LabelVideo), Origin: domain.OriginIngest,
 		State: domain.JobDone, Priority: 110, EncoderUsed: domain.EncoderQSV,
 		DecodePath: domain.DecodeHardware, SourceSize: 8_000, OutputSize: 4_000,
 		ActualSeconds: actual, FfmpegArgv: []string{"-nostdin", "-i", "in.mkv"},
@@ -271,7 +299,7 @@ func TestCancelAndRestartJob(t *testing.T) {
 	h := newHarness(t)
 	noInstances(h.store)
 
-	j := domain.Job{ID: 4, MediaFileID: 7, Kind: domain.KindFull, Origin: domain.OriginManual, State: domain.JobRunning}
+	j := domain.Job{ID: 4, MediaFileID: 7, Kind: domain.KindOf(domain.LabelVideo), Origin: domain.OriginManual, State: domain.JobRunning}
 
 	h.store.GetJobFunc = func(context.Context, int64) (domain.Job, error) { return j, nil }
 	h.store.GetMediaFileFunc = func(context.Context, int64) (domain.MediaFile, error) { return mediaFixture(), nil }

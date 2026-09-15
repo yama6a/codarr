@@ -66,7 +66,7 @@ type SettingsStore interface {
 
 // ThroughputStore is the rolling average behind every duration estimate (14.3).
 type ThroughputStore interface {
-	GetThroughputStat(ctx context.Context, kind domain.Kind, encoder, resolution string) (domain.ThroughputStat, error)
+	GetThroughputStat(ctx context.Context, kind domain.ThroughputKind, encoder, resolution string) (domain.ThroughputStat, error)
 	UpsertThroughputStat(ctx context.Context, s domain.ThroughputStat) error
 }
 

@@ -37,12 +37,12 @@ func (s *Server) dashboard(ctx context.Context) (gen.Dashboard, error) {
 
 	cache := newMediaCache(s.store)
 
-	completions, err := s.listState(ctx, cache, DashboardListSize, domain.JobDone)
+	completions, completionsTotal, err := s.listState(ctx, cache, DashboardListSize, domain.JobDone)
 	if err != nil {
 		return gen.Dashboard{}, err
 	}
 
-	failures, err := s.listState(ctx, cache, DashboardListSize, domain.JobFailed)
+	failures, failuresTotal, err := s.listState(ctx, cache, DashboardListSize, domain.JobFailed)
 	if err != nil {
 		return gen.Dashboard{}, err
 	}
@@ -60,8 +60,10 @@ func (s *Server) dashboard(ctx context.Context) (gen.Dashboard, error) {
 	return gen.Dashboard{
 		AwaitingStreamEnd: queue.AwaitingStreamEnd,
 		Compatibility:     compat,
+		CompletionsTotal:  completionsTotal,
 		CurrentJob:        queue.Running,
 		Failures:          failures,
+		FailuresTotal:     failuresTotal,
 		GeneratedAt:       s.clk.Now(),
 		Queue:             queue.Queued,
 		QueueDepth:        queue.Depth,
@@ -106,12 +108,14 @@ func (s *Server) compatibility(ctx context.Context) (gen.CompatibilitySummary, e
 		return gen.CompatibilitySummary{}, err
 	}
 
+	counts := domain.CountKinds(byKind)
+
 	out := gen.CompatibilitySummary{
-		ByPlanKind:       planKindBreakdown(byKind),
+		ByPlanKind:       planKindBreakdown(counts),
 		ByReason:         reasons,
 		FilesAnalyzed:    analysed,
-		FilesCompatible:  byKind[domain.KindSkip],
-		FilesNeedingWork: analysed - byKind[domain.KindSkip],
+		FilesCompatible:  counts.Skip,
+		FilesNeedingWork: analysed - counts.Skip,
 		FilesUnanalyzed:  max(total-analysed, 0),
 	}
 
@@ -126,7 +130,7 @@ func (s *Server) compatibility(ctx context.Context) (gen.CompatibilitySummary, e
 // subtitle conversion from an audio re-encode and the reason strings are prose.
 func (s *Server) reasonBreakdown(ctx context.Context) (gen.CompatibilityReasons, error) {
 	filter := store.MediaFilter{
-		PlanKind: []domain.Kind{domain.KindRemux, domain.KindAudioOnly, domain.KindFull},
+		PlanKind: labelFilters(),
 		Sort:     store.SortPath,
 		Limit:    compatPageSize,
 	}
@@ -190,4 +194,15 @@ func streamWork(streams []domain.StreamPlan) (video, audio, subtitle bool) {
 	}
 
 	return video, audio, subtitle
+}
+
+func labelFilters() []string {
+	labels := domain.Labels()
+	out := make([]string, 0, len(labels))
+
+	for _, l := range labels {
+		out = append(out, string(l))
+	}
+
+	return out
 }

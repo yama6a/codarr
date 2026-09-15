@@ -6,8 +6,9 @@ import { Panel } from '../ui/Panel';
 import { ProgressBar } from '../ui/ProgressBar';
 import { FallbackWarning } from './FallbackWarning';
 import { useNow } from '../../hooks/useNow';
-import { elapsedSeconds, formatBytes, formatDuration, formatPercent, humanise } from '../../lib/format';
-import { jobStateTone, planKindTone } from '../../lib/tone';
+import { PlanKindBadges } from '../ui/PlanKindBadges';
+import { elapsedSeconds, formatBytes, formatDateTime, formatDuration, formatPercent, humanise } from '../../lib/format';
+import { jobStateTone } from '../../lib/tone';
 import type { JobSummary } from '../../api/types';
 
 interface CurrentJobPanelProps {
@@ -66,7 +67,7 @@ export function CurrentJobPanel({ job, paused, onCancel, onOpen, cancelling }: C
           >
             {job.media_filename}
           </button>
-          <Badge tone={planKindTone(job.kind)}>{humanise(job.kind)}</Badge>
+          <PlanKindBadges kind={job.kind} />
           <Badge tone={jobStateTone(job.state)}>{humanise(job.state)}</Badge>
           {job.attempt > 1 && <Badge tone="warning">Attempt {job.attempt}</Badge>}
         </div>
@@ -103,6 +104,7 @@ export function CurrentJobPanel({ job, paused, onCancel, onOpen, cancelling }: C
           <KeyValue label="Source size">{job.source_size ? formatBytes(job.source_size) : 'unknown'}</KeyValue>
           <KeyValue label="Origin">{humanise(job.origin)}</KeyValue>
           <KeyValue label="Job">#{job.id}</KeyValue>
+          <KeyValue label="Started">{formatDateTime(job.started_at)}</KeyValue>
           <KeyValue label="Blocked by">{job.blocked_by || 'nothing'}</KeyValue>
         </dl>
       </div>

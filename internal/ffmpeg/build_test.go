@@ -15,7 +15,7 @@ func minimalRequest() ffmpeg.Request {
 		Output: "/library/out.mkv",
 		Tags:   tags(),
 		Plan: domain.Plan{
-			Kind:            domain.KindAudioOnly,
+			Kind:            domain.KindOf(domain.LabelAudio),
 			OutputContainer: domain.ContainerMatroska,
 			Streams: []domain.StreamPlan{
 				videoCopy(),
@@ -29,7 +29,7 @@ func fullRequest() ffmpeg.Request {
 	req := minimalRequest()
 	req.Encoder = domain.EncoderQSV
 	req.Device = "/dev/dri/renderD128"
-	req.Plan.Kind = domain.KindFull
+	req.Plan.Kind = domain.KindOf(domain.LabelVideo)
 	req.Plan.TargetVideoBitrate = 3_000_000
 	req.Plan.Streams[0] = videoEncode()
 

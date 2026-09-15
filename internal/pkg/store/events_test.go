@@ -50,6 +50,23 @@ func TestEventStore_AppendAndCursorRead(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, byCategory, 1)
 	require.Equal(t, first, byCategory[0].ID)
+
+	newest, err := s.ListEvents(t.Context(), store.EventFilter{Descending: true})
+	require.NoError(t, err)
+	require.Equal(t, []int64{second, first}, eventIDs(newest))
+
+	older, err := s.ListEvents(t.Context(), store.EventFilter{BeforeID: second, Descending: true})
+	require.NoError(t, err)
+	require.Equal(t, []int64{first}, eventIDs(older), "before_id excludes the boundary")
+}
+
+func eventIDs(events []domain.Event) []int64 {
+	out := make([]int64, 0, len(events))
+	for _, e := range events {
+		out = append(out, e.ID)
+	}
+
+	return out
 }
 
 // The events table is a convenience and stdout is the source of truth (plan.md 24), so

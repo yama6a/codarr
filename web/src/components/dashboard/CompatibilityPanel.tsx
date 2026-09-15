@@ -65,13 +65,15 @@ export function CompatibilityPanel({ summary }: { summary: CompatibilitySummary 
           </p>
 
           <div className="flex flex-wrap gap-2 pt-1 text-xs text-slate-400">
+            <span>Video {summary.by_plan_kind.video.toLocaleString()}</span>
+            <span className="text-slate-600">|</span>
+            <span>Audio {summary.by_plan_kind.audio.toLocaleString()}</span>
+            <span className="text-slate-600">|</span>
+            <span>Subtitles {summary.by_plan_kind.subtitles.toLocaleString()}</span>
+            <span className="text-slate-600">|</span>
             <span>Remux {summary.by_plan_kind.remux.toLocaleString()}</span>
             <span className="text-slate-600">|</span>
-            <span>Audio only {summary.by_plan_kind.audio_only.toLocaleString()}</span>
-            <span className="text-slate-600">|</span>
-            <span>Full {summary.by_plan_kind.full.toLocaleString()}</span>
-            <span className="text-slate-600">|</span>
-            <span>Skip {summary.by_plan_kind.skip.toLocaleString()}</span>
+            <span>Skipped {summary.by_plan_kind.skip.toLocaleString()}</span>
           </div>
         </div>
       </div>

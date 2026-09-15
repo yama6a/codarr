@@ -13,10 +13,11 @@ interface LibraryFiltersProps {
 
 const planKinds = [
   { value: '', label: 'Any plan' },
-  { value: 'skip', label: 'Skip' },
+  { value: 'skip', label: 'Skipped' },
+  { value: 'video', label: 'Video' },
+  { value: 'audio', label: 'Audio' },
+  { value: 'subtitles', label: 'Subtitles' },
   { value: 'remux', label: 'Remux' },
-  { value: 'audio_only', label: 'Audio only' },
-  { value: 'full', label: 'Full' },
 ];
 
 const statuses = [

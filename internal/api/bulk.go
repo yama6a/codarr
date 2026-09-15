@@ -93,7 +93,7 @@ func mediaFilter(in gen.MediaFilter) store.MediaFilter {
 	}
 
 	if in.PlanKind != nil {
-		out.PlanKind = []domain.Kind{domain.Kind(*in.PlanKind)}
+		out.PlanKind = planKindFilter(*in.PlanKind)
 	}
 
 	if in.VideoCodec != nil && *in.VideoCodec != "" {
@@ -109,7 +109,7 @@ func mediaFilter(in gen.MediaFilter) store.MediaFilter {
 
 func recheckResult(r job.RecheckResult) gen.RecheckResult {
 	out := gen.RecheckResult{
-		ByPlanKind:   breakdown(r.ByPlanKind),
+		ByPlanKind:   planKindBreakdown(r.ByPlanKind),
 		Count:        r.Count,
 		DryRun:       r.DryRun,
 		Examined:     r.Examined,
@@ -162,7 +162,7 @@ func (s *Server) RunSpaceSweep(
 	}
 
 	return gen.RunSpaceSweep200JSONResponse{
-		ByPlanKind:           breakdown(res.ByPlanKind),
+		ByPlanKind:           planKindBreakdown(res.ByPlanKind),
 		Count:                res.Count,
 		ProjectedSavingBytes: res.ProjectedSavingBytes,
 		QueuedJobIds:         nonNilInt64s(res.QueuedJobIDs),
@@ -187,7 +187,7 @@ func sweepPreview(r job.SpaceSweepPreview) gen.SpaceSweepPreview {
 	}
 
 	return gen.SpaceSweepPreview{
-		ByPlanKind:           breakdown(r.ByPlanKind),
+		ByPlanKind:           planKindBreakdown(r.ByPlanKind),
 		Candidates:           candidates,
 		Count:                r.Count,
 		CurrentBytes:         r.CurrentBytes,
@@ -196,15 +196,6 @@ func sweepPreview(r job.SpaceSweepPreview) gen.SpaceSweepPreview {
 		ProjectedBytes:       r.ProjectedBytes,
 		ProjectedSavingBytes: r.ProjectedSavingBytes,
 		ProjectedSavingPct:   r.ProjectedSavingPct,
-	}
-}
-
-func breakdown(b job.PlanKindBreakdown) gen.PlanKindBreakdown {
-	return gen.PlanKindBreakdown{
-		AudioOnly: b.AudioOnly,
-		Full:      b.Full,
-		Remux:     b.Remux,
-		Skip:      b.Skip,
 	}
 }
 

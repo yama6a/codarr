@@ -52,17 +52,17 @@ func TestMetrics_ExposesEverySeriesSection24Names(t *testing.T) {
 
 	m := metrics.New()
 
-	m.JobObserved(domain.JobQueued, domain.KindFull, domain.OriginManual)
+	m.JobObserved(domain.JobQueued, domain.KindOf(domain.LabelVideo), domain.OriginManual)
 	m.JobFailed(domain.FailFfmpeg)
 	m.JobRequeued()
 	m.EncoderFallback(domain.EncoderQSV, domain.EncoderVAAPI)
 	m.DecodeFallback()
 	m.Error("upstream_error")
-	m.TranscodeDuration(domain.KindFull, domain.EncoderQSV, 1200)
+	m.TranscodeDuration(domain.KindOf(domain.LabelVideo), domain.EncoderQSV, 1200)
 	m.EstimateError(-300)
 	m.SetQueueDepth(4)
 	m.SetAwaitingStreamEnd(1)
-	m.SetFilesByPlanKind(map[domain.Kind]int{domain.KindFull: 12})
+	m.SetFilesByPlanKind(map[domain.Kind]int{domain.KindOf(domain.LabelVideo): 12})
 	m.SetBytes(100, 40, 60)
 	m.SetPlex(true, 2)
 	m.SetArrUp("radarr-4k", true)
@@ -70,16 +70,16 @@ func TestMetrics_ExposesEverySeriesSection24Names(t *testing.T) {
 	body := scrape(t, m)
 
 	for _, want := range []string{
-		`codarr_jobs_total{kind="full",origin="manual",state="queued"} 1`,
+		`codarr_jobs_total{kind="video",origin="manual",state="queued"} 1`,
 		`codarr_queue_depth 4`,
-		`codarr_transcode_duration_seconds_bucket{encoder="hevc_qsv",kind="full",le="1800"} 1`,
+		`codarr_transcode_duration_seconds_bucket{encoder="hevc_qsv",kind="video",le="1800"} 1`,
 		`codarr_transcode_estimate_error_seconds_sum -300`,
 		`codarr_bytes_in_total 100`,
 		`codarr_bytes_out_total 40`,
 		`codarr_bytes_saved_total 60`,
 		`codarr_encoder_fallback_total{from="hevc_qsv",to="hevc_vaapi"} 1`,
 		`codarr_decode_fallback_total 1`,
-		`codarr_files_by_plan_kind{kind="full"} 12`,
+		`codarr_files_by_plan_kind{kind="video"} 12`,
 		`codarr_plex_up 1`,
 		`codarr_plex_active_sessions 2`,
 		`codarr_arr_up{instance="radarr-4k"} 1`,
@@ -107,12 +107,12 @@ func TestMetrics_PlanKindGaugeReportsZeroesForEmptyKinds(t *testing.T) {
 	t.Parallel()
 
 	m := metrics.New()
-	m.SetFilesByPlanKind(map[domain.Kind]int{domain.KindRemux: 3, domain.KindFull: 1})
-	m.SetFilesByPlanKind(map[domain.Kind]int{domain.KindRemux: 3})
+	m.SetFilesByPlanKind(map[domain.Kind]int{domain.KindOf(domain.LabelRemux): 3, domain.KindOf(domain.LabelVideo): 1})
+	m.SetFilesByPlanKind(map[domain.Kind]int{domain.KindOf(domain.LabelRemux): 3})
 
 	body := scrape(t, m)
 	require.Contains(t, body, `codarr_files_by_plan_kind{kind="remux"} 3`)
-	require.Contains(t, body, `codarr_files_by_plan_kind{kind="full"} 0`)
+	require.Contains(t, body, `codarr_files_by_plan_kind{kind="video"} 0`)
 	require.Contains(t, body, `codarr_files_by_plan_kind{kind="skip"} 0`)
 }
 
@@ -133,7 +133,7 @@ func TestRefresher_SetsGaugesFromTheStore(t *testing.T) {
 	m := metrics.New()
 	src := fakeSource{
 		jobs:  map[domain.JobState]int{domain.JobQueued: 5, domain.JobAwaitingStreamEnd: 2},
-		kinds: map[domain.Kind]int{domain.KindSkip: 900, domain.KindAudioOnly: 7},
+		kinds: map[domain.Kind]int{domain.KindSkip: 900, domain.KindOf(domain.LabelAudio): 7},
 		stats: store.Stats{BytesIn: 900, BytesOut: 500, BytesSaved: 400},
 	}
 
@@ -147,7 +147,7 @@ func TestRefresher_SetsGaugesFromTheStore(t *testing.T) {
 	require.Contains(t, body, "codarr_queue_depth 5")
 	require.Contains(t, body, "codarr_jobs_awaiting_stream_end 2")
 	require.Contains(t, body, `codarr_files_by_plan_kind{kind="skip"} 900`)
-	require.Contains(t, body, `codarr_files_by_plan_kind{kind="audio_only"} 7`)
+	require.Contains(t, body, `codarr_files_by_plan_kind{kind="audio"} 7`)
 	require.Contains(t, body, "codarr_bytes_saved_total 400")
 	require.True(t, probed)
 }

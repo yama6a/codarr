@@ -15,7 +15,7 @@ import (
 // as progress, a short one reads as a stall.
 const (
 	// SeedThroughput is the read+write rate an I/O bound job is assumed to get,
-	// in bytes per second. audio_only and remux move the whole file twice.
+	// in bytes per second. A job that copies video moves the whole file twice.
 	SeedThroughput = 40 << 20
 
 	// SeedSpeedHardware is the encoded-seconds-per-wall-second a fixed-function
@@ -48,18 +48,18 @@ type work struct {
 	mediaSeconds float64
 }
 
-// plan.md 7: audio encoding inside an audio_only job is negligible, because every
-// stream encodes concurrently with the copy.
-func (w work) ioBound() bool { return w.kind != domain.KindFull }
+// plan.md 7: audio encoding inside a job that copies video is negligible, because
+// every stream encodes concurrently with the copy.
+func (w work) ioBound() bool { return !w.kind.Has(domain.LabelVideo) }
 
-// The I/O bound kinds do not vary by encoder or resolution, so they share one
-// throughput_stats row per kind.
-func (w work) key() (domain.Kind, string, string) {
+// I/O bound work does not vary by encoder or resolution, so it shares one
+// throughput_stats row whatever labels it carries.
+func (w work) key() (domain.ThroughputKind, string, string) {
 	if w.ioBound() {
-		return w.kind, "", ""
+		return domain.ThroughputIO, "", ""
 	}
 
-	return w.kind, string(w.encoder), w.resolution
+	return domain.ThroughputVideo, string(w.encoder), w.resolution
 }
 
 // seed is the value used until the first real measurement lands.

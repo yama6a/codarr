@@ -2,19 +2,24 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { Panel } from '../ui/Panel';
+import { LoadMore } from './LoadMore';
 import { failureLabel, formatDateTime } from '../../lib/format';
 import type { JobSummary } from '../../api/types';
 
 interface FailuresPanelProps {
   jobs: JobSummary[];
+  total: number;
+  loadingMore: boolean;
+  onLoadMore: () => void;
   retryingId: number | null;
   onRetry: (jobId: number) => void;
   onOpen: (job: JobSummary) => void;
 }
 
-export function FailuresPanel({ jobs, retryingId, onRetry, onOpen }: FailuresPanelProps) {
+export function FailuresPanel({ jobs, total, loadingMore, onLoadMore, retryingId, onRetry, onOpen }: FailuresPanelProps) {
+  const title = total > jobs.length ? `Failures (latest ${jobs.length} of ${total})` : `Failures (${jobs.length})`;
   return (
-    <Panel title={`Failures (${jobs.length})`} icon="error">
+    <Panel title={title} icon="error">
       {jobs.length === 0 ? (
         <EmptyState icon="success" message="No failures need attention." />
       ) : (
@@ -45,6 +50,7 @@ export function FailuresPanel({ jobs, retryingId, onRetry, onOpen }: FailuresPan
           ))}
         </ul>
       )}
+      <LoadMore shown={jobs.length} total={total} loading={loadingMore} onLoadMore={onLoadMore} />
     </Panel>
   );
 }

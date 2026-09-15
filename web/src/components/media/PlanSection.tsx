@@ -1,7 +1,8 @@
 import { Badge } from '../ui/Badge';
 import { Icon } from '../ui/Icon';
+import { PlanKindBadges } from '../ui/PlanKindBadges';
 import { formatBitrate, humanise } from '../../lib/format';
-import { decisionTone, planKindTone } from '../../lib/tone';
+import { decisionTone } from '../../lib/tone';
 import type { Plan, StreamPlan } from '../../api/types';
 
 function flags(stream: StreamPlan): string[] {
@@ -30,7 +31,7 @@ export function PlanSection({ plan }: { plan: Plan }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Badge tone={planKindTone(plan.kind)}>{humanise(plan.kind)}</Badge>
+        <PlanKindBadges kind={plan.kind} />
         <Badge tone="neutral">
           {plan.source_container} to {plan.output_container}
         </Badge>

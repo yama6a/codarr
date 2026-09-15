@@ -575,7 +575,7 @@ func outIdx(i int) *int { return &i }
 // subtitle. Three output streams.
 func goodPlan() domain.Plan {
 	return domain.Plan{
-		Kind:            domain.KindAudioOnly,
+		Kind:            domain.KindOf(domain.LabelAudio),
 		OutputContainer: domain.ContainerMatroska,
 		PolicyHash:      "policy-abc",
 		Streams: []domain.StreamPlan{

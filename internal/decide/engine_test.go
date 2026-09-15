@@ -108,7 +108,7 @@ func TestEngine_KindDerivation(t *testing.T) {
 			name:   "everything copies in an avi",
 			probe:  probeOf("avi", video("h264", "High"), audio("ac3", 2)),
 			path:   "/media/x.avi",
-			kind:   domain.KindRemux,
+			kind:   domain.KindOf(domain.LabelRemux),
 			source: "avi",
 			output: domain.ContainerMatroska,
 		},
@@ -116,7 +116,7 @@ func TestEngine_KindDerivation(t *testing.T) {
 			name:   "a mov is a legacy container",
 			probe:  mp4(video("h264", "High"), audio("aac", 2)),
 			path:   "/media/x.mov",
-			kind:   domain.KindRemux,
+			kind:   domain.KindOf(domain.LabelRemux),
 			source: "mp4",
 			output: domain.ContainerMatroska,
 		},
@@ -124,7 +124,7 @@ func TestEngine_KindDerivation(t *testing.T) {
 			name:   "an mpeg-ts capture",
 			probe:  probeOf("mpegts", video("h264", "High"), audio("ac3", 6)),
 			path:   "/media/x.ts",
-			kind:   domain.KindRemux,
+			kind:   domain.KindOf(domain.LabelRemux),
 			source: "mpegts",
 			output: domain.ContainerMatroska,
 		},
@@ -132,7 +132,7 @@ func TestEngine_KindDerivation(t *testing.T) {
 			name:   "audio work alone",
 			probe:  mkv(video("h264", "High"), audio("dts", 6)),
 			path:   mkvPath,
-			kind:   domain.KindAudioOnly,
+			kind:   domain.KindOf(domain.LabelAudio),
 			source: "matroska",
 			output: domain.ContainerMatroska,
 		},
@@ -140,7 +140,7 @@ func TestEngine_KindDerivation(t *testing.T) {
 			name:   "subtitle work alone",
 			probe:  mkv(video("h264", "High"), audio("aac", 2), subtitle("ass")),
 			path:   mkvPath,
-			kind:   domain.KindAudioOnly,
+			kind:   domain.KindOf(domain.LabelSubtitles),
 			source: "matroska",
 			output: domain.ContainerMatroska,
 		},
@@ -148,23 +148,23 @@ func TestEngine_KindDerivation(t *testing.T) {
 			name:   "a dropped subtitle alone",
 			probe:  mkv(video("h264", "High"), audio("aac", 2), subtitle("hdmv_pgs_subtitle")),
 			path:   mkvPath,
-			kind:   domain.KindAudioOnly,
+			kind:   domain.KindOf(domain.LabelSubtitles),
 			source: "matroska",
 			output: domain.ContainerMatroska,
 		},
 		{
-			name:   "video work makes it full whatever else is true",
+			name:   "video work carries the video label",
 			probe:  mkv(video("av1", "Main"), audio("aac", 2)),
 			path:   mkvPath,
-			kind:   domain.KindFull,
+			kind:   domain.KindOf(domain.LabelVideo),
 			source: "matroska",
 			output: domain.ContainerMatroska,
 		},
 		{
-			name:   "a legacy container that also needs an encode is full",
+			name:   "a legacy container that also needs an encode carries both labels",
 			probe:  probeOf("mpeg", video("mpeg2video", "Main", withFieldOrder("tt")), audio("ac3", 6)),
 			path:   "/media/x.vob",
-			kind:   domain.KindFull,
+			kind:   domain.KindOf(domain.LabelVideo, domain.LabelRemux),
 			source: "mpeg",
 			output: domain.ContainerMatroska,
 		},
@@ -172,7 +172,7 @@ func TestEngine_KindDerivation(t *testing.T) {
 			name:   "an mp4 that needs subtitle conversion",
 			probe:  mp4(video("h264", "High"), audio("aac", 2), subtitle("subrip")),
 			path:   mp4Path,
-			kind:   domain.KindAudioOnly,
+			kind:   domain.KindOf(domain.LabelSubtitles),
 			source: "mp4",
 			output: domain.ContainerMP4,
 		},
@@ -180,7 +180,23 @@ func TestEngine_KindDerivation(t *testing.T) {
 			name:   "a webm keeps its extension only when nothing needs doing",
 			probe:  probeOf("matroska,webm", video("vp9", "Profile 0"), audio("opus", 2)),
 			path:   "/media/x.webm",
-			kind:   domain.KindFull,
+			kind:   domain.KindOf(domain.LabelVideo, domain.LabelAudio),
+			source: "matroska",
+			output: domain.ContainerMatroska,
+		},
+		{
+			name:   "dropped subtitle plus audio work",
+			probe:  mkv(video("h264", "High"), audio("dts", 6), subtitle("hdmv_pgs_subtitle")),
+			path:   mkvPath,
+			kind:   domain.KindOf(domain.LabelAudio, domain.LabelSubtitles),
+			source: "matroska",
+			output: domain.ContainerMatroska,
+		},
+		{
+			name:   "cover art alone is nothing to do",
+			probe:  mkv(video("mjpeg", "Baseline", withAttachedPic()), video("h264", "High"), audio("aac", 2)),
+			path:   mkvPath,
+			kind:   domain.KindSkip,
 			source: "matroska",
 			output: domain.ContainerMatroska,
 		},
@@ -188,7 +204,7 @@ func TestEngine_KindDerivation(t *testing.T) {
 			name:   "a format ffprobe could not name",
 			probe:  probeOf("", video("h264", "High"), audio("aac", 2)),
 			path:   "/media/x.bin",
-			kind:   domain.KindRemux,
+			kind:   domain.KindOf(domain.LabelRemux),
 			source: "unknown",
 			output: domain.ContainerMatroska,
 		},
@@ -203,7 +219,7 @@ func TestEngine_KindDerivation(t *testing.T) {
 			require.Equal(t, tc.kind, a.Plan.Kind)
 			require.Equal(t, tc.source, a.Plan.SourceContainer)
 			require.Equal(t, tc.output, a.Plan.OutputContainer)
-			require.Equal(t, tc.kind != domain.KindSkip, a.Plan.NeedsWrite())
+			require.Equal(t, !tc.kind.Skip(), a.Plan.NeedsWrite())
 		})
 	}
 }
@@ -253,7 +269,7 @@ func TestEngine_ReasonBlock(t *testing.T) {
 		"subtitle 1 (eng, ass): CONVERT - ass to srt",
 		"subtitle 2 (eng, hdmv_pgs_subtitle): DROP - image-based",
 		"container: matroska -> matroska",
-		"plan: AUDIO_ONLY - video copied, 1 audio stream re-encoded, 1 subtitle stream converted, 1 subtitle stream dropped",
+		"plan: AUDIO|SUBTITLES - video copied, 1 audio stream re-encoded, 1 subtitle stream converted, 1 subtitle stream dropped",
 	}, a.Plan.Reasons)
 }
 
@@ -308,7 +324,7 @@ func TestEngine_ReasonBlockVariants(t *testing.T) {
 				"video: ENCODE - codec av1 is not on the copy list",
 				"audio 0 (eng, 2.0): ENCODE - opus not in copy list for 1-2 channels",
 				"container: matroska -> matroska",
-				"plan: FULL - video re-encoded to HEVC MAIN, 1 audio stream re-encoded",
+				"plan: VIDEO|AUDIO - video re-encoded to HEVC MAIN, 1 audio stream re-encoded",
 			},
 		},
 		{
@@ -319,7 +335,7 @@ func TestEngine_ReasonBlockVariants(t *testing.T) {
 				`video: ENCODE - profile "Rext" is not on the copy list for hevc, chroma 4:2:2 is not 4:2:0`,
 				"audio 0 (eng, 2.0): COPY - aac, stereo",
 				"container: matroska -> matroska",
-				"plan: FULL - video re-encoded to HEVC MAIN10",
+				"plan: VIDEO - video re-encoded to HEVC MAIN10",
 			},
 		},
 		{
@@ -332,7 +348,7 @@ func TestEngine_ReasonBlockVariants(t *testing.T) {
 				"subtitle 0 (eng, dvd_subtitle): DROP - image-based",
 				"subtitle 1 (eng, eia_608): DROP - broadcast caption format",
 				"container: matroska -> matroska",
-				"plan: AUDIO_ONLY - video copied, 2 subtitle streams dropped",
+				"plan: SUBTITLES - video copied, 2 subtitle streams dropped",
 			},
 		},
 	}
@@ -357,5 +373,5 @@ func TestEngine_AttachmentsAreNotStreamPlans(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.Len(t, a.Plan.Streams, 3)
-	require.Equal(t, domain.KindAudioOnly, a.Plan.Kind)
+	require.Equal(t, domain.KindOf(domain.LabelSubtitles), a.Plan.Kind)
 }

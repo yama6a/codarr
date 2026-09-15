@@ -34,7 +34,7 @@ func (s *Server) ListMedia(ctx context.Context, req gen.ListMediaRequestObject) 
 	}
 
 	if req.Params.PlanKind != nil {
-		filter.PlanKind = []domain.Kind{domain.Kind(*req.Params.PlanKind)}
+		filter.PlanKind = planKindFilter(*req.Params.PlanKind)
 	}
 
 	if req.Params.VideoCodec != nil && *req.Params.VideoCodec != "" {
@@ -115,7 +115,7 @@ func (s *Server) QueueMediaFile(
 		Enqueued:    res.Enqueued,
 		JobId:       res.JobID,
 		MediaFileId: res.MediaFileID,
-		PlanKind:    planKindPtr(res.PlanKind),
+		PlanKind:    planKindPtr(res.Planned, res.PlanKind),
 		Reason:      res.Reason,
 	}, nil
 }
@@ -172,7 +172,7 @@ func (s *Server) mediaView(ctx context.Context, id int64) (gen.MediaDetail, erro
 }
 
 func (s *Server) latestJobID(ctx context.Context, mediaFileID int64) (*int64, error) {
-	jobs, _, err := s.store.ListJobs(ctx, store.JobFilter{MediaFileID: &mediaFileID, Limit: 1})
+	jobs, _, err := s.store.ListJobs(ctx, store.JobFilter{MediaFileID: &mediaFileID, Order: store.OrderNewest, Limit: 1})
 	if err != nil {
 		return nil, fmt.Errorf("list jobs for media file %d: %w", mediaFileID, err)
 	}
@@ -212,6 +212,8 @@ func sortColumn(sort *gen.MediaSort) store.MediaSort {
 		return store.SortBitrate
 	case "provenance":
 		return store.SortProvenance
+	case "codarr_processed_at":
+		return store.SortProcessedAt
 	default:
 		return store.SortPath
 	}

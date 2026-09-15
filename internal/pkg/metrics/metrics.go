@@ -229,8 +229,16 @@ func (m *Metrics) SetAwaitingStreamEnd(n int) { m.awaitingStreamEnd.Set(float64(
 // SetFilesByPlanKind replaces the library breakdown, writing the zeroes too so a kind
 // that empties reports zero rather than freezing at its last value.
 func (m *Metrics) SetFilesByPlanKind(counts map[domain.Kind]int) {
-	for _, k := range []domain.Kind{domain.KindSkip, domain.KindRemux, domain.KindAudioOnly, domain.KindFull} {
-		m.filesByPlanKind.WithLabelValues(string(k)).Set(float64(counts[k]))
+	c := domain.CountKinds(counts)
+
+	for label, n := range map[string]int{
+		"skip":                        c.Skip,
+		string(domain.LabelVideo):     c.Video,
+		string(domain.LabelAudio):     c.Audio,
+		string(domain.LabelSubtitles): c.Subtitles,
+		string(domain.LabelRemux):     c.Remux,
+	} {
+		m.filesByPlanKind.WithLabelValues(label).Set(float64(n))
 	}
 }
 

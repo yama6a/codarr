@@ -66,6 +66,30 @@ describe('Logs', () => {
     expect(lastQuery.limit).toBe(200);
   });
 
+  it('loads older rows below the list with before_id set to the oldest id held', async () => {
+    mocks.get.mockResolvedValue({ data: { ...page, has_more: true } });
+    renderLogs();
+    await screen.findByText('deferred, Plex is streaming the file');
+
+    mocks.get.mockResolvedValue({
+      data: {
+        items: [{ ...page.items[0], id: 3, message: 'an older line' }],
+        next_since_id: 3,
+        has_more: false,
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Load older' }));
+
+    expect(await screen.findByText('an older line')).toBeInTheDocument();
+    expect(mocks.get).toHaveBeenLastCalledWith('/api/events', {
+      params: { query: { level: undefined, category: undefined, since_id: undefined, before_id: 7, limit: 200 } },
+    });
+    const rows = screen.getAllByRole('listitem');
+    expect(rows[0]).toHaveTextContent('deferred, Plex is streaming the file');
+    expect(rows[1]).toHaveTextContent('an older line');
+    expect(screen.queryByRole('button', { name: 'Load older' })).not.toBeInTheDocument();
+  });
+
   it('resets the cursor when the level filter changes', async () => {
     renderLogs();
     await screen.findByText('deferred, Plex is streaming the file');

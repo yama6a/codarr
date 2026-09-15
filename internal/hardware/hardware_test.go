@@ -28,9 +28,13 @@ func encodeEntry(backend string, profile string, works bool, errText string) dom
 }
 
 func decodeEntry(backend string, works bool, errText string) domain.HWCapability {
+	return decodeEntryFor(backend, "vp9", works, errText)
+}
+
+func decodeEntryFor(backend, codec string, works bool, errText string) domain.HWCapability {
 	return domain.HWCapability{
 		Backend:       backend,
-		Codec:         "vp9",
+		Codec:         codec,
 		Direction:     "decode",
 		Works:         works,
 		Error:         errText,
@@ -52,6 +56,8 @@ func everythingWorks() hardware.Capabilities {
 			encodeEntry("vaapi", "main10", true, ""),
 			decodeEntry("qsv", true, ""),
 			decodeEntry("vaapi", true, ""),
+			decodeEntryFor("qsv", "av1", true, ""),
+			decodeEntryFor("vaapi", "av1", true, ""),
 		},
 	}
 }

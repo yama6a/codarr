@@ -120,7 +120,9 @@ target. Everything else is best effort.
 
 - Don't make encoding policy configurable.
 - Don't add a trash, undo or restore path.
-- Don't collapse `audio_only` into `full`.
+- Don't treat a plan without the `video` label as the slow tier. It is I/O bound
+  however many other labels it carries: one `io` throughput row, quick priority,
+  no size check.
 - Don't compare `pix_fmt` as a string to test chroma; test subsampling.
 - Don't treat unknown or absent `field_order` as interlaced.
 - Don't pass `-hwaccel` for a codec outside the hardware-decode set.

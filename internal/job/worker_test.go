@@ -19,7 +19,7 @@ func TestService_RunOnceExecutesAJobEndToEnd(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	j := h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	ran, err := h.svc.RunOnce(t.Context())
@@ -73,7 +73,7 @@ func TestService_RunOnceStartsNothingWhilePaused(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	j := h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 
 	require.NoError(t, h.svc.Pause(t.Context()))
 
@@ -116,7 +116,7 @@ func TestService_CancelRunningJobCleansTheStagingFile(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	j := h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/4)
 
 	started := make(chan struct{})
@@ -150,7 +150,7 @@ func TestService_CancelQueuedJob(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	j := h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 
 	require.NoError(t, h.svc.Cancel(t.Context(), j.ID))
 	require.Equal(t, domain.JobCancelled, h.jobRow(j.ID).State)
@@ -162,11 +162,11 @@ func TestService_RestartPutsACancelledJobAtTheFront(t *testing.T) {
 	h := newHarness(t)
 
 	queued := h.store.putJob(domain.Job{
-		MediaFileID: 99, Kind: domain.KindFull, State: domain.JobQueued,
+		MediaFileID: 99, Kind: domain.KindOf(domain.LabelVideo), State: domain.JobQueued,
 		Priority: domain.PriorityFull, QueuedAt: h.clk.Now(),
 	})
 	cancelled := h.store.putJob(domain.Job{
-		MediaFileID: mediaID, Kind: domain.KindAudioOnly, State: domain.JobCancelled,
+		MediaFileID: mediaID, Kind: domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), State: domain.JobCancelled,
 		Priority: domain.PriorityQuick, QueuedAt: h.clk.Now(),
 	})
 
@@ -182,7 +182,7 @@ func TestService_ProgressReachesTheDatabaseEveryFiveSecondsNotPerLine(t *testing
 	t.Parallel()
 
 	h := newHarness(t)
-	h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 
 	h.encoder.RunFunc = func(_ context.Context, args []string, progress func(ffmpeg.Progress)) (ffmpeg.RunResult, error) {
 		h.recordRun(args)
@@ -234,7 +234,7 @@ func TestService_ShutdownLeavesTheJobInFlightForTheStartupSweep(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	j := h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	started := make(chan struct{})
@@ -267,7 +267,7 @@ func TestService_VerificationFailureKeepsTheStagingFileForInspection(t *testing.
 	t.Parallel()
 
 	h := newHarness(t)
-	j := h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	h.promoter.PromoteFunc = func(context.Context, promote.Request) (promote.Result, error) {
@@ -290,7 +290,7 @@ func TestService_PostRenameFailureStillPersistsTheOutputIdentity(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	j := h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	h.promoter.PromoteFunc = func(_ context.Context, req promote.Request) (promote.Result, error) {
@@ -414,7 +414,7 @@ func TestService_EveryFailurePathCarriesACodeAndAMessage(t *testing.T) {
 			h := newHarness(t)
 			tc.arrange(h)
 
-			j := h.queue(domain.KindAudioOnly, domain.OriginIngest)
+			j := h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 			h.addFile(stagingPath, sourceSize/2)
 
 			ran, err := h.svc.RunOnce(t.Context())
@@ -430,7 +430,7 @@ func TestService_FfmpegFailurePersistsTheStderrTail(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	j := h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 
 	tail := "frame= 12 fps=3\n[hevc_qsv @ 0x1] Error initializing an internal MFX session"
 	h.encoder.RunFunc = func(context.Context, []string, func(ffmpeg.Progress)) (ffmpeg.RunResult, error) {
@@ -450,7 +450,7 @@ func TestService_APromotionBlockedByPlexMovesTheJobToAwaitingStreamEnd(t *testin
 	t.Parallel()
 
 	h := newHarness(t)
-	j := h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	var blockedState domain.JobState
@@ -482,9 +482,9 @@ func TestService_RunDrainsTheQueue(t *testing.T) {
 	h := newHarness(t)
 	h.store.putMedia(withID(11, audioOnlyProbe(), nil))
 
-	first := h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	first := h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 	second := h.store.putJob(domain.Job{
-		MediaFileID: 11, Kind: domain.KindAudioOnly, Origin: domain.OriginIngest,
+		MediaFileID: 11, Kind: domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), Origin: domain.OriginIngest,
 		Priority: domain.PriorityNormal, State: domain.JobQueued, QueuedAt: h.clk.Now(),
 	})
 
@@ -504,7 +504,7 @@ func TestService_FpsRidesTheSameThrottledProgressWrite(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	j := h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	h.encoder.RunFunc = func(_ context.Context, args []string, progress func(ffmpeg.Progress)) (ffmpeg.RunResult, error) {

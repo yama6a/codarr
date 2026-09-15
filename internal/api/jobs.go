@@ -13,7 +13,8 @@ import (
 // so the first page is the part anyone looks at.
 const DashboardListSize = 25
 
-// ListJobs is the job history, newest first.
+// ListJobs is the job history: terminal states newest finished first, the queue
+// in execution order.
 func (s *Server) ListJobs(ctx context.Context, req gen.ListJobsRequestObject) (gen.ListJobsResponseObject, error) {
 	limit, offset, pageNo, pageSize := page(req.Params.Page, req.Params.PageSize)
 
@@ -132,7 +133,7 @@ func (s *Server) queueState(ctx context.Context) (gen.QueueState, error) {
 
 	names := newMediaCache(s.store)
 
-	queued, err := s.listState(ctx, names, DashboardListSize, domain.JobQueued)
+	queued, _, err := s.listState(ctx, names, DashboardListSize, domain.JobQueued)
 	if err != nil {
 		return gen.QueueState{}, err
 	}
@@ -160,7 +161,7 @@ func (s *Server) queueState(ctx context.Context) (gen.QueueState, error) {
 // one job is ever in a running state (plan.md 19).
 func (s *Server) currentJob(ctx context.Context, cache *mediaCache) (*gen.JobSummary, error) {
 	for _, state := range []domain.JobState{domain.JobRunning, domain.JobVerifying, domain.JobPromoting} {
-		found, err := s.listState(ctx, cache, 1, state)
+		found, _, err := s.listState(ctx, cache, 1, state)
 		if err != nil {
 			return nil, err
 		}
@@ -173,15 +174,22 @@ func (s *Server) currentJob(ctx context.Context, cache *mediaCache) (*gen.JobSum
 	return nil, nil //nolint:nilnil // an idle queue has no current job, which is not an error
 }
 
+// listState returns the first page in the state's natural order plus how many
+// rows the state holds, so a capped list can say "25 of 231".
 func (s *Server) listState(
 	ctx context.Context, cache *mediaCache, limit int, states ...domain.JobState,
-) ([]gen.JobSummary, error) {
-	jobs, _, err := s.store.ListJobs(ctx, store.JobFilter{State: states, Limit: limit})
+) ([]gen.JobSummary, int, error) {
+	jobs, total, err := s.store.ListJobs(ctx, store.JobFilter{State: states, Limit: limit})
 	if err != nil {
-		return nil, fmt.Errorf("list jobs: %w", err)
+		return nil, 0, fmt.Errorf("list jobs: %w", err)
 	}
 
-	return s.summariesWith(ctx, cache, jobs)
+	items, err := s.summariesWith(ctx, cache, jobs)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return items, total, nil
 }
 
 func (s *Server) awaitingStreamEnd(ctx context.Context, cache *mediaCache) ([]gen.AwaitingStreamEnd, error) {
@@ -300,7 +308,7 @@ func jobSummary(j domain.Job, path string) gen.JobSummary {
 		FellBack:         j.FellBack,
 		FinishedAt:       j.FinishedAt,
 		Id:               j.ID,
-		Kind:             gen.PlanKind(j.Kind),
+		Kind:             planKind(j.Kind),
 		MediaFileId:      j.MediaFileID,
 		MediaFilename:    filename(path),
 		MediaPath:        path,
@@ -333,7 +341,7 @@ func jobDetail(j domain.Job, media domain.MediaFile, instance string) gen.Job {
 		FellBack:          j.FellBack,
 		FinishedAt:        j.FinishedAt,
 		Id:                j.ID,
-		Kind:              gen.PlanKind(j.Kind),
+		Kind:              planKind(j.Kind),
 		MediaFileId:       j.MediaFileID,
 		MediaFilename:     filename(media.Path),
 		MediaPath:         media.Path,

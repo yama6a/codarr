@@ -13,8 +13,9 @@ import { PlanSection } from './PlanSection';
 import { ProvenanceSection } from './ProvenanceSection';
 import { TechnicalSection } from './TechnicalSection';
 import { TransformSections } from './TransformSections';
-import { formatBytes, formatDateTime, humanise } from '../../lib/format';
-import { jobStateTone, mediaStatusTone, planKindTone } from '../../lib/tone';
+import { PlanKindBadges } from '../ui/PlanKindBadges';
+import { formatBytes, formatDateTime, humanise, planKindText } from '../../lib/format';
+import { jobStateTone, mediaStatusTone } from '../../lib/tone';
 import type { IntegrityResult, Job, JobState, MediaDetail } from '../../api/types';
 
 const ACTIVE_STATES: JobState[] = ['queued', 'running', 'verifying', 'awaiting_stream_end', 'promoting'];
@@ -87,7 +88,7 @@ export function MediaDetailModal({ mediaFileId, jobId, onClose, onChanged }: Med
     run('queue', async () => {
       const result = await unwrap(api.POST('/api/media/{id}/queue', { params: { path: { id: mediaFileId } } }));
       if (result.enqueued) {
-        toast.success(`Queued as ${result.plan_kind ?? 'a job'}.`);
+        toast.success(`Queued as ${planKindText(result.plan_kind)}.`);
       } else {
         toast.warning(result.reason || 'Nothing to do for this file.');
       }
@@ -167,7 +168,7 @@ export function MediaDetailModal({ mediaFileId, jobId, onClose, onChanged }: Med
         <div className="space-y-6">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={mediaStatusTone(media.status)}>{humanise(media.status)}</Badge>
-            {media.plan_kind && <Badge tone={planKindTone(media.plan_kind)}>{humanise(media.plan_kind)}</Badge>}
+            {media.plan_kind && <PlanKindBadges kind={media.plan_kind} />}
             {job && <Badge tone={jobStateTone(job.state)}>Job #{job.id} {humanise(job.state)}</Badge>}
             {media.ignored && <Badge tone="neutral">Ignored</Badge>}
             {media.is_hdr && <Badge tone="warning">HDR</Badge>}

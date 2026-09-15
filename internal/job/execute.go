@@ -149,7 +149,7 @@ func (s *Service) replan(t *task, scan domain.Scan) error {
 		if !ok {
 			return failf(domain.FailInternal,
 				"%s cannot be re-encoded for the space sweep: the current policy plans its video as %s",
-				t.media.Path, plan.Kind)
+				t.media.Path, plan.Kind.Display())
 		}
 
 		plan = forced
@@ -158,7 +158,7 @@ func (s *Service) replan(t *task, scan domain.Scan) error {
 	if !plan.NeedsWrite() {
 		return failf(domain.FailInternal,
 			"%s plans as skip under the current policy, so there is nothing to do; it was queued as %s under an older one",
-			t.media.Path, t.job.Kind)
+			t.media.Path, t.job.Kind.Display())
 	}
 
 	// The target survives a re-plan: the sample probe measures the content, not
@@ -224,7 +224,7 @@ func (s *Service) preflight(t *task) error {
 // plan.md 8.1 runs here rather than at enqueue, which is why 17.2 leaves the
 // target null; a failed probe is not a failed job, 8.2 is the fallback.
 func (s *Service) resolveBitrate(ctx context.Context, t *task) error {
-	if t.plan.Kind != domain.KindFull {
+	if !t.plan.EncodesVideo() {
 		return nil
 	}
 
@@ -324,7 +324,7 @@ func (s *Service) selectEncoder(ctx context.Context, t *task) error {
 
 	t.caps = caps
 
-	if t.plan.Kind != domain.KindFull {
+	if !t.plan.EncodesVideo() {
 		return nil
 	}
 
@@ -422,7 +422,7 @@ func (s *Service) stepBack(ctx context.Context, t *task, cmd ffmpeg.Command, res
 		return true
 	}
 
-	if t.plan.Kind != domain.KindFull {
+	if !t.plan.EncodesVideo() {
 		return false
 	}
 

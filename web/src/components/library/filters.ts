@@ -1,9 +1,9 @@
-import type { MediaFilter, MediaStatus, PlanKind, Provenance } from '../../api/types';
+import type { MediaFilter, MediaStatus, PlanKindFilter, Provenance } from '../../api/types';
 
 export interface LibraryFilterState {
   q: string;
   status: MediaStatus | '';
-  plan_kind: PlanKind | '';
+  plan_kind: PlanKindFilter | '';
   video_codec: string;
   arr_instance_id: string;
   provenance: Provenance | '';

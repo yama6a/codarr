@@ -42,7 +42,7 @@ func mediaFixture() domain.MediaFile {
 		FingerprintAlgo: "xxh3-128",
 		ProbeJSON:       probeJSON,
 		AnalyzedAt:      &analysed,
-		PlanKind:        domain.KindFull,
+		PlanKind:        domain.KindOf(domain.LabelVideo),
 		PlanReasons:     []string{"video: ENCODE - h264 High"},
 		Container:       "matroska",
 		VideoCodec:      "h264",
@@ -110,12 +110,12 @@ func TestListMedia_MapsFilterSortAndPagination(t *testing.T) {
 	}
 
 	got := decodeInto[gen.MediaPage](t, h.do(t, "GET",
-		"/api/media?q=dune&status=analyzed&plan_kind=full&video_codec=h264&sort=-size_bytes&page=3&page_size=25",
+		"/api/media?q=dune&status=analyzed&plan_kind=video&video_codec=h264&sort=-size_bytes&page=3&page_size=25",
 		nil), 200)
 
 	require.Equal(t, "dune", seen.Query)
 	require.Equal(t, []domain.MediaStatus{domain.MediaAnalyzed}, seen.Status)
-	require.Equal(t, []domain.Kind{domain.KindFull}, seen.PlanKind)
+	require.Equal(t, []string{"video"}, seen.PlanKind)
 	require.Equal(t, []string{"h264"}, seen.VideoCodec)
 	require.Equal(t, store.SortSize, seen.Sort)
 	require.True(t, seen.Descending)
@@ -160,6 +160,7 @@ func TestQueueMediaFile_ReportsANoOpRatherThanFailing(t *testing.T) {
 			MediaFileID: 7,
 			Enqueued:    false,
 			PlanKind:    domain.KindSkip,
+			Planned:     true,
 			Reason:      "every stream is already compatible",
 		}, nil
 	}
@@ -169,7 +170,7 @@ func TestQueueMediaFile_ReportsANoOpRatherThanFailing(t *testing.T) {
 	require.False(t, got.Enqueued)
 	require.Equal(t, "every stream is already compatible", got.Reason)
 	require.NotNil(t, got.PlanKind)
-	require.Equal(t, gen.PlanKindSkip, *got.PlanKind)
+	require.Equal(t, gen.PlanKind{}, *got.PlanKind)
 }
 
 func TestIgnoreAndUnignoreMediaFile(t *testing.T) {
@@ -351,7 +352,7 @@ func TestGetMediaFile_RendersThePlanStreams(t *testing.T) {
 	media := mediaFixture()
 	out0, out1 := 0, 1
 	media.Plan = &domain.Plan{
-		Kind:            domain.KindFull,
+		Kind:            domain.KindOf(domain.LabelVideo),
 		SourceContainer: "matroska",
 		OutputContainer: domain.ContainerMatroska,
 		PolicyHash:      "914f0f87",
@@ -373,7 +374,7 @@ func TestGetMediaFile_RendersThePlanStreams(t *testing.T) {
 	got := decodeInto[gen.MediaDetail](t, h.do(t, "GET", "/api/media/7", nil), 200)
 
 	require.NotNil(t, got.Plan)
-	require.Equal(t, gen.PlanKindFull, got.Plan.Kind)
+	require.Equal(t, gen.PlanKind{gen.PlanLabelVideo}, got.Plan.Kind)
 	require.Equal(t, gen.ContainerFamilyMatroska, got.Plan.OutputContainer)
 	require.Len(t, got.Plan.Streams, 3)
 

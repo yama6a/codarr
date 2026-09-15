@@ -33,7 +33,7 @@ func TestEngine_PlansRealProbeJSON(t *testing.T) {
 	a, err := decide.New().Plan(probe, decide.Options{Path: probe.Format.Filename})
 	require.NoError(t, err)
 
-	require.Equal(t, domain.KindAudioOnly, a.Plan.Kind)
+	require.Equal(t, domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), a.Plan.Kind)
 	require.Equal(t, domain.ContainerMatroska, a.Plan.OutputContainer)
 	require.False(t, a.Plan.LevelRewrite)
 	require.False(t, a.Plan.Deinterlace)
@@ -48,7 +48,7 @@ func TestEngine_PlansRealProbeJSON(t *testing.T) {
 		"subtitle 1 (eng, subrip): COPY",
 		"subtitle 2 (swe, ass): CONVERT - ass to srt",
 		"container: matroska -> matroska",
-		"plan: AUDIO_ONLY - video copied, 1 audio stream re-encoded, 1 subtitle stream converted, 1 subtitle stream dropped",
+		"plan: AUDIO|SUBTITLES - video copied, 1 audio stream re-encoded, 1 subtitle stream converted, 1 subtitle stream dropped",
 	}, a.Plan.Reasons)
 
 	rec := decide.NewTransform(probe, a.Plan, 240)

@@ -59,7 +59,7 @@ func TestMediaStore_RecordPromotionLeavesTheNextScanNothingToDo(t *testing.T) {
 
 	s := storetest.NewDB(t)
 	media := seedMedia(t, s, "/library/movies/promoted.mkv")
-	job := seedJob(t, s, media.ID, domain.KindFull, domain.PriorityFull)
+	job := seedJob(t, s, media.ID, domain.KindOf(domain.LabelVideo), domain.PriorityFull)
 
 	const (
 		outputFingerprint = "xxh3-128:output"
@@ -113,7 +113,7 @@ func TestMediaStore_ProvenanceGoesModifiedWhenSomethingRewritesTheFile(t *testin
 
 	s := storetest.NewDB(t)
 	media := seedMedia(t, s, "/library/movies/bazarr.mkv")
-	job := seedJob(t, s, media.ID, domain.KindFull, domain.PriorityFull)
+	job := seedJob(t, s, media.ID, domain.KindOf(domain.LabelVideo), domain.PriorityFull)
 
 	require.NoError(t, s.RecordPromotion(t.Context(), store.PromotionUpdate{
 		JobID:             job.ID,
@@ -157,7 +157,7 @@ func TestMediaStore_AnalysisRecomputesProvenanceAndStoresThePlan(t *testing.T) {
 	media := seedMedia(t, s, "/library/movies/analyzed.mkv")
 
 	plan := &domain.Plan{
-		Kind:            domain.KindAudioOnly,
+		Kind:            domain.KindOf(domain.LabelAudio),
 		SourceContainer: "matroska",
 		OutputContainer: domain.ContainerMatroska,
 		Streams: []domain.StreamPlan{
@@ -177,7 +177,7 @@ func TestMediaStore_AnalysisRecomputesProvenanceAndStoresThePlan(t *testing.T) {
 		ProbeJSON:       `{"format":{}}`,
 		MediaInfoJSON:   `{"video":"h264"}`,
 		Plan:            plan,
-		PlanKind:        domain.KindAudioOnly,
+		PlanKind:        domain.KindOf(domain.LabelAudio),
 		PlanReasons:     []string{"dts not in copy list for 3+ channels"},
 		Container:       "matroska",
 		VideoCodec:      "h264",
@@ -193,7 +193,7 @@ func TestMediaStore_AnalysisRecomputesProvenanceAndStoresThePlan(t *testing.T) {
 	analyzed, err := s.GetMediaFile(t.Context(), media.ID)
 	require.NoError(t, err)
 	require.Equal(t, plan, analyzed.Plan)
-	require.Equal(t, domain.KindAudioOnly, analyzed.PlanKind)
+	require.Equal(t, domain.KindOf(domain.LabelAudio), analyzed.PlanKind)
 	require.Equal(t, []string{"dts not in copy list for 3+ channels"}, analyzed.PlanReasons)
 	require.Equal(t, "h264", analyzed.VideoCodec)
 	require.Equal(t, 8_420_000, analyzed.VideoBitrate)
@@ -222,9 +222,9 @@ func TestMediaStore_ListFiltersSortsAndPaginates(t *testing.T) {
 		kind   domain.Kind
 		status domain.MediaStatus
 	}{
-		{"/library/movies/alpha.mkv", "h264", domain.KindFull, domain.MediaAnalyzed},
+		{"/library/movies/alpha.mkv", "h264", domain.KindOf(domain.LabelVideo), domain.MediaAnalyzed},
 		{"/library/movies/bravo.mkv", "hevc", domain.KindSkip, domain.MediaDone},
-		{"/library/shows/charlie.mkv", "h264", domain.KindAudioOnly, domain.MediaAnalyzed},
+		{"/library/shows/charlie.mkv", "h264", domain.KindOf(domain.LabelAudio), domain.MediaAnalyzed},
 	} {
 		m, err := s.UpsertMediaFile(t.Context(), domain.MediaFile{
 			Path: spec.path, SizeBytes: 1, MTime: 1, ArrInstanceID: &instance.ID,
@@ -250,11 +250,16 @@ func TestMediaStore_ListFiltersSortsAndPaginates(t *testing.T) {
 	require.Len(t, byCodec, 2)
 
 	byKind, total, err := s.ListMediaFiles(t.Context(), store.MediaFilter{
-		PlanKind: []domain.Kind{domain.KindAudioOnly},
+		PlanKind: []string{string(domain.LabelAudio)},
 	})
 	require.NoError(t, err)
 	require.Equal(t, 1, total)
 	require.Equal(t, "/library/shows/charlie.mkv", byKind[0].Path)
+
+	skipped, total, err := s.ListMediaFiles(t.Context(), store.MediaFilter{PlanKind: []string{store.PlanKindSkip}})
+	require.NoError(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, "/library/movies/bravo.mkv", skipped[0].Path)
 
 	byQuery, total, err := s.ListMediaFiles(t.Context(), store.MediaFilter{Query: "/shows/"})
 	require.NoError(t, err)
@@ -380,7 +385,7 @@ func TestMediaStore_SetIntegrityRederivesProvenance(t *testing.T) {
 
 	s := storetest.NewDB(t)
 	media := seedMedia(t, s, "/library/movies/integrity.mkv")
-	job := seedJob(t, s, media.ID, domain.KindFull, domain.PriorityFull)
+	job := seedJob(t, s, media.ID, domain.KindOf(domain.LabelVideo), domain.PriorityFull)
 
 	require.NoError(t, s.RecordPromotion(t.Context(), store.PromotionUpdate{
 		JobID: job.ID, MediaFileID: media.ID, OutputFingerprint: "xxh3-128:output",
@@ -416,7 +421,7 @@ func TestMediaStore_CountsForTheDashboard(t *testing.T) {
 	for _, path := range []string{"/library/one.mkv", "/library/two.mkv"} {
 		m := seedMedia(t, s, path)
 		require.NoError(t, s.UpdateMediaAnalysis(t.Context(), store.AnalysisUpdate{
-			MediaFileID: m.ID, SizeBytes: 1, MTime: 1, PlanKind: domain.KindFull,
+			MediaFileID: m.ID, SizeBytes: 1, MTime: 1, PlanKind: domain.KindOf(domain.LabelVideo),
 			Status: domain.MediaAnalyzed, AnalyzedAt: testTime(),
 		}))
 	}
@@ -427,7 +432,7 @@ func TestMediaStore_CountsForTheDashboard(t *testing.T) {
 
 	byKind, err := s.CountMediaByPlanKind(t.Context())
 	require.NoError(t, err)
-	require.Equal(t, map[domain.Kind]int{domain.KindFull: 2}, byKind)
+	require.Equal(t, map[domain.Kind]int{domain.KindOf(domain.LabelVideo): 2}, byKind)
 }
 
 // plan.md 18.2 makes provenance a first-class sort column. Outside the whitelist the
@@ -442,7 +447,7 @@ func TestMediaStore_SortsByProvenanceInBothDirections(t *testing.T) {
 	modified := seedMedia(t, s, "/library/zzz-modified.mkv")
 
 	for _, m := range []domain.MediaFile{output, modified} {
-		job := seedJob(t, s, m.ID, domain.KindFull, domain.PriorityFull)
+		job := seedJob(t, s, m.ID, domain.KindOf(domain.LabelVideo), domain.PriorityFull)
 
 		require.NoError(t, s.RecordPromotion(t.Context(), store.PromotionUpdate{
 			JobID:             job.ID,
@@ -492,4 +497,49 @@ func provenances(files []domain.MediaFile) []domain.Provenance {
 	}
 
 	return out
+}
+
+// A label matches anywhere in the set, and the empty set is only ever "skip".
+func TestMediaStore_FiltersByAnyLabelInThePlanKind(t *testing.T) {
+	t.Parallel()
+
+	s := storetest.NewDB(t)
+
+	both := seedMedia(t, s, "/library/both.mkv")
+	subs := seedMedia(t, s, "/library/subs.mkv")
+	seedMedia(t, s, "/library/unanalysed.mkv")
+
+	for id, kind := range map[int64]domain.Kind{
+		both.ID: domain.KindOf(domain.LabelAudio, domain.LabelSubtitles),
+		subs.ID: domain.KindOf(domain.LabelSubtitles),
+	} {
+		require.NoError(t, s.UpdateMediaAnalysis(t.Context(), store.AnalysisUpdate{
+			MediaFileID: id, SizeBytes: 1, MTime: 1, PlanKind: kind,
+			Status: domain.MediaAnalyzed, AnalyzedAt: testTime(),
+		}))
+	}
+
+	paths := func(f store.MediaFilter) []string {
+		t.Helper()
+
+		f.Sort = store.SortPath
+		rows, _, err := s.ListMediaFiles(t.Context(), f)
+		require.NoError(t, err)
+
+		out := make([]string, 0, len(rows))
+		for _, r := range rows {
+			out = append(out, r.Path)
+		}
+
+		return out
+	}
+
+	require.Equal(t, []string{"/library/both.mkv", "/library/subs.mkv"},
+		paths(store.MediaFilter{PlanKind: []string{string(domain.LabelSubtitles)}}))
+	require.Equal(t, []string{"/library/both.mkv"},
+		paths(store.MediaFilter{PlanKind: []string{string(domain.LabelAudio)}}))
+	require.Empty(t, paths(store.MediaFilter{PlanKind: []string{string(domain.LabelVideo)}}))
+	require.Empty(t, paths(store.MediaFilter{PlanKind: []string{store.PlanKindSkip}}))
+	require.Equal(t, []string{"/library/both.mkv", "/library/subs.mkv"},
+		paths(store.MediaFilter{PlanKind: []string{string(domain.LabelAudio), string(domain.LabelSubtitles)}}))
 }

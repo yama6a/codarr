@@ -29,7 +29,7 @@ const items = [
     path: '/media/movies/Dune (2021)/Dune.mkv',
     provenance: 'modified_since_transcode',
     status: 'done',
-    plan_kind: 'remux',
+    plan_kind: ['remux'],
   }),
 ];
 
@@ -72,7 +72,7 @@ describe('Library', () => {
     expect(within(row).getByText(/h264 High L5.1/)).toBeInTheDocument();
     expect(within(row).getByText('3840x2160, 42.0 Mbps')).toBeInTheDocument();
     expect(within(row).getByText('eac3 6ch')).toBeInTheDocument();
-    expect(within(row).getByText('subrip')).toBeInTheDocument();
+    expect(within(row).getByText('1x subrip')).toBeInTheDocument();
     expect(within(row).getByText('Untouched')).toBeInTheDocument();
   });
 
@@ -110,7 +110,7 @@ describe('Library', () => {
         dry_run: true,
         examined: 40_000,
         count: 1200,
-        by_plan_kind: { skip: 0, remux: 400, audio_only: 300, full: 500 },
+        by_plan_kind: { skip: 0, video: 500, audio: 300, subtitles: 100, remux: 400 },
         queued_job_ids: [],
       },
     });
@@ -134,7 +134,7 @@ describe('Library', () => {
         dry_run: true,
         examined: 900,
         count: 120,
-        by_plan_kind: { skip: 0, remux: 40, audio_only: 30, full: 50 },
+        by_plan_kind: { skip: 0, video: 50, audio: 30, subtitles: 10, remux: 40 },
         queued_job_ids: [],
       },
     });

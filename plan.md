@@ -326,8 +326,8 @@ then rewrite the level in-stream during the container rebuild:
 -bsf:v h264_metadata=level=4.2
 ```
 
-The stream is still copied - no decode, no quality change - and the plan kind
-stays `remux` or `audio_only`. Content genuinely above 4.2 goes to encode.
+The stream is still copied - no decode, no quality change - and the plan gains
+the `remux` label rather than `video`. Content genuinely above 4.2 goes to encode.
 
 The `refs <= 4` guard is load-bearing, not a safety margin: level 4.2 allows
 MaxDpbMbs 34816, a 1080p frame is 8160 macroblocks, so the decoded picture buffer
@@ -483,31 +483,44 @@ const (
     Drop    Decision = "drop"
 )
 
-type Kind string
+type Label string
 const (
-    KindSkip      Kind = "skip"
-    KindRemux     Kind = "remux"
-    KindAudioOnly Kind = "audio_only"
-    KindFull      Kind = "full"
+    LabelVideo     Label = "video"
+    LabelAudio     Label = "audio"
+    LabelSubtitles Label = "subtitles"
+    LabelRemux     Label = "remux"
 )
+
+// Kind is the set of labels a plan carries, pipe-joined in the order above.
+// Empty means every stream is already compatible.
+type Kind string
 ```
 
-| Kind | Condition | Expected frequency | Cost |
-| --- | --- | --- | --- |
-| `skip` | all streams copy, container is MKV or MP4 | common | none |
-| `remux` | all streams copy, container is legacy -> MKV | occasional | I/O only |
-| `audio_only` | video copies, audio or subtitle work needed | **dominant** | I/O bound |
-| `full` | video needs re-encoding | rare | CPU/GPU bound |
+A plan carries every label that applies, with no precedence between them. A
+file that needs a video encode, a DTS fix and a PGS drop is `video|audio|subtitles`.
 
-With copy-first video, most of the library is `audio_only`: fix the DTS track,
-drop the PGS, copy the video. The cost is reading and writing the whole file
-because the container is rebuilt; the audio encoding itself is negligible, since
-all streams within one ffmpeg run encode concurrently.
+| Label | Condition | Expected frequency |
+| --- | --- | --- |
+| `video` | the primary video stream is re-encoded | rare |
+| `audio` | any audio stream is re-encoded or dropped | **dominant** |
+| `subtitles` | any subtitle stream is converted or dropped | common |
+| `remux` | the container changes, or the level flag is rewritten | occasional |
 
-**Do not collapse `audio_only` into `full`.**
+The empty set is "nothing to do"; the UI renders it as skipped. A dropped
+attached picture is metadata and carries no label.
+
+Cost follows one label only: a plan with `video` is CPU or GPU bound, a plan
+without it is I/O bound however many other labels it carries. With copy-first
+video most of the library is `audio` or `subtitles`: fix the DTS track, drop the
+PGS, copy the video. The cost is reading and writing the whole file because the
+container is rebuilt; the audio encoding itself is negligible, since all streams
+within one ffmpeg run encode concurrently.
+
+**Do not treat a plan without `video` as the slow tier.** It shares one
+throughput row, gets the quick priority and skips the size check.
 
 The level rewrite from 6.2 is a copy with a bitstream filter attached: the
-decision stays `copy`, the reason records the rewrite, the plan kind is unchanged.
+decision stays `copy`, the reason records the rewrite, the plan gains `remux`.
 
 Every decision records a human-readable reason, stored and shown in the UI:
 
@@ -521,7 +534,7 @@ subtitle 0 (eng, subrip): COPY
 subtitle 1 (eng, ass): CONVERT - ass to srt
 subtitle 2 (eng, hdmv_pgs_subtitle): DROP - image-based
 container: matroska -> matroska
-plan: AUDIO_ONLY - video copied, 1 audio stream re-encoded
+plan: AUDIO|SUBTITLES - video copied, 1 audio stream re-encoded, 1 subtitle stream converted, 1 subtitle stream dropped
 ```
 
 ### 7.1 What actually forces playback transcoding
@@ -642,7 +655,7 @@ VERIFY: transcode one HDR file on the actual ffmpeg build and confirm the output
 HDR10-compatible base layer, so losing the RPU degrades gracefully to HDR10.
 Profile 5 has no HDR10 base layer; it uses IPT-PQ-C2 colour, and stripping the RPU
 produces visibly wrong output, typically green and purple. Detect it and copy the
-video stream, downgrading the plan to `audio_only`.
+video stream, so the plan loses the `video` label.
 
 **Copying the stream is necessary but not sufficient.** The Dolby Vision
 configuration record (`dvcC`/`dvvC`) and the in-band RPUs must survive the
@@ -831,9 +844,9 @@ For users who want a definitive integrity record, a setting (`full_hash_enabled`
 **default off**) additionally computes an xxh3-128 over the entire staging file
 after verification and before promotion, storing it on the job and the media row.
 
-The cost is one extra full read of the output. On an `audio_only` job - already
-one full read plus one full write - that is roughly 40% more I/O. On a `full` job
-it is closer to 5%, since the encode dominates.
+The cost is one extra full read of the output. On a job that copies video -
+already one full read plus one full write - that is roughly 40% more I/O. On a
+`video` job it is closer to 5%, since the encode dominates.
 
 **It is computed once and verified only on demand**, never during the daily scan.
 Drift detection is the sparse fingerprint's job; the full hash exists so that
@@ -936,7 +949,7 @@ Passing `-hwaccel qsv` unconditionally fails on exactly the sources the encode
 path exists for: Xvid and MPEG-4 ASP have no QSV decoder on this iGPU, and neither
 does AV1.
 
-**Dominant case, `audio_only`** - `-c:v copy`, no hardware device needed:
+**Dominant case, video copied** - `-c:v copy`, no hardware device needed:
 
 ```
 ffmpeg -hide_banner -nostdin -y
@@ -1016,7 +1029,7 @@ Mandatory on every job:
 index the OUTPUT stream position, not the source stream.** When subtitle 1 is
 dropped, source subtitle 2 becomes output subtitle 1.
 
-Note the `audio_only` example above: source subtitles 1 and 2 are mapped, source 0
+Note the copied-video example above: source subtitles 1 and 2 are mapped, source 0
 is dropped, and the codec options are `-c:s:0` and `-c:s:1` referring to output
 positions.
 
@@ -1046,10 +1059,10 @@ failure.
 
 **Estimate at enqueue, measure at completion.** Both stored, both shown.
 
-- `audio_only` and `remux`: I/O bound. Estimate `source_bytes * 2 / throughput`,
-  where throughput is a rolling average of observed read+write rate from past jobs
-  of the same kind.
-- `full`: encode bound. Estimate `media_duration / speed_ratio`, where
+- Plans without `video`: I/O bound. Estimate `source_bytes * 2 / throughput`,
+  where throughput is a rolling average of observed read+write rate from past
+  I/O bound jobs; they share one `io` throughput row whatever else they carry.
+- Plans with `video`: encode bound. Estimate `media_duration / speed_ratio`, where
   `speed_ratio` is a rolling average per (encoder, resolution).
 
 Seed both with conservative defaults until data exists. Store the rolling averages
@@ -1066,7 +1079,7 @@ refine it when the job starts.
 **Write the output directly to a staging file on the destination filesystem**:
 `<dest_dir>/.codarr-staging-<job_id>.mkv`
 
-This matters more than it looks. `audio_only` jobs are I/O bound and dominate the
+This matters more than it looks. Jobs that copy video are I/O bound and dominate the
 queue. Writing to a temp volume and then copying to the destination means reading
 the source from the array, writing to temp, reading from temp, writing to the
 array - **double the array I/O** of writing straight to the destination, where
@@ -1127,10 +1140,10 @@ mtime, so this does not affect Plex ordering either way.
   is 4.2 instead.
 - **the DOVI configuration record is present in the output whenever the source
   carried one: hard failure for profile 5, warning for profiles 7/8** (section 9)
-- **output not larger than source, for `full` plans only**
+- **output not larger than source, for plans carrying `video` only**
 
-The size check applies only to `full`. An `audio_only` plan can legitimately grow
-a file when a 1.5 Mbps DTS track becomes 640k AC3 while video is untouched.
+The size check applies only when video is re-encoded. A plan that copies video
+can legitimately grow a file when a 1.5 Mbps DTS track becomes 640k AC3.
 
 ### 15.4 Preflight
 
@@ -1712,8 +1725,9 @@ non-placeholder value is supplied. Never log them.
 ### 18.5 Logs
 
 Read from `GET /api/events`, filterable by level and category, cursor-paginated.
-Auto-scroll when the user is at the bottom of the list, freeze when they have
-scrolled up.
+Newest first: the first page is the latest rows, a "Load older" button below the
+list pages back with `before_id`, and the poll prepends what arrived since the
+newest id held. A prepend must not move the row under the reader's cursor.
 
 ### 18.6 Polling, not streaming
 
@@ -1725,7 +1739,7 @@ confusing bugs. Plain request/response survives all of it.
 - Poll `GET /api/dashboard` every **10 seconds** while the dashboard is open. One
   call returns the current job, queue, recent completions, failures and stats, so
   the interval costs one request rather than six.
-- Poll `GET /api/events?since_id=<last>` every 10 seconds on the logs page.
+- Poll `GET /api/events?since_id=<newest>` every 10 seconds on the logs page.
 - **Stop polling when the tab is hidden** (`visibilitychange`) and fire one
   immediate poll when it becomes visible again.
 - Poll immediately after any mutation (cancel, retry, queue) rather than waiting
@@ -1758,9 +1772,9 @@ Controls:
   everything already queued.
 
 Model with an integer `priority`, lower runs first. Normal enqueues get 100. A
-restarted cancelled job gets `min(current queued priorities) - 1`. Give
-`audio_only` and `remux` a better default priority than `full` so quick wins clear
-first.
+restarted cancelled job gets `min(current queued priorities) - 1`. Give plans
+without `video` a better default priority than plans with it so quick wins clear
+first; with the setting off every enqueue gets 100.
 
 Bulk operations, all dry-run first with an explicit "queue these N jobs"
 confirmation:
@@ -1903,7 +1917,7 @@ POST   /api/hardware/probe
 POST   /api/webhook/{webhook_id}      *arr receiver
 
 GET    /api/stats
-GET    /api/events                    level, category, since_id, limit
+GET    /api/events                    level, category, since_id, before_id, limit
 
 GET    /api/dashboard                 single call for the polled dashboard:
                                       current job, queue, recent completions,
@@ -2156,7 +2170,7 @@ as the code.
 **Phase 2 - config and connections.** Settings, Plex, multiple *arr instances,
 path mappings, root import, Test buttons, attribution by longest-prefix match.
 
-**Phase 3 - audio, subtitles and remux.** `audio_only` and `remux` with
+**Phase 3 - audio, subtitles and remux.** Every plan without `video`, with
 `-c:v copy`. No hardware needed. Verification, duration estimation. **Write to a
 scratch directory, not over the source.** This fixes most of the library at low
 risk because video is never touched.

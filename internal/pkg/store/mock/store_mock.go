@@ -87,7 +87,7 @@ var _ store.Store = &StoreMock{}
 //			GetSettingsFunc: func(ctx context.Context) (domain.Settings, error) {
 //				panic("mock out the GetSettings method")
 //			},
-//			GetThroughputStatFunc: func(ctx context.Context, kind domain.Kind, encoder string, resolution string) (domain.ThroughputStat, error) {
+//			GetThroughputStatFunc: func(ctx context.Context, kind domain.ThroughputKind, encoder string, resolution string) (domain.ThroughputStat, error) {
 //				panic("mock out the GetThroughputStat method")
 //			},
 //			ListArrInstancesFunc: func(ctx context.Context) ([]domain.ArrInstance, error) {
@@ -275,7 +275,7 @@ type StoreMock struct {
 	GetSettingsFunc func(ctx context.Context) (domain.Settings, error)
 
 	// GetThroughputStatFunc mocks the GetThroughputStat method.
-	GetThroughputStatFunc func(ctx context.Context, kind domain.Kind, encoder string, resolution string) (domain.ThroughputStat, error)
+	GetThroughputStatFunc func(ctx context.Context, kind domain.ThroughputKind, encoder string, resolution string) (domain.ThroughputStat, error)
 
 	// ListArrInstancesFunc mocks the ListArrInstances method.
 	ListArrInstancesFunc func(ctx context.Context) ([]domain.ArrInstance, error)
@@ -543,7 +543,7 @@ type StoreMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// Kind is the kind argument value.
-			Kind domain.Kind
+			Kind domain.ThroughputKind
 			// Encoder is the encoder argument value.
 			Encoder string
 			// Resolution is the resolution argument value.
@@ -1674,13 +1674,13 @@ func (mock *StoreMock) GetSettingsCalls() []struct {
 }
 
 // GetThroughputStat calls GetThroughputStatFunc.
-func (mock *StoreMock) GetThroughputStat(ctx context.Context, kind domain.Kind, encoder string, resolution string) (domain.ThroughputStat, error) {
+func (mock *StoreMock) GetThroughputStat(ctx context.Context, kind domain.ThroughputKind, encoder string, resolution string) (domain.ThroughputStat, error) {
 	if mock.GetThroughputStatFunc == nil {
 		panic("StoreMock.GetThroughputStatFunc: method is nil but Store.GetThroughputStat was just called")
 	}
 	callInfo := struct {
 		Ctx        context.Context
-		Kind       domain.Kind
+		Kind       domain.ThroughputKind
 		Encoder    string
 		Resolution string
 	}{
@@ -1701,13 +1701,13 @@ func (mock *StoreMock) GetThroughputStat(ctx context.Context, kind domain.Kind, 
 //	len(mockedStore.GetThroughputStatCalls())
 func (mock *StoreMock) GetThroughputStatCalls() []struct {
 	Ctx        context.Context
-	Kind       domain.Kind
+	Kind       domain.ThroughputKind
 	Encoder    string
 	Resolution string
 } {
 	var calls []struct {
 		Ctx        context.Context
-		Kind       domain.Kind
+		Kind       domain.ThroughputKind
 		Encoder    string
 		Resolution string
 	}

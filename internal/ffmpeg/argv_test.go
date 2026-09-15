@@ -66,7 +66,7 @@ func TestBuild_Golden(t *testing.T) {
 				Output: "/library/.codarr-staging-1.mkv",
 				Tags:   tags(),
 				Plan: domain.Plan{
-					Kind:            domain.KindAudioOnly,
+					Kind:            domain.KindOf(domain.LabelAudio),
 					SourceContainer: "matroska,webm",
 					OutputContainer: domain.ContainerMatroska,
 					Streams: []domain.StreamPlan{
@@ -89,7 +89,7 @@ func TestBuild_Golden(t *testing.T) {
 				Output: "/library/.codarr-staging-2.mkv",
 				Tags:   tags(),
 				Plan: domain.Plan{
-					Kind:            domain.KindAudioOnly,
+					Kind:            domain.KindOf(domain.LabelAudio),
 					SourceContainer: "matroska,webm",
 					OutputContainer: domain.ContainerMatroska,
 					Streams: []domain.StreamPlan{
@@ -114,7 +114,7 @@ func TestBuild_Golden(t *testing.T) {
 				Output: "/library/.codarr-staging-3.mp4",
 				Tags:   tags(),
 				Plan: domain.Plan{
-					Kind:            domain.KindAudioOnly,
+					Kind:            domain.KindOf(domain.LabelAudio),
 					SourceContainer: "mov,mp4,m4a,3gp,3g2,mj2",
 					OutputContainer: domain.ContainerMP4,
 					Streams: []domain.StreamPlan{
@@ -133,7 +133,7 @@ func TestBuild_Golden(t *testing.T) {
 				Output: "/library/.codarr-staging-4.mkv",
 				Tags:   tags(),
 				Plan: domain.Plan{
-					Kind:            domain.KindAudioOnly,
+					Kind:            domain.KindOf(domain.LabelAudio),
 					SourceContainer: "matroska,webm",
 					OutputContainer: domain.ContainerMatroska,
 					LevelRewrite:    true,
@@ -151,7 +151,7 @@ func TestBuild_Golden(t *testing.T) {
 				Output: "/library/.codarr-staging-5.mp4",
 				Tags:   tags(),
 				Plan: domain.Plan{
-					Kind:            domain.KindAudioOnly,
+					Kind:            domain.KindOf(domain.LabelAudio),
 					SourceContainer: "mov,mp4,m4a,3gp,3g2,mj2",
 					OutputContainer: domain.ContainerMP4,
 					LevelRewrite:    true,
@@ -170,7 +170,7 @@ func TestBuild_Golden(t *testing.T) {
 				Output: "/library/.codarr-staging-6.mkv",
 				Tags:   tags(),
 				Plan: domain.Plan{
-					Kind:            domain.KindRemux,
+					Kind:            domain.KindOf(domain.LabelRemux),
 					SourceContainer: "avi",
 					OutputContainer: domain.ContainerMatroska,
 					Streams: []domain.StreamPlan{
@@ -190,7 +190,7 @@ func TestBuild_Golden(t *testing.T) {
 				Encoder: domain.EncoderQSV,
 				Device:  "/dev/dri/renderD128",
 				Plan: domain.Plan{
-					Kind:               domain.KindFull,
+					Kind:               domain.KindOf(domain.LabelVideo),
 					SourceContainer:    "matroska,webm",
 					OutputContainer:    domain.ContainerMatroska,
 					TargetVideoBitrate: 3_500_000,
@@ -212,7 +212,7 @@ func TestBuild_Golden(t *testing.T) {
 				Encoder: domain.EncoderQSV,
 				Device:  "/dev/dri/renderD128",
 				Plan: domain.Plan{
-					Kind:               domain.KindFull,
+					Kind:               domain.KindOf(domain.LabelVideo),
 					SourceContainer:    "matroska,webm",
 					OutputContainer:    domain.ContainerMatroska,
 					TargetVideoBitrate: 2_500_000,
@@ -234,7 +234,7 @@ func TestBuild_Golden(t *testing.T) {
 				Encoder: domain.EncoderQSV,
 				Device:  "/dev/dri/renderD128",
 				Plan: domain.Plan{
-					Kind:               domain.KindFull,
+					Kind:               domain.KindOf(domain.LabelVideo),
 					SourceContainer:    "matroska,webm",
 					OutputContainer:    domain.ContainerMatroska,
 					TargetVideoBitrate: 4_000_000,
@@ -255,7 +255,7 @@ func TestBuild_Golden(t *testing.T) {
 				Encoder: domain.EncoderQSV,
 				Device:  "/dev/dri/renderD128",
 				Plan: domain.Plan{
-					Kind:               domain.KindFull,
+					Kind:               domain.KindOf(domain.LabelVideo),
 					SourceContainer:    "avi",
 					OutputContainer:    domain.ContainerMatroska,
 					TargetVideoBitrate: 1_500_000,
@@ -277,7 +277,7 @@ func TestBuild_Golden(t *testing.T) {
 				Encoder: domain.EncoderQSV,
 				Device:  "/dev/dri/renderD128",
 				Plan: domain.Plan{
-					Kind:               domain.KindFull,
+					Kind:               domain.KindOf(domain.LabelVideo),
 					SourceContainer:    "matroska,webm",
 					OutputContainer:    domain.ContainerMatroska,
 					TargetVideoBitrate: 12_000_000,
@@ -298,7 +298,7 @@ func TestBuild_Golden(t *testing.T) {
 				Output: "/library/.codarr-staging-19.mp4",
 				Tags:   tags(),
 				Plan: domain.Plan{
-					Kind:               domain.KindAudioOnly,
+					Kind:               domain.KindOf(domain.LabelAudio),
 					SourceContainer:    "mp4",
 					OutputContainer:    domain.ContainerMP4,
 					HDR:                true,
@@ -322,7 +322,7 @@ func TestBuild_Golden(t *testing.T) {
 				Encoder: domain.EncoderQSV,
 				Device:  "/dev/dri/renderD128",
 				Plan: domain.Plan{
-					Kind:               domain.KindFull,
+					Kind:               domain.KindOf(domain.LabelVideo),
 					SourceContainer:    "matroska,webm",
 					OutputContainer:    domain.ContainerMatroska,
 					TargetVideoBitrate: 12_000_000,
@@ -345,7 +345,7 @@ func TestBuild_Golden(t *testing.T) {
 				Encoder: domain.EncoderQSV,
 				Device:  "/dev/dri/renderD128",
 				Plan: domain.Plan{
-					Kind:               domain.KindFull,
+					Kind:               domain.KindOf(domain.LabelVideo),
 					SourceContainer:    "matroska,webm",
 					OutputContainer:    domain.ContainerMatroska,
 					TargetVideoBitrate: 12_000_000,
@@ -366,7 +366,7 @@ func TestBuild_Golden(t *testing.T) {
 				Tags:    tags(),
 				Encoder: domain.EncoderSoftware,
 				Plan: domain.Plan{
-					Kind:               domain.KindFull,
+					Kind:               domain.KindOf(domain.LabelVideo),
 					SourceContainer:    "matroska,webm",
 					OutputContainer:    domain.ContainerMatroska,
 					TargetVideoBitrate: 2_500_000,
@@ -386,7 +386,7 @@ func TestBuild_Golden(t *testing.T) {
 				Tags:    tags(),
 				Encoder: domain.EncoderSoftware,
 				Plan: domain.Plan{
-					Kind:               domain.KindFull,
+					Kind:               domain.KindOf(domain.LabelVideo),
 					SourceContainer:    "matroska,webm",
 					OutputContainer:    domain.ContainerMatroska,
 					TargetVideoBitrate: 12_000_000,
@@ -408,7 +408,7 @@ func TestBuild_Golden(t *testing.T) {
 				Encoder: domain.EncoderQSV,
 				Device:  "/dev/dri/renderD128",
 				Plan: domain.Plan{
-					Kind:               domain.KindFull,
+					Kind:               domain.KindOf(domain.LabelVideo),
 					SourceContainer:    "mov,mp4,m4a,3gp,3g2,mj2",
 					OutputContainer:    domain.ContainerMP4,
 					TargetVideoBitrate: 3_000_000,
@@ -430,7 +430,7 @@ func TestBuild_Golden(t *testing.T) {
 				Encoder: domain.EncoderVAAPI,
 				Device:  "/dev/dri/renderD128",
 				Plan: domain.Plan{
-					Kind:               domain.KindFull,
+					Kind:               domain.KindOf(domain.LabelVideo),
 					SourceContainer:    "matroska,webm",
 					OutputContainer:    domain.ContainerMatroska,
 					TargetVideoBitrate: 3_500_000,
@@ -453,7 +453,7 @@ func TestBuild_Golden(t *testing.T) {
 				Device:              "/dev/dri/renderD128",
 				ForceSoftwareDecode: true,
 				Plan: domain.Plan{
-					Kind:               domain.KindFull,
+					Kind:               domain.KindOf(domain.LabelVideo),
 					SourceContainer:    "matroska,webm",
 					OutputContainer:    domain.ContainerMatroska,
 					TargetVideoBitrate: 3_500_000,

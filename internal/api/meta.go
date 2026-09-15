@@ -106,8 +106,8 @@ func (s *Server) stats(ctx context.Context) (gen.Stats, error) {
 	return out, nil
 }
 
-// ListEvents is the log view of plan.md 18.5: a cursor read, ascending by id,
-// so the UI appends rather than re-renders.
+// ListEvents is the log view of plan.md 18.5: newest first for the initial page
+// and for history, ascending from since_id for the poll that prepends.
 func (s *Server) ListEvents(ctx context.Context, req gen.ListEventsRequestObject) (gen.ListEventsResponseObject, error) {
 	limit := DefaultEventLimit
 	if req.Params.Limit != nil && *req.Params.Limit > 0 {
@@ -139,8 +139,8 @@ func (s *Server) ListEvents(ctx context.Context, req gen.ListEventsRequestObject
 		next = *req.Params.SinceId
 	}
 
-	if len(items) > 0 {
-		next = items[len(items)-1].Id
+	for _, it := range items {
+		next = max(next, it.Id)
 	}
 
 	return gen.ListEvents200JSONResponse{HasMore: hasMore, Items: items, NextSinceId: next}, nil
@@ -184,6 +184,12 @@ func storeEventFilter(p gen.ListEventsParams, limit int) store.EventFilter {
 	if p.SinceId != nil {
 		f.SinceID = *p.SinceId
 	}
+
+	if p.BeforeId != nil {
+		f.BeforeID = *p.BeforeId
+	}
+
+	f.Descending = p.SinceId == nil
 
 	return f
 }

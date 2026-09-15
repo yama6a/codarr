@@ -35,12 +35,19 @@ func (s *store) AppendEvent(ctx context.Context, e domain.Event) (int64, error) 
 	return id, nil
 }
 
-// ListEvents is the cursor read of plan.md 18.5: everything after SinceID, in
-// insertion order, so the UI can append rather than re-render.
+// ListEvents is the cursor read of plan.md 18.5: forward from SinceID so the UI
+// can prepend what is new, or back from BeforeID to load history.
 func (s *store) ListEvents(ctx context.Context, f EventFilter) ([]domain.Event, error) {
 	var c conds
 
-	c.add("id > ?", f.SinceID)
+	if f.SinceID > 0 {
+		c.add("id > ?", f.SinceID)
+	}
+
+	if f.BeforeID > 0 {
+		c.add("id < ?", f.BeforeID)
+	}
+
 	c.in("level", f.Level)
 	c.in("category", f.Category)
 
@@ -49,8 +56,13 @@ func (s *store) ListEvents(ctx context.Context, f EventFilter) ([]domain.Event, 
 		limit = 200
 	}
 
-	//nolint:gosec // the only interpolation is placeholder lists built from constants
-	query := `SELECT ` + eventColumns + ` FROM events` + c.where() + ` ORDER BY id ASC LIMIT ?`
+	order := "ASC"
+	if f.Descending {
+		order = "DESC"
+	}
+
+	//nolint:gosec // the only interpolation is placeholder lists and a fixed order word
+	query := `SELECT ` + eventColumns + ` FROM events` + c.where() + ` ORDER BY id ` + order + ` LIMIT ?`
 
 	rows, err := s.db.read.QueryContext(ctx, query, append(c.args, limit)...)
 	if err != nil {

@@ -8,7 +8,7 @@ import (
 	"github.com/yama6a/codarr/internal/hardware"
 )
 
-// GetHardware is cache-first: re-probing on every read burns six ffmpeg invocations for
+// GetHardware is cache-first: re-probing on every read burns the whole ffmpeg matrix for
 // an answer already in SQLite, so only the button forces a fresh run (plan.md 10.1).
 func (s *Server) GetHardware(
 	ctx context.Context, _ gen.GetHardwareRequestObject,

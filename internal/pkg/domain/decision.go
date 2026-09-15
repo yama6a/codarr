@@ -17,16 +17,6 @@ const (
 	DecisionDrop    Decision = "drop"
 )
 
-// Kind is the overall shape of the work a file needs.
-type Kind string
-
-const (
-	KindSkip      Kind = "skip"
-	KindRemux     Kind = "remux"
-	KindAudioOnly Kind = "audio_only"
-	KindFull      Kind = "full"
-)
-
 // StreamType is the ffprobe codec_type of a stream Codarr cares about.
 type StreamType string
 

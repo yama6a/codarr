@@ -45,6 +45,7 @@ const (
 const (
 	CodecHEVC = "hevc"
 	CodecVP9  = "vp9"
+	CodecAV1  = "av1"
 )
 
 // Backends is the probe matrix's backend axis, in preference order.
@@ -113,7 +114,12 @@ func (c Capabilities) Encodes(b Backend, p Profile) bool {
 // DecodesVP9 reports whether the driver delivered VP9 decode. The Gen 9.5 set
 // says the silicon has the decoder; this says the stack exposes it.
 func (c Capabilities) DecodesVP9(b Backend) bool {
-	return c.works(b, DirectionDecode, CodecVP9, "")
+	return c.Decodes(b, CodecVP9)
+}
+
+// Decodes reports whether the decode probe for the codec passed on the backend.
+func (c Capabilities) Decodes(b Backend, codec string) bool {
+	return c.works(b, DirectionDecode, codec, "")
 }
 
 func (c Capabilities) works(b Backend, d Direction, codec, profile string) bool {

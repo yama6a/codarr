@@ -49,8 +49,8 @@ sonarr-*  standardEpisodeFormat
 
 23.2 is now satisfied on its second limb rather than waived, and renaming can
 stay on. Nothing left in a filename derives from the file's contents, so the name
-a rename pass would compute is invariant under everything Codarr does: a `full`
-job changing the codec and an `audio_only` job changing the audio no longer move
+a rename pass would compute is invariant under everything Codarr does: a `video`
+job changing the codec and an `audio` job changing the audio no longer move
 the path. A future rename pass is a guaranteed no-op.
 
 Consequence worth recording: `{Quality Full}` is gone too, so an *arr database
@@ -326,7 +326,7 @@ CM v2.9.
 
 **The configuration record DOES survive `-c:v copy` into MKV.** ffprobe reads it
 back intact (`dv_profile: 5`, `dv_level: 3`, `rpu_present_flag: 1`), including on
-a realistic `audio_only` job with the video copied and the audio re-encoded to
+a realistic `audio` job with the video copied and the audio re-encoded to
 AC-3. The earlier finding was an artifact of a hand-injected record with no RPUs
 behind it: the muxers were refusing a record the bitstream did not back up.
 

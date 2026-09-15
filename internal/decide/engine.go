@@ -72,7 +72,7 @@ func (e Engine) Plan(probe *ffprobe.Result, opts Options) (Analysis, error) {
 
 	p.Kind = deriveKind(p)
 
-	if p.Kind != domain.KindSkip && !hasOutputAudio(p) {
+	if !p.Kind.Skip() && !hasOutputAudio(p) {
 		return Analysis{}, ErrNoAudioStreams
 	}
 
@@ -212,26 +212,37 @@ func assignOutputIndices(plans []domain.StreamPlan) {
 }
 
 func deriveKind(p domain.Plan) domain.Kind {
-	video, ok := p.VideoStream()
-	if ok && video.Decision == domain.DecisionEncode {
-		return domain.KindFull
+	var labels []domain.Label
+
+	if v, ok := p.VideoStream(); ok && v.Decision == domain.DecisionEncode {
+		labels = append(labels, domain.LabelVideo)
 	}
 
-	for _, s := range p.Streams {
-		if s.Type == domain.StreamVideo || s.Decision == domain.DecisionCopy {
-			continue
-		}
+	if hasWork(p, domain.StreamAudio) {
+		labels = append(labels, domain.LabelAudio)
+	}
 
-		return domain.KindAudioOnly
+	if hasWork(p, domain.StreamSubtitle) {
+		labels = append(labels, domain.LabelSubtitles)
 	}
 
 	// A level rewrite is a copy with a bitstream filter attached, so the file
-	// is still rebuilt (plan.md 6.2) - remux, never full.
+	// is still rebuilt (plan.md 6.2).
 	if p.LevelRewrite || p.SourceContainer != string(p.OutputContainer) {
-		return domain.KindRemux
+		labels = append(labels, domain.LabelRemux)
 	}
 
-	return domain.KindSkip
+	return domain.KindOf(labels...)
+}
+
+func hasWork(p domain.Plan, t domain.StreamType) bool {
+	for _, s := range p.Streams {
+		if s.Type == t && s.Decision != domain.DecisionCopy {
+			return true
+		}
+	}
+
+	return false
 }
 
 func hasOutputAudio(p domain.Plan) bool {

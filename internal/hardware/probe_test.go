@@ -3,6 +3,7 @@ package hardware_test
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -27,8 +28,10 @@ type script struct {
 	version string
 	versErr error
 	encode  map[string]error
-	sample  error
-	decode  map[string]error
+	// sample is keyed by the sample encoder; a missing key means the encoder works.
+	sample map[string]error
+	// decode is keyed by "backend:codec", read off the sample path.
+	decode map[string]error
 }
 
 func (s script) runner(t *testing.T) *mock.RunnerMock {
@@ -39,15 +42,21 @@ func (s script) runner(t *testing.T) *mock.RunnerMock {
 			switch {
 			case slices.Contains(args, "-version"):
 				return s.version, s.versErr
-			case slices.Contains(args, "libvpx-vp9"):
-				return "vp9 sample", s.sample
+			case slices.Contains(args, "-y"):
+				return "sample failed", s.sample[argAfter(args, "-c:v")]
 			case slices.Contains(args, "-hwaccel"):
-				return "decode failed", s.decode[argAfter(args, "-hwaccel")]
+				return "decode failed", s.decode[argAfter(args, "-hwaccel")+":"+sampleCodec(argAfter(args, "-i"))]
 			default:
 				return "encode failed", s.encode[argAfter(args, "-c:v")+":"+argAfter(args, "-profile:v")]
 			}
 		},
 	}
+}
+
+func sampleCodec(path string) string {
+	name := strings.TrimPrefix(filepath.Base(path), ".codarr-")
+
+	return strings.SplitN(name, "-", 2)[0]
 }
 
 func argAfter(args []string, flag string) string {
@@ -96,13 +105,16 @@ func TestProber_ProbeWritesTheWholeMatrix(t *testing.T) {
 			encodeEntry("vaapi", "main10", true, ""),
 			decodeEntry("qsv", true, ""),
 			decodeEntry("vaapi", true, ""),
+			decodeEntryFor("qsv", "av1", true, ""),
+			decodeEntryFor("vaapi", "av1", true, ""),
 		},
 	}, caps)
 
 	require.Len(t, st.ReplaceHWCapabilitiesCalls(), 1)
 	require.Equal(t, caps.Entries, st.ReplaceHWCapabilitiesCalls()[0].Caps)
-	require.Len(t, fs.RemoveCalls(), 1)
+	require.Len(t, fs.RemoveCalls(), 2)
 	require.Equal(t, "/tmp/.codarr-vp9-probe.webm", fs.RemoveCalls()[0].Path)
+	require.Equal(t, "/tmp/.codarr-av1-probe.mkv", fs.RemoveCalls()[1].Path)
 }
 
 func TestProber_ProbeRecordsPerProfileFailuresSeparately(t *testing.T) {
@@ -144,7 +156,7 @@ func TestProber_ProbeStoresTheStderrOfAFailedEncode(t *testing.T) {
 func TestProber_ProbeMarksVP9InconclusiveWhenTheSampleCannotBeMade(t *testing.T) {
 	t.Parallel()
 
-	s := script{version: versionOutput, sample: errors.New("Unknown encoder 'libvpx-vp9'")}
+	s := script{version: versionOutput, sample: map[string]error{"libvpx-vp9": errors.New("Unknown encoder 'libvpx-vp9'")}}
 
 	fs := okFS()
 	caps, err := newProber(t, s, emptyStore(), fs).Probe(t.Context())
@@ -152,8 +164,39 @@ func TestProber_ProbeMarksVP9InconclusiveWhenTheSampleCannotBeMade(t *testing.T)
 
 	require.False(t, caps.DecodesVP9(hardware.BackendQSV))
 	require.Equal(t, decodeEntry("qsv", false,
-		"inconclusive: could not synthesise a VP9 sample to decode: vp9 sample"), caps.Entries[4])
-	require.Empty(t, fs.RemoveCalls(), "nothing was written, so nothing is removed")
+		"inconclusive: could not synthesise VP9 sample to decode: libvpx-vp9: sample failed"), caps.Entries[4])
+	require.True(t, caps.Decodes(hardware.BackendQSV, hardware.CodecAV1), "the AV1 half still ran")
+	require.Len(t, fs.RemoveCalls(), 1, "only the AV1 sample was written")
+	require.Equal(t, "/tmp/.codarr-av1-probe.mkv", fs.RemoveCalls()[0].Path)
+}
+
+// AV1 has two candidate sample encoders; the second is tried when the first is
+// not in the build, and both missing marks the row inconclusive rather than failed.
+func TestProber_ProbeFallsBackToTheSecondAV1Encoder(t *testing.T) {
+	t.Parallel()
+
+	s := script{version: versionOutput, sample: map[string]error{"libsvtav1": errors.New("Unknown encoder")}}
+
+	fs := okFS()
+	caps, err := newProber(t, s, emptyStore(), fs).Probe(t.Context())
+	require.NoError(t, err)
+
+	require.True(t, caps.Decodes(hardware.BackendQSV, hardware.CodecAV1))
+	require.Len(t, fs.RemoveCalls(), 2)
+
+	both := script{version: versionOutput, sample: map[string]error{
+		"libsvtav1":  errors.New("Unknown encoder"),
+		"libaom-av1": errors.New("Unknown encoder"),
+	}}
+
+	caps, err = newProber(t, both, emptyStore(), okFS()).Probe(t.Context())
+	require.NoError(t, err)
+
+	require.False(t, caps.Decodes(hardware.BackendVAAPI, hardware.CodecAV1))
+	require.Equal(t, decodeEntryFor("vaapi", "av1", false,
+		"inconclusive: could not synthesise AV1 sample to decode: libaom-av1: sample failed"), caps.Entries[7])
+	require.True(t, caps.DecodesVP9(hardware.BackendVAAPI), "VP9 is unaffected")
+	require.Empty(t, caps.Remediation(), "AV1 is reported only; nothing to fix")
 }
 
 func TestProber_ProbeRecordsAFailedVP9Decode(t *testing.T) {
@@ -161,7 +204,7 @@ func TestProber_ProbeRecordsAFailedVP9Decode(t *testing.T) {
 
 	s := script{
 		version: versionOutput,
-		decode:  map[string]error{"qsv": errors.New("exit status 1")},
+		decode:  map[string]error{"qsv:vp9": errors.New("exit status 1"), "qsv:av1": errors.New("exit status 1")},
 	}
 
 	caps, err := newProber(t, s, emptyStore(), okFS()).Probe(t.Context())
@@ -169,6 +212,8 @@ func TestProber_ProbeRecordsAFailedVP9Decode(t *testing.T) {
 
 	require.False(t, caps.DecodesVP9(hardware.BackendQSV))
 	require.True(t, caps.DecodesVP9(hardware.BackendVAAPI))
+	require.False(t, caps.Decodes(hardware.BackendQSV, hardware.CodecAV1))
+	require.True(t, caps.Decodes(hardware.BackendVAAPI, hardware.CodecAV1))
 	require.Contains(t, caps.Remediation(), "qsv did not decode VP9, so VP9 sources decode in software")
 	// The driver message stays on the capability row: this line is informational.
 	require.NotContains(t, caps.Remediation(), "decode failed")
@@ -256,6 +301,24 @@ func TestProber_CapabilitiesReprobesOnAHalfWrittenCache(t *testing.T) {
 	_, err := newProber(t, script{version: versionOutput}, st, okFS()).Capabilities(t.Context())
 	require.NoError(t, err)
 	require.Len(t, st.ReplaceHWCapabilitiesCalls(), 1)
+}
+
+// A cache written before AV1 joined the decode axis has no AV1 rows, so it is
+// re-probed once rather than shown incomplete until someone presses the button.
+func TestProber_CapabilitiesReprobesWhenACodecIsMissingFromTheCache(t *testing.T) {
+	t.Parallel()
+
+	old := everythingWorks().Entries[:6]
+
+	st := emptyStore()
+	st.ListHWCapabilitiesFunc = func(context.Context) ([]domain.HWCapability, error) {
+		return old, nil
+	}
+
+	caps, err := newProber(t, script{version: versionOutput}, st, okFS()).Capabilities(t.Context())
+	require.NoError(t, err)
+	require.Len(t, st.ReplaceHWCapabilitiesCalls(), 1)
+	require.True(t, caps.Decodes(hardware.BackendQSV, hardware.CodecAV1))
 }
 
 func TestProber_CapabilitiesUsesTheNewestProbedAtFromTheCache(t *testing.T) {

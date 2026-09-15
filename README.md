@@ -22,8 +22,8 @@ Two goals, in order:
 
 Most of the library needs no video work at all. Valid H.264 and HEVC are copied,
 never upgraded, because re-encoding already-compatible video is generation loss
-for no gain. The dominant job is `audio_only`: fix the DTS track, drop the PGS
-subtitles, copy the video through untouched.
+for no gain. The dominant job copies the video through untouched and fixes the
+DTS track or drops the PGS subtitles.
 
 ## There is no undo
 

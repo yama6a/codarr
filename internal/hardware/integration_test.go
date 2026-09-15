@@ -29,7 +29,7 @@ func TestProber_ProbeAgainstRealFfmpeg(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NotEmpty(t, caps.FfmpegVersion)
-	require.Len(t, caps.Entries, 6)
+	require.Len(t, caps.Entries, 8)
 	require.Equal(t, caps.Entries, st.caps)
 
 	t.Logf("encoder %s, remediation: %s", caps.Select(false).Encoder, caps.Remediation())

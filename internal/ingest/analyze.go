@@ -248,7 +248,7 @@ func (a *Analyzer) decide(ctx context.Context, res Result, env Env, row domain.M
 		MediaFileID: row.ID,
 		Kind:        plan.Kind,
 		Origin:      env.Origin,
-		Priority:    PriorityFor(plan.Kind, env.Settings.PrioritiseQuickJobs),
+		Priority:    domain.PriorityFor(plan.Kind, env.Settings.PrioritiseQuickJobs),
 		Transform:   decide.NewTransform(probe, plan, 0),
 		QueuedAt:    a.clock.Now(),
 	})
@@ -334,27 +334,9 @@ func statusFor(skip bool, kind domain.Kind) domain.MediaStatus {
 	switch {
 	case skip:
 		return domain.MediaDone
-	case kind == domain.KindSkip:
+	case kind.Skip():
 		return domain.MediaSkipped
 	default:
 		return domain.MediaAnalyzed
-	}
-}
-
-// PriorityFor is plan.md 19's ordering: quick wins clear ahead of encodes.
-func PriorityFor(kind domain.Kind, prioritiseQuick bool) int {
-	switch kind {
-	case domain.KindFull:
-		return domain.PriorityFull
-	case domain.KindRemux, domain.KindAudioOnly:
-		if prioritiseQuick {
-			return domain.PriorityQuick
-		}
-
-		return domain.PriorityNormal
-	case domain.KindSkip:
-		return domain.PriorityNormal
-	default:
-		return domain.PriorityNormal
 	}
 }

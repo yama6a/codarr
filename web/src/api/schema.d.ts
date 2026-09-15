@@ -745,9 +745,11 @@ export interface paths {
         put?: never;
         /**
          * Re-run the encoder probe now.
-         * @description Runs a real one-second encode per backend and profile (plan.md 10.1).
-         *     Compiled-in support is not working support, so this is the only thing
-         *     that decides which encoder gets used.
+         * @description Runs a real one-second encode per backend and profile, plus a decode of
+         *     a synthesised VP9 and AV1 clip per backend (plan.md 10.1). Compiled-in
+         *     support is not working support, so this is the only thing that decides
+         *     which encoder gets used. AV1 is reported only; the hardware decode set
+         *     is unchanged.
          */
         post: operations["probeHardware"];
         delete?: never;
@@ -807,8 +809,10 @@ export interface paths {
         };
         /**
          * The log view, cursor-paginated.
-         * @description Ascending by id. Poll with `since_id` set to the last id seen; the
-         *     response carries the cursor to use next.
+         * @description Newest first by default, which is the initial page and every
+         *     `before_id` page. With `since_id` set the page is ascending from that
+         *     id, which is what polling appends; the response carries the cursor to
+         *     use next.
          */
         get: operations["listEvents"];
         put?: never;
@@ -883,10 +887,17 @@ export interface components {
             policy_hash?: string;
         };
         /**
-         * @description The shape of the work a file needs.
+         * @description One kind of work a plan carries (plan.md 7).
          * @enum {string}
          */
-        PlanKind: "skip" | "remux" | "audio_only" | "full";
+        PlanLabel: "video" | "audio" | "subtitles" | "remux";
+        /** @description The work a file needs, as the set of labels it carries in fixed order. Empty means every stream is already compatible; the UI renders that as "skipped". */
+        PlanKind: components["schemas"]["PlanLabel"][];
+        /**
+         * @description Files carrying the label, or `skip` for analysed files that need nothing.
+         * @enum {string}
+         */
+        PlanKindFilter: "skip" | "video" | "audio" | "subtitles" | "remux";
         /** @enum {string} */
         MediaStatus: "new" | "analyzed" | "queued" | "processing" | "done" | "failed" | "ignored" | "skipped" | "missing";
         /**
@@ -935,7 +946,7 @@ export interface components {
         /** @enum {string} */
         EventLevel: "debug" | "info" | "warn" | "error";
         /** @enum {string} */
-        MediaSort: "path" | "-path" | "size_bytes" | "-size_bytes" | "video_bitrate" | "-video_bitrate" | "plan_kind" | "-plan_kind" | "status" | "-status" | "provenance" | "-provenance" | "updated_at" | "-updated_at";
+        MediaSort: "path" | "-path" | "size_bytes" | "-size_bytes" | "video_bitrate" | "-video_bitrate" | "plan_kind" | "-plan_kind" | "status" | "-status" | "provenance" | "-provenance" | "codarr_processed_at" | "-codarr_processed_at" | "updated_at" | "-updated_at";
         Settings: {
             /** @description Staging fallback when the destination filesystem cannot hold the output. */
             temp_dir: string;
@@ -947,7 +958,7 @@ export interface components {
             /** @description Files per second the scheduled walk is allowed to stat. */
             scan_rate_limit_fps: number;
             queue_paused: boolean;
-            /** @description Give remux and audio_only a better default priority than full. */
+            /** @description Give plans without a video encode a better default priority than the ones with one. */
             prioritise_quick_jobs: boolean;
             /** @description Compute a whole-file hash at promotion as well (plan.md 12.2). */
             full_hash_enabled: boolean;
@@ -1244,6 +1255,11 @@ export interface components {
             provenance: components["schemas"]["Provenance"];
             ignored: boolean;
             codarr_tagged: boolean;
+            /**
+             * Format: date-time
+             * @description When Codarr last promoted its own output over this path.
+             */
+            codarr_processed_at?: string | null;
             /** Format: date-time */
             analyzed_at?: string | null;
             /** Format: date-time */
@@ -1640,11 +1656,13 @@ export interface components {
             plan_kind?: components["schemas"]["PlanKind"];
             reason: string;
         };
+        /** @description A file counts under every label it carries, so the label counts overlap. skip is disjoint. */
         PlanKindBreakdown: {
             skip: number;
+            video: number;
+            audio: number;
+            subtitles: number;
             remux: number;
-            audio_only: number;
-            full: number;
         };
         RecheckAllRequest: {
             /** @description False re-probes and re-plans but queues nothing. */
@@ -1654,7 +1672,7 @@ export interface components {
         MediaFilter: {
             q?: string;
             status?: components["schemas"]["MediaStatus"];
-            plan_kind?: components["schemas"]["PlanKind"];
+            plan_kind?: components["schemas"]["PlanKindFilter"];
             video_codec?: string;
             /** Format: int64 */
             arr_instance_id?: number;
@@ -1939,9 +1957,12 @@ export interface components {
             /** @description In execution order. */
             queue: components["schemas"]["JobSummary"][];
             awaiting_stream_end: components["schemas"]["AwaitingStreamEnd"][];
+            /** @description Newest finished first, capped; `completions_total` says how many exist. */
             recent_completions: components["schemas"]["JobSummary"][];
-            /** @description Failed jobs needing attention, newest first. */
+            completions_total: number;
+            /** @description Failed jobs needing attention, newest first, capped; `failures_total` says how many exist. */
             failures: components["schemas"]["JobSummary"][];
+            failures_total: number;
             stats: components["schemas"]["Stats"];
             compatibility: components["schemas"]["CompatibilitySummary"];
         };
@@ -1959,11 +1980,11 @@ export interface components {
             created_at: string;
         };
         EventPage: {
-            /** @description Ascending by id. */
+            /** @description Ascending by id when `since_id` was given, otherwise newest first. */
             items: components["schemas"]["Event"][];
             /**
              * Format: int64
-             * @description Pass as `since_id` on the next poll.
+             * @description The highest id in the page, to pass as `since_id` on the next poll.
              */
             next_since_id: number;
             /** @description More events matched than the limit allowed. */
@@ -2762,7 +2783,7 @@ export interface operations {
                 /** @description Substring match on the path. */
                 q?: string;
                 status?: components["schemas"]["MediaStatus"];
-                plan_kind?: components["schemas"]["PlanKind"];
+                plan_kind?: components["schemas"]["PlanKindFilter"];
                 /** @description ffprobe codec name, matched exactly. */
                 video_codec?: string;
                 arr_instance_id?: number;
@@ -3306,8 +3327,10 @@ export interface operations {
                 /** @description Minimum level, inclusive. */
                 level?: components["schemas"]["EventLevel"];
                 category?: string;
-                /** @description Return events with a strictly greater id. */
+                /** @description Return events with a strictly greater id, ascending. */
                 since_id?: number;
+                /** @description Return events with a strictly smaller id, newest first; for loading older rows. */
+                before_id?: number;
                 limit?: number;
             };
             header?: never;

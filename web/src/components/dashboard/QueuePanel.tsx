@@ -2,8 +2,8 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { Panel } from '../ui/Panel';
-import { formatDuration, humanise } from '../../lib/format';
-import { planKindTone } from '../../lib/tone';
+import { PlanKindBadges } from '../ui/PlanKindBadges';
+import { formatDateTime, formatDuration } from '../../lib/format';
 import type { JobSummary } from '../../api/types';
 
 interface QueuePanelProps {
@@ -54,13 +54,16 @@ export function QueuePanel({ queue, depth, paused, busy, onTogglePause, onOpen }
                   <span className="block truncate text-sm text-slate-200">
                     {job.media_filename}
                   </span>
+                  <span className="block text-[11px] text-slate-500">
+                    queued {formatDateTime(job.queued_at)}
+                  </span>
                 </span>
                 {job.attempt > 1 && (
                   <Badge tone="warning" title="Auto-requeued after an interruption">
                     Attempt {job.attempt}
                   </Badge>
                 )}
-                <Badge tone={planKindTone(job.kind)}>{humanise(job.kind)}</Badge>
+                <PlanKindBadges kind={job.kind} />
                 <span className="w-16 flex-shrink-0 text-right text-xs text-slate-400">
                   {formatDuration(job.estimated_seconds)}
                 </span>

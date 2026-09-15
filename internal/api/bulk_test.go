@@ -8,6 +8,7 @@ import (
 
 	gen "github.com/yama6a/codarr/api"
 	"github.com/yama6a/codarr/internal/job"
+	"github.com/yama6a/codarr/internal/pkg/domain"
 )
 
 // plan.md 19: every bulk operation is dry-run first, and the confirmation has to
@@ -24,7 +25,7 @@ func TestRecheckAllMedia_DryRunReportsTheBreakdownAndQueuesNothing(t *testing.T)
 			DryRun:       true,
 			Examined:     120,
 			Count:        9,
-			ByPlanKind:   job.PlanKindBreakdown{Remux: 4, AudioOnly: 3, Full: 2},
+			ByPlanKind:   domain.KindCounts{Remux: 4, Audio: 3, Video: 2},
 			MediaFileIDs: []int64{1, 2, 3},
 			Irreversible: true,
 		}, nil
@@ -36,7 +37,7 @@ func TestRecheckAllMedia_DryRunReportsTheBreakdownAndQueuesNothing(t *testing.T)
 	require.True(t, got.DryRun)
 	require.Equal(t, 120, got.Examined)
 	require.Equal(t, 9, got.Count)
-	require.Equal(t, gen.PlanKindBreakdown{AudioOnly: 3, Full: 2, Remux: 4, Skip: 0}, got.ByPlanKind)
+	require.Equal(t, gen.PlanKindBreakdown{Audio: 3, Video: 2, Remux: 4, Skip: 0}, got.ByPlanKind)
 	require.Empty(t, got.QueuedJobIds)
 	require.NotNil(t, got.MediaFileIds)
 	require.Equal(t, []int64{1, 2, 3}, *got.MediaFileIds)
@@ -145,7 +146,7 @@ func TestPreviewSpaceSweep_ReportsTheCountAndBreakdownWithoutQueueing(t *testing
 		return job.SpaceSweepPreview{
 			Count:                2,
 			Examined:             30,
-			ByPlanKind:           job.PlanKindBreakdown{Full: 2},
+			ByPlanKind:           domain.KindCounts{Video: 2},
 			CurrentBytes:         100,
 			ProjectedBytes:       55,
 			ProjectedSavingBytes: 45,
@@ -163,7 +164,7 @@ func TestPreviewSpaceSweep_ReportsTheCountAndBreakdownWithoutQueueing(t *testing
 
 	require.Equal(t, 2, got.Count)
 	require.Equal(t, 30, got.Examined)
-	require.Equal(t, gen.PlanKindBreakdown{Full: 2}, got.ByPlanKind)
+	require.Equal(t, gen.PlanKindBreakdown{Video: 2}, got.ByPlanKind)
 	require.True(t, got.Irreversible)
 	require.Len(t, got.Candidates, 1)
 	require.Equal(t, "a.mkv", got.Candidates[0].Filename)
@@ -202,7 +203,7 @@ func TestRunSpaceSweep_ConfirmQueues(t *testing.T) {
 
 		return job.SpaceSweepPreview{
 			Count:                1,
-			ByPlanKind:           job.PlanKindBreakdown{Full: 1},
+			ByPlanKind:           domain.KindCounts{Video: 1},
 			ProjectedSavingBytes: 30,
 			QueuedJobIDs:         []int64{42},
 		}, nil

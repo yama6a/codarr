@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Dashboard from '../Dashboard';
 import { dashboard, jobSummary } from '../../../test/fixtures';
@@ -121,5 +121,36 @@ describe('Dashboard', () => {
     (await screen.findByRole('button', { name: 'Pause' })).click();
 
     await vi.waitFor(() => expect(mocks.post).toHaveBeenCalledWith('/api/queue/pause'));
+  });
+
+  it('says how many failures exist beyond the capped list and pages them in', async () => {
+    const failed = jobSummary({
+      id: 9,
+      state: 'failed',
+      failure_code: 'ffmpeg_failed',
+      failure_message: 'boom',
+    });
+    mocks.get.mockImplementation((path: string) => {
+      if (path === '/api/jobs') {
+        return Promise.resolve({
+          data: {
+            items: [{ ...failed, id: 10, media_filename: 'Older.mkv' }],
+            page: 2,
+            page_size: 25,
+            total: 26,
+          },
+        });
+      }
+      return Promise.resolve({ data: dashboard({ failures: [failed], failures_total: 26 }) });
+    });
+    renderDashboard();
+
+    expect(await screen.findByText('Failures (latest 1 of 26)')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
+
+    expect(await screen.findByText('Older.mkv')).toBeInTheDocument();
+    expect(mocks.get).toHaveBeenCalledWith('/api/jobs', {
+      params: { query: { state: 'failed', page: 1, page_size: 25 } },
+    });
   });
 });

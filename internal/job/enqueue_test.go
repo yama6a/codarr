@@ -17,7 +17,7 @@ func TestService_EnqueueQueuesAnAnalysedFile(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, res.Enqueued)
 	require.NotNil(t, res.JobID)
-	require.Equal(t, domain.KindAudioOnly, res.PlanKind)
+	require.Equal(t, domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), res.PlanKind)
 
 	queued := h.jobRow(*res.JobID)
 	require.Equal(t, domain.JobQueued, queued.State)
@@ -121,10 +121,10 @@ func TestService_EnqueuePriority(t *testing.T) {
 		kind     domain.Kind
 		priority int
 	}{
-		{"audio_only ahead of full", audioOnlyProbe, true, domain.KindAudioOnly, domain.PriorityQuick},
-		{"full behind everything", fullProbe, true, domain.KindFull, domain.PriorityFull},
-		{"audio_only without the setting", audioOnlyProbe, false, domain.KindAudioOnly, domain.PriorityNormal},
-		{"full without the setting", fullProbe, false, domain.KindFull, domain.PriorityNormal},
+		{"audio_only ahead of full", audioOnlyProbe, true, domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.PriorityQuick},
+		{"full behind everything", fullProbe, true, domain.KindOf(domain.LabelVideo, domain.LabelSubtitles), domain.PriorityFull},
+		{"audio_only without the setting", audioOnlyProbe, false, domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.PriorityNormal},
+		{"full without the setting", fullProbe, false, domain.KindOf(domain.LabelVideo, domain.LabelSubtitles), domain.PriorityNormal},
 	}
 
 	for _, tc := range cases {
@@ -172,10 +172,10 @@ func TestService_EnqueueForTheSpaceSweepPlansAFullJob(t *testing.T) {
 	res, err := h.svc.Enqueue(t.Context(), mediaID, domain.OriginSpaceSweep)
 	require.NoError(t, err)
 	require.True(t, res.Enqueued)
-	require.Equal(t, domain.KindFull, res.PlanKind, "the file plans as audio_only, the sweep makes it full")
+	require.Equal(t, domain.KindOf(domain.LabelVideo, domain.LabelAudio, domain.LabelSubtitles), res.PlanKind, "the sweep adds the video label")
 
 	queued := h.jobRow(*res.JobID)
-	require.Equal(t, domain.KindFull, queued.Kind)
+	require.Equal(t, domain.KindOf(domain.LabelVideo, domain.LabelAudio, domain.LabelSubtitles), queued.Kind)
 	require.Equal(t, domain.PriorityFull, queued.Priority)
 	require.Equal(t, domain.DecisionEncode, queued.Transform.Video.Action)
 }

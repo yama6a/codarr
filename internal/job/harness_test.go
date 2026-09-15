@@ -304,7 +304,7 @@ func (h *harness) interrupted(state domain.JobState, attempt int) domain.Job {
 
 	return h.store.putJob(domain.Job{
 		MediaFileID: mediaID,
-		Kind:        domain.KindAudioOnly,
+		Kind:        domain.KindOf(domain.LabelAudio, domain.LabelSubtitles),
 		Origin:      domain.OriginIngest,
 		Priority:    domain.PriorityQuick,
 		State:       state,

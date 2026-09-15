@@ -92,12 +92,18 @@ func Open(ctx context.Context, path string) (*DB, error) {
 
 // Migrate applies the embedded migrations through the write pool.
 func Migrate(db *DB, logger *zap.Logger) error {
+	return MigrateMax(db, logger, 0)
+}
+
+// MigrateMax applies at most limit pending migrations, or every one when limit
+// is zero, so a test can seed rows under an older schema.
+func MigrateMax(db *DB, logger *zap.Logger, limit int) error {
 	source := migrate.EmbedFileSystemMigrationSource{
 		FileSystem: data.FS,
 		Root:       migrationsRoot,
 	}
 
-	n, err := migrate.Exec(db.write, migrateDialect, source, migrate.Up)
+	n, err := migrate.ExecMax(db.write, migrateDialect, source, migrate.Up, limit)
 	if err != nil {
 		return fmt.Errorf("run migrations: %w", err)
 	}

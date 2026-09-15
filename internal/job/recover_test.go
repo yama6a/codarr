@@ -199,9 +199,9 @@ func TestService_RecoverLeavesTerminalJobsAlone(t *testing.T) {
 
 	h := newHarness(t)
 
-	done := h.store.putJob(domain.Job{MediaFileID: mediaID, State: domain.JobDone, Kind: domain.KindAudioOnly})
-	failed := h.store.putJob(domain.Job{MediaFileID: 8, State: domain.JobFailed, Kind: domain.KindFull})
-	queued := h.store.putJob(domain.Job{MediaFileID: 9, State: domain.JobQueued, Kind: domain.KindRemux})
+	done := h.store.putJob(domain.Job{MediaFileID: mediaID, State: domain.JobDone, Kind: domain.KindOf(domain.LabelAudio, domain.LabelSubtitles)})
+	failed := h.store.putJob(domain.Job{MediaFileID: 8, State: domain.JobFailed, Kind: domain.KindOf(domain.LabelVideo)})
+	queued := h.store.putJob(domain.Job{MediaFileID: 9, State: domain.JobQueued, Kind: domain.KindOf(domain.LabelRemux)})
 
 	require.NoError(t, h.svc.Recover(t.Context()))
 
@@ -272,7 +272,7 @@ func TestService_ResumedLegacyContainerJobStillHasTheDurationFallback(t *testing
 
 	j := h.store.putJob(domain.Job{
 		MediaFileID:    mediaID,
-		Kind:           domain.KindAudioOnly,
+		Kind:           domain.KindOf(domain.LabelAudio, domain.LabelSubtitles),
 		Origin:         domain.OriginIngest,
 		Priority:       domain.PriorityQuick,
 		State:          domain.JobAwaitingStreamEnd,

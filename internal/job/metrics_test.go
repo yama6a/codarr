@@ -17,7 +17,7 @@ func TestService_MetricsRecordEveryTransitionOfACompletedJob(t *testing.T) {
 	t.Parallel()
 
 	h := newMeteredHarness(t)
-	h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	h.encoder.RunFunc = func(_ context.Context, args []string, _ func(ffmpeg.Progress)) (ffmpeg.RunResult, error) {
@@ -31,14 +31,14 @@ func TestService_MetricsRecordEveryTransitionOfACompletedJob(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, []transition{
-		{State: domain.JobRunning, Kind: domain.KindAudioOnly, Origin: domain.OriginIngest},
-		{State: domain.JobVerifying, Kind: domain.KindAudioOnly, Origin: domain.OriginIngest},
-		{State: domain.JobPromoting, Kind: domain.KindAudioOnly, Origin: domain.OriginIngest},
-		{State: domain.JobDone, Kind: domain.KindAudioOnly, Origin: domain.OriginIngest},
+		{State: domain.JobRunning, Kind: domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), Origin: domain.OriginIngest},
+		{State: domain.JobVerifying, Kind: domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), Origin: domain.OriginIngest},
+		{State: domain.JobPromoting, Kind: domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), Origin: domain.OriginIngest},
+		{State: domain.JobDone, Kind: domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), Origin: domain.OriginIngest},
 	}, h.metrics.states())
 
 	got := h.metrics.snapshot()
-	require.Equal(t, []duration{{Kind: domain.KindAudioOnly, Seconds: 420}}, got.Durations)
+	require.Equal(t, []duration{{Kind: domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), Seconds: 420}}, got.Durations)
 	require.Len(t, got.EstimateErrors, 1)
 	require.Empty(t, got.Failed)
 	require.Empty(t, got.Errors)
@@ -50,7 +50,7 @@ func TestService_MetricsRecordTheEstimateErrorAsActualMinusEstimated(t *testing.
 	t.Parallel()
 
 	h := newMeteredHarness(t)
-	j := h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	h.encoder.RunFunc = func(_ context.Context, args []string, _ func(ffmpeg.Progress)) (ffmpeg.RunResult, error) {
@@ -74,7 +74,7 @@ func TestService_MetricsRecordAFailureWithItsCode(t *testing.T) {
 	t.Parallel()
 
 	h := newMeteredHarness(t)
-	h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	h.promoter.PromoteFunc = func(context.Context, promote.Request) (promote.Result, error) {
@@ -89,7 +89,7 @@ func TestService_MetricsRecordAFailureWithItsCode(t *testing.T) {
 
 	require.Equal(t, []domain.FailureCode{domain.FailVerification}, h.metrics.snapshot().Failed)
 	require.Contains(t, h.metrics.states(),
-		transition{State: domain.JobFailed, Kind: domain.KindAudioOnly, Origin: domain.OriginIngest})
+		transition{State: domain.JobFailed, Kind: domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), Origin: domain.OriginIngest})
 }
 
 func TestService_MetricsRecordTheDecodeFallback(t *testing.T) {
@@ -117,7 +117,7 @@ func TestService_MetricsRecordTheDecodeFallback(t *testing.T) {
 		return ffmpeg.RunResult{Argv: args, FinalOutTime: time.Duration(mediaDur) * time.Second}, nil
 	}
 
-	h.queue(domain.KindFull, domain.OriginIngest)
+	h.queue(domain.KindOf(domain.LabelVideo), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	_, err := h.svc.RunOnce(t.Context())
@@ -146,7 +146,7 @@ func TestService_MetricsRecordEveryStepOfTheEncoderChain(t *testing.T) {
 		return ffmpeg.RunResult{StderrTail: "Device creation failed"}, errors.New("exit status 1")
 	}
 
-	h.queue(domain.KindFull, domain.OriginIngest)
+	h.queue(domain.KindOf(domain.LabelVideo), domain.OriginIngest)
 
 	_, err := h.svc.RunOnce(t.Context())
 	require.NoError(t, err)
@@ -169,7 +169,7 @@ func TestService_MetricsRecordAnEnqueueAndTheQueueDepth(t *testing.T) {
 	require.True(t, res.Enqueued)
 
 	require.Equal(t, []transition{
-		{State: domain.JobQueued, Kind: domain.KindAudioOnly, Origin: domain.OriginManual},
+		{State: domain.JobQueued, Kind: domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), Origin: domain.OriginManual},
 	}, h.metrics.states())
 	require.Equal(t, []int{1}, h.metrics.queueDepth)
 	require.Equal(t, []int{0}, h.metrics.awaiting)
@@ -179,7 +179,7 @@ func TestService_MetricsRecordAJobDeferredByAStream(t *testing.T) {
 	t.Parallel()
 
 	h := newMeteredHarness(t)
-	h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	h.promoter.PromoteFunc = func(_ context.Context, req promote.Request) (promote.Result, error) {
@@ -192,7 +192,7 @@ func TestService_MetricsRecordAJobDeferredByAStream(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Contains(t, h.metrics.states(),
-		transition{State: domain.JobAwaitingStreamEnd, Kind: domain.KindAudioOnly, Origin: domain.OriginIngest})
+		transition{State: domain.JobAwaitingStreamEnd, Kind: domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), Origin: domain.OriginIngest})
 	require.Contains(t, h.metrics.awaiting, 1)
 }
 
@@ -240,7 +240,7 @@ func TestService_MetricsCategoriseAnErrorTheJobSurvived(t *testing.T) {
 		return ffmpeg.RunResult{Argv: args, FinalOutTime: time.Duration(mediaDur) * time.Second}, nil
 	}
 
-	h.queue(domain.KindFull, domain.OriginIngest)
+	h.queue(domain.KindOf(domain.LabelVideo), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	_, err := h.svc.RunOnce(t.Context())
@@ -258,7 +258,7 @@ func TestService_MetricsAreOptional(t *testing.T) {
 	h := newHarness(t)
 	require.Nil(t, h.metrics)
 
-	j := h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	ran, err := h.svc.RunOnce(t.Context())

@@ -10,7 +10,7 @@ describe('toMediaFilter', () => {
       toMediaFilter({
         q: 'arrival',
         status: 'done',
-        plan_kind: 'full',
+        plan_kind: 'video',
         video_codec: 'h264',
         arr_instance_id: '2',
         provenance: 'modified_since_transcode',
@@ -18,7 +18,7 @@ describe('toMediaFilter', () => {
     ).toEqual({
       q: 'arrival',
       status: 'done',
-      plan_kind: 'full',
+      plan_kind: 'video',
       video_codec: 'h264',
       arr_instance_id: 2,
       provenance: 'modified_since_transcode',

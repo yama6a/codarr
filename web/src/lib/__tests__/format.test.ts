@@ -1,4 +1,5 @@
 import {
+  codecCounts,
   deltaPercent,
   elapsedSeconds,
   failureLabel,
@@ -7,6 +8,7 @@ import {
   formatDuration,
   formatSignedBytes,
   humanise,
+  planKindText,
   provenanceLabel,
   titleFromPath,
 } from '../format';
@@ -80,7 +82,25 @@ describe('labels', () => {
   });
 
   it('humanises snake case', () => {
-    expect(humanise('audio_only')).toBe('Audio only');
+    expect(humanise('awaiting_stream_end')).toBe('Awaiting stream end');
+  });
+
+  it('names a label set and reads an empty one as skipped', () => {
+    expect(planKindText(['audio', 'subtitles'])).toBe('audio, subtitles');
+    expect(planKindText([])).toBe('skipped');
+    expect(planKindText(undefined)).toBe('skipped');
+  });
+
+  it('counts codecs most frequent first', () => {
+    expect(
+      codecCounts([
+        { codec: 'subrip' },
+        { codec: 'ass' },
+        { codec: 'subrip' },
+        { codec: 'subrip' },
+      ]),
+    ).toBe('3x subrip, 1x ass');
+    expect(codecCounts([])).toBe('none');
   });
 
   it('strips the extension for a title', () => {

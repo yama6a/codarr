@@ -40,7 +40,7 @@ func TestRunner_RealRemux(t *testing.T) {
 		Output: out,
 		Tags:   tags(),
 		Plan: domain.Plan{
-			Kind:            domain.KindRemux,
+			Kind:            domain.KindOf(domain.LabelRemux),
 			OutputContainer: domain.ContainerMatroska,
 			Streams: []domain.StreamPlan{
 				videoCopy(),

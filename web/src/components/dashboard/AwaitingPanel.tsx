@@ -1,6 +1,6 @@
 import { EmptyState } from '../ui/EmptyState';
 import { Panel } from '../ui/Panel';
-import { formatDuration } from '../../lib/format';
+import { formatDateTime, formatDuration } from '../../lib/format';
 import type { AwaitingStreamEnd } from '../../api/types';
 
 interface AwaitingPanelProps {
@@ -38,7 +38,10 @@ export function AwaitingPanel({ items, onOpen }: AwaitingPanelProps) {
                   </span>
                 </span>
                 <span className="flex-shrink-0 text-right text-xs text-slate-400">
-                  waiting {formatDuration(item.waiting_seconds)}
+                  <span className="block">waiting {formatDuration(item.waiting_seconds)}</span>
+                  <span className="block text-[11px] text-slate-500">
+                    since {formatDateTime(item.waiting_since)}
+                  </span>
                 </span>
               </button>
             </li>

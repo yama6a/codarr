@@ -101,10 +101,20 @@ type Event struct {
 	CreatedAt   time.Time
 }
 
+// ThroughputKind is what a throughput average is keyed on: every plan
+// without a video encode is I/O bound and shares one row (plan.md 14.3).
+type ThroughputKind string
+
+// The two throughput buckets.
+const (
+	ThroughputIO    ThroughputKind = "io"
+	ThroughputVideo ThroughputKind = "video"
+)
+
 // ThroughputStat is a rolling average feeding duration estimates.
 type ThroughputStat struct {
 	ID         int64
-	Kind       Kind
+	Kind       ThroughputKind
 	Encoder    string
 	Resolution string
 	Samples    int

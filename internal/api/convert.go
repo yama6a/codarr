@@ -161,7 +161,7 @@ func plan(p *domain.Plan) *gen.Plan {
 		DolbyVision:           p.DolbyVision,
 		DolbyVisionProfile:    intPtr(p.DolbyVisionProfile),
 		Hdr:                   p.HDR,
-		Kind:                  gen.PlanKind(p.Kind),
+		Kind:                  planKind(p.Kind),
 		LevelRewrite:          p.LevelRewrite,
 		OutputContainer:       gen.ContainerFamily(p.OutputContainer),
 		PolicyHash:            p.PolicyHash,
@@ -328,13 +328,31 @@ func hwCapability(c domain.HWCapability) gen.HWCapability {
 	}
 }
 
-func planKindBreakdown(counts map[domain.Kind]int) gen.PlanKindBreakdown {
+func planKindBreakdown(c domain.KindCounts) gen.PlanKindBreakdown {
 	return gen.PlanKindBreakdown{
-		AudioOnly: counts[domain.KindAudioOnly],
-		Full:      counts[domain.KindFull],
-		Remux:     counts[domain.KindRemux],
-		Skip:      counts[domain.KindSkip],
+		Audio:     c.Audio,
+		Remux:     c.Remux,
+		Skip:      c.Skip,
+		Subtitles: c.Subtitles,
+		Video:     c.Video,
 	}
+}
+
+// planKind never returns nil: the field is required, and a JSON null would
+// read as "not planned" where an empty array means "nothing to do".
+func planKind(k domain.Kind) gen.PlanKind {
+	labels := k.Labels()
+	out := make(gen.PlanKind, 0, len(labels))
+
+	for _, l := range labels {
+		out = append(out, gen.PlanLabel(l))
+	}
+
+	return out
+}
+
+func planKindFilter(f gen.PlanKindFilter) []string {
+	return []string{string(f)}
 }
 
 func filename(path string) string { return filepath.Base(path) }

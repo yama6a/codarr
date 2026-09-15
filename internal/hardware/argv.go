@@ -6,8 +6,8 @@ import "strconv"
 // the whole pipeline and still runs at startup (plan.md 10.1).
 const TestSource = "testsrc=size=640x480:rate=30:duration=1"
 
-// vp9SampleBitrate keeps the synthesised clip small; it is decoded, never watched.
-const vp9SampleBitrate = 500_000
+// sampleBitrate keeps the synthesised clip small; it is decoded, never watched.
+const sampleBitrate = 500_000
 
 // VersionArgs asks ffmpeg what build it is, which is the cache key for a probe
 // run (plan.md 10.1).
@@ -27,21 +27,48 @@ func EncodeArgs(b Backend, p Profile, device string) []string {
 	}
 }
 
-// VP9SampleArgs writes the clip the decode probe reads back. lavfi cannot be
-// decoded, so the check needs a real VP9 elementary stream first.
-func VP9SampleArgs(out string) []string {
-	return []string{
-		"-hide_banner", "-loglevel", "error", "-nostdin", "-y",
-		"-f", "lavfi", "-i", TestSource,
-		"-c:v", "libvpx-vp9", "-b:v", strconv.Itoa(vp9SampleBitrate),
-		"-cpu-used", "8", "-an",
-		out,
+// DecodeProbe is one codec the decode half of the matrix covers: the sample is
+// synthesised with the first encoder this ffmpeg has, then decoded per backend.
+type DecodeProbe struct {
+	Codec    string
+	Encoders []string
+	Ext      string
+}
+
+// DecodeProbes is the decode axis. VP9 is in the 10.1 decode set; AV1 is
+// reported only, so the operator can see what the driver stack exposes.
+func DecodeProbes() []DecodeProbe {
+	return []DecodeProbe{
+		{Codec: CodecVP9, Encoders: []string{"libvpx-vp9"}, Ext: ".webm"},
+		{Codec: CodecAV1, Encoders: []string{"libsvtav1", "libaom-av1"}, Ext: ".mkv"},
 	}
 }
 
-// VP9DecodeArgs decodes the sample on the iGPU, separately from the encode matrix
+// SampleArgs writes the clip a decode probe reads back. lavfi cannot be decoded,
+// so the check needs a real elementary stream first; each encoder gets the flag
+// that makes a one-second clip fast.
+func SampleArgs(encoder, out string) []string {
+	args := []string{
+		"-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+		"-f", "lavfi", "-i", TestSource,
+		"-c:v", encoder, "-b:v", strconv.Itoa(sampleBitrate),
+	}
+
+	switch encoder {
+	case "libsvtav1":
+		args = append(args, "-preset", "12")
+	case "libaom-av1":
+		args = append(args, "-cpu-used", "8", "-usage", "realtime")
+	default:
+		args = append(args, "-cpu-used", "8")
+	}
+
+	return append(args, "-an", out)
+}
+
+// DecodeArgs decodes the sample on the iGPU, separately from the encode matrix
 // because an encode probe says nothing about decode (plan.md 10.1).
-func VP9DecodeArgs(b Backend, device, src string) []string {
+func DecodeArgs(b Backend, device, src string) []string {
 	return []string{
 		"-hide_banner", "-loglevel", "error", "-nostdin",
 		"-hwaccel", string(b), "-hwaccel_device", device,

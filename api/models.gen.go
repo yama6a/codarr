@@ -287,25 +287,31 @@ func (e JobState) Valid() bool {
 
 // Defines values for MediaSort.
 const (
-	MediaSortMinusPath         MediaSort = "-path"
-	MediaSortMinusPlanKind     MediaSort = "-plan_kind"
-	MediaSortMinusProvenance   MediaSort = "-provenance"
-	MediaSortMinusSizeBytes    MediaSort = "-size_bytes"
-	MediaSortMinusStatus       MediaSort = "-status"
-	MediaSortMinusUpdatedAt    MediaSort = "-updated_at"
-	MediaSortMinusVideoBitrate MediaSort = "-video_bitrate"
-	MediaSortPath              MediaSort = "path"
-	MediaSortPlanKind          MediaSort = "plan_kind"
-	MediaSortProvenance        MediaSort = "provenance"
-	MediaSortSizeBytes         MediaSort = "size_bytes"
-	MediaSortStatus            MediaSort = "status"
-	MediaSortUpdatedAt         MediaSort = "updated_at"
-	MediaSortVideoBitrate      MediaSort = "video_bitrate"
+	MediaSortCodarrProcessedAt      MediaSort = "codarr_processed_at"
+	MediaSortMinusCodarrProcessedAt MediaSort = "-codarr_processed_at"
+	MediaSortMinusPath              MediaSort = "-path"
+	MediaSortMinusPlanKind          MediaSort = "-plan_kind"
+	MediaSortMinusProvenance        MediaSort = "-provenance"
+	MediaSortMinusSizeBytes         MediaSort = "-size_bytes"
+	MediaSortMinusStatus            MediaSort = "-status"
+	MediaSortMinusUpdatedAt         MediaSort = "-updated_at"
+	MediaSortMinusVideoBitrate      MediaSort = "-video_bitrate"
+	MediaSortPath                   MediaSort = "path"
+	MediaSortPlanKind               MediaSort = "plan_kind"
+	MediaSortProvenance             MediaSort = "provenance"
+	MediaSortSizeBytes              MediaSort = "size_bytes"
+	MediaSortStatus                 MediaSort = "status"
+	MediaSortUpdatedAt              MediaSort = "updated_at"
+	MediaSortVideoBitrate           MediaSort = "video_bitrate"
 )
 
 // Valid indicates whether the value is a known member of the MediaSort enum.
 func (e MediaSort) Valid() bool {
 	switch e {
+	case MediaSortCodarrProcessedAt:
+		return true
+	case MediaSortMinusCodarrProcessedAt:
+		return true
 	case MediaSortMinusPath:
 		return true
 	case MediaSortMinusPlanKind:
@@ -378,24 +384,51 @@ func (e MediaStatus) Valid() bool {
 	}
 }
 
-// Defines values for PlanKind.
+// Defines values for PlanKindFilter.
 const (
-	PlanKindAudioOnly PlanKind = "audio_only"
-	PlanKindFull      PlanKind = "full"
-	PlanKindRemux     PlanKind = "remux"
-	PlanKindSkip      PlanKind = "skip"
+	PlanKindFilterAudio     PlanKindFilter = "audio"
+	PlanKindFilterRemux     PlanKindFilter = "remux"
+	PlanKindFilterSkip      PlanKindFilter = "skip"
+	PlanKindFilterSubtitles PlanKindFilter = "subtitles"
+	PlanKindFilterVideo     PlanKindFilter = "video"
 )
 
-// Valid indicates whether the value is a known member of the PlanKind enum.
-func (e PlanKind) Valid() bool {
+// Valid indicates whether the value is a known member of the PlanKindFilter enum.
+func (e PlanKindFilter) Valid() bool {
 	switch e {
-	case PlanKindAudioOnly:
+	case PlanKindFilterAudio:
 		return true
-	case PlanKindFull:
+	case PlanKindFilterRemux:
 		return true
-	case PlanKindRemux:
+	case PlanKindFilterSkip:
 		return true
-	case PlanKindSkip:
+	case PlanKindFilterSubtitles:
+		return true
+	case PlanKindFilterVideo:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlanLabel.
+const (
+	PlanLabelAudio     PlanLabel = "audio"
+	PlanLabelRemux     PlanLabel = "remux"
+	PlanLabelSubtitles PlanLabel = "subtitles"
+	PlanLabelVideo     PlanLabel = "video"
+)
+
+// Valid indicates whether the value is a known member of the PlanLabel enum.
+func (e PlanLabel) Valid() bool {
+	switch e {
+	case PlanLabelAudio:
+		return true
+	case PlanLabelRemux:
+		return true
+	case PlanLabelSubtitles:
+		return true
+	case PlanLabelVideo:
 		return true
 	default:
 		return false
@@ -683,6 +716,7 @@ type CompatibilityReasons struct {
 // CompatibilitySummary How many files still force playback transcoding, and why. This is the
 // number that tracks progress toward the primary goal.
 type CompatibilitySummary struct {
+	// ByPlanKind A file counts under every label it carries, so the label counts overlap. skip is disjoint.
 	ByPlanKind PlanKindBreakdown `json:"by_plan_kind"`
 
 	// ByReason A file can need work for more than one reason, so these overlap.
@@ -708,17 +742,21 @@ type Dashboard struct {
 
 	// Compatibility How many files still force playback transcoding, and why. This is the
 	// number that tracks progress toward the primary goal.
-	Compatibility CompatibilitySummary `json:"compatibility"`
-	CurrentJob    *JobSummary          `json:"current_job,omitempty"`
+	Compatibility    CompatibilitySummary `json:"compatibility"`
+	CompletionsTotal int                  `json:"completions_total"`
+	CurrentJob       *JobSummary          `json:"current_job,omitempty"`
 
-	// Failures Failed jobs needing attention, newest first.
-	Failures    []JobSummary `json:"failures"`
-	GeneratedAt time.Time    `json:"generated_at"`
+	// Failures Failed jobs needing attention, newest first, capped; `failures_total` says how many exist.
+	Failures      []JobSummary `json:"failures"`
+	FailuresTotal int          `json:"failures_total"`
+	GeneratedAt   time.Time    `json:"generated_at"`
 
 	// Queue In execution order.
-	Queue             []JobSummary `json:"queue"`
-	QueueDepth        int          `json:"queue_depth"`
-	QueuePaused       bool         `json:"queue_paused"`
+	Queue       []JobSummary `json:"queue"`
+	QueueDepth  int          `json:"queue_depth"`
+	QueuePaused bool         `json:"queue_paused"`
+
+	// RecentCompletions Newest finished first, capped; `completions_total` says how many exist.
 	RecentCompletions []JobSummary `json:"recent_completions"`
 	Stats             Stats        `json:"stats"`
 }
@@ -747,7 +785,7 @@ type EnqueueResult struct {
 	JobId       *int64 `json:"job_id,omitempty"`
 	MediaFileId int64  `json:"media_file_id"`
 
-	// PlanKind The shape of the work a file needs.
+	// PlanKind The work a file needs, as the set of labels it carries in fixed order. Empty means every stream is already compatible; the UI renders that as "skipped".
 	PlanKind *PlanKind `json:"plan_kind,omitempty"`
 	Reason   string    `json:"reason"`
 }
@@ -784,10 +822,10 @@ type EventPage struct {
 	// HasMore More events matched than the limit allowed.
 	HasMore bool `json:"has_more"`
 
-	// Items Ascending by id.
+	// Items Ascending by id when `since_id` was given, otherwise newest first.
 	Items []Event `json:"items"`
 
-	// NextSinceId Pass as `since_id` on the next poll.
+	// NextSinceId The highest id in the page, to pass as `since_id` on the next poll.
 	NextSinceId int64 `json:"next_since_id"`
 }
 
@@ -904,7 +942,7 @@ type Job struct {
 	FinishedAt     *time.Time   `json:"finished_at,omitempty"`
 	Id             int64        `json:"id"`
 
-	// Kind The shape of the work a file needs.
+	// Kind The work a file needs, as the set of labels it carries in fixed order. Empty means every stream is already compatible; the UI renders that as "skipped".
 	Kind              PlanKind  `json:"kind"`
 	MediaFileId       int64     `json:"media_file_id"`
 	MediaFilename     string    `json:"media_filename"`
@@ -979,7 +1017,7 @@ type JobSummary struct {
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
 	Id         int64      `json:"id"`
 
-	// Kind The shape of the work a file needs.
+	// Kind The work a file needs, as the set of labels it carries in fixed order. Empty means every stream is already compatible; the UI renders that as "skipped".
 	Kind          PlanKind  `json:"kind"`
 	MediaFileId   int64     `json:"media_file_id"`
 	MediaFilename string    `json:"media_filename"`
@@ -1047,7 +1085,7 @@ type MediaDetail struct {
 	// is deterministic (plan.md section 7).
 	Plan *Plan `json:"plan,omitempty"`
 
-	// PlanKind The shape of the work a file needs.
+	// PlanKind The work a file needs, as the set of labels it carries in fixed order. Empty means every stream is already compatible; the UI renders that as "skipped".
 	PlanKind    *PlanKind `json:"plan_kind,omitempty"`
 	PlanReasons []string  `json:"plan_reasons"`
 
@@ -1076,8 +1114,8 @@ type MediaDetail struct {
 type MediaFilter struct {
 	ArrInstanceId *int64 `json:"arr_instance_id,omitempty"`
 
-	// PlanKind The shape of the work a file needs.
-	PlanKind *PlanKind `json:"plan_kind,omitempty"`
+	// PlanKind Files carrying the label, or `skip` for analysed files that need nothing.
+	PlanKind *PlanKindFilter `json:"plan_kind,omitempty"`
 
 	// Provenance Derived on every analysis, never set by a user. `modified_since_transcode`
 	// means something rewrote a file Codarr produced.
@@ -1133,16 +1171,19 @@ type MediaListItem struct {
 	ArrInstanceId   *int64         `json:"arr_instance_id,omitempty"`
 	ArrInstanceName *string        `json:"arr_instance_name,omitempty"`
 	Audio           []AudioSummary `json:"audio"`
-	CodarrTagged    bool           `json:"codarr_tagged"`
-	Container       *string        `json:"container,omitempty"`
-	Filename        string         `json:"filename"`
-	Height          *int           `json:"height,omitempty"`
-	Id              int64          `json:"id"`
-	Ignored         bool           `json:"ignored"`
-	IsHdr           bool           `json:"is_hdr"`
-	Path            string         `json:"path"`
 
-	// PlanKind The shape of the work a file needs.
+	// CodarrProcessedAt When Codarr last promoted its own output over this path.
+	CodarrProcessedAt *time.Time `json:"codarr_processed_at,omitempty"`
+	CodarrTagged      bool       `json:"codarr_tagged"`
+	Container         *string    `json:"container,omitempty"`
+	Filename          string     `json:"filename"`
+	Height            *int       `json:"height,omitempty"`
+	Id                int64      `json:"id"`
+	Ignored           bool       `json:"ignored"`
+	IsHdr             bool       `json:"is_hdr"`
+	Path              string     `json:"path"`
+
+	// PlanKind The work a file needs, as the set of labels it carries in fixed order. Empty means every stream is already compatible; the UI renders that as "skipped".
 	PlanKind *PlanKind `json:"plan_kind,omitempty"`
 
 	// Provenance Derived on every analysis, never set by a user. `modified_since_transcode`
@@ -1218,7 +1259,7 @@ type Plan struct {
 	DolbyVisionProfile *int `json:"dolby_vision_profile,omitempty"`
 	Hdr                bool `json:"hdr"`
 
-	// Kind The shape of the work a file needs.
+	// Kind The work a file needs, as the set of labels it carries in fixed order. Empty means every stream is already compatible; the UI renders that as "skipped".
 	Kind PlanKind `json:"kind"`
 
 	// LevelRewrite The stream is still copied; only the H.264 level flag is rewritten
@@ -1237,16 +1278,23 @@ type Plan struct {
 	TargetVideoBitrateBps *int `json:"target_video_bitrate_bps,omitempty"`
 }
 
-// PlanKind The shape of the work a file needs.
-type PlanKind string
+// PlanKind The work a file needs, as the set of labels it carries in fixed order. Empty means every stream is already compatible; the UI renders that as "skipped".
+type PlanKind = []PlanLabel
 
-// PlanKindBreakdown defines model for PlanKindBreakdown.
+// PlanKindBreakdown A file counts under every label it carries, so the label counts overlap. skip is disjoint.
 type PlanKindBreakdown struct {
-	AudioOnly int `json:"audio_only"`
-	Full      int `json:"full"`
+	Audio     int `json:"audio"`
 	Remux     int `json:"remux"`
 	Skip      int `json:"skip"`
+	Subtitles int `json:"subtitles"`
+	Video     int `json:"video"`
 }
+
+// PlanKindFilter Files carrying the label, or `skip` for analysed files that need nothing.
+type PlanKindFilter string
+
+// PlanLabel One kind of work a plan carries (plan.md 7).
+type PlanLabel string
 
 // PlexAuthPoll defines model for PlexAuthPoll.
 type PlexAuthPoll struct {
@@ -1576,6 +1624,7 @@ type RecheckAllRequest struct {
 
 // RecheckResult defines model for RecheckResult.
 type RecheckResult struct {
+	// ByPlanKind A file counts under every label it carries, so the label counts overlap. skip is disjoint.
 	ByPlanKind PlanKindBreakdown `json:"by_plan_kind"`
 
 	// Count Files that no longer match the current policy, so would be queued.
@@ -1671,7 +1720,7 @@ type Settings struct {
 	// FullHashEnabled Compute a whole-file hash at promotion as well (plan.md 12.2).
 	FullHashEnabled bool `json:"full_hash_enabled"`
 
-	// PrioritiseQuickJobs Give remux and audio_only a better default priority than full.
+	// PrioritiseQuickJobs Give plans without a video encode a better default priority than the ones with one.
 	PrioritiseQuickJobs bool `json:"prioritise_quick_jobs"`
 
 	// QsvDevice Example: /dev/dri/renderD128
@@ -1723,6 +1772,7 @@ type SpaceSweepCandidate struct {
 
 // SpaceSweepPreview defines model for SpaceSweepPreview.
 type SpaceSweepPreview struct {
+	// ByPlanKind A file counts under every label it carries, so the label counts overlap. skip is disjoint.
 	ByPlanKind PlanKindBreakdown     `json:"by_plan_kind"`
 	Candidates []SpaceSweepCandidate `json:"candidates"`
 
@@ -1752,6 +1802,7 @@ type SpaceSweepRunRequest struct {
 
 // SpaceSweepRunResult defines model for SpaceSweepRunResult.
 type SpaceSweepRunResult struct {
+	// ByPlanKind A file counts under every label it carries, so the label counts overlap. skip is disjoint.
 	ByPlanKind           PlanKindBreakdown `json:"by_plan_kind"`
 	Count                int               `json:"count"`
 	ProjectedSavingBytes int64             `json:"projected_saving_bytes"`
@@ -1928,9 +1979,12 @@ type ListEventsParams struct {
 	Level    *EventLevel `form:"level,omitempty" json:"level,omitempty"`
 	Category *string     `form:"category,omitempty" json:"category,omitempty"`
 
-	// SinceId Return events with a strictly greater id.
+	// SinceId Return events with a strictly greater id, ascending.
 	SinceId *int64 `form:"since_id,omitempty" json:"since_id,omitempty"`
-	Limit   *int   `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// BeforeId Return events with a strictly smaller id, newest first; for loading older rows.
+	BeforeId *int64 `form:"before_id,omitempty" json:"before_id,omitempty"`
+	Limit    *int   `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // ListJobsParams defines parameters for ListJobs.
@@ -1946,9 +2000,9 @@ type ListJobsParams struct {
 // ListMediaParams defines parameters for ListMedia.
 type ListMediaParams struct {
 	// Q Substring match on the path.
-	Q        *string      `form:"q,omitempty" json:"q,omitempty"`
-	Status   *MediaStatus `form:"status,omitempty" json:"status,omitempty"`
-	PlanKind *PlanKind    `form:"plan_kind,omitempty" json:"plan_kind,omitempty"`
+	Q        *string         `form:"q,omitempty" json:"q,omitempty"`
+	Status   *MediaStatus    `form:"status,omitempty" json:"status,omitempty"`
+	PlanKind *PlanKindFilter `form:"plan_kind,omitempty" json:"plan_kind,omitempty"`
 
 	// VideoCodec ffprobe codec name, matched exactly.
 	VideoCodec    *string     `form:"video_codec,omitempty" json:"video_codec,omitempty"`

@@ -500,7 +500,7 @@ paths:
         - name: plan_kind
           in: query
           schema:
-            $ref: '#/components/schemas/PlanKind'
+            $ref: '#/components/schemas/PlanKindFilter'
         - name: video_codec
           in: query
           description: ffprobe codec name, matched exactly.
@@ -934,9 +934,11 @@ paths:
       tags: [hardware]
       summary: Re-run the encoder probe now.
       description: |
-        Runs a real one-second encode per backend and profile (plan.md 10.1).
-        Compiled-in support is not working support, so this is the only thing
-        that decides which encoder gets used.
+        Runs a real one-second encode per backend and profile, plus a decode of
+        a synthesised VP9 and AV1 clip per backend (plan.md 10.1). Compiled-in
+        support is not working support, so this is the only thing that decides
+        which encoder gets used. AV1 is reported only; the hardware decode set
+        is unchanged.
       responses:
         '200':
           description: The fresh probe results.
@@ -1003,8 +1005,10 @@ paths:
       tags: [dashboard]
       summary: The log view, cursor-paginated.
       description: |
-        Ascending by id. Poll with `since_id` set to the last id seen; the
-        response carries the cursor to use next.
+        Newest first by default, which is the initial page and every
+        `before_id` page. With `since_id` set the page is ascending from that
+        id, which is what polling appends; the response carries the cursor to
+        use next.
       parameters:
         - name: level
           in: query
@@ -1017,7 +1021,13 @@ paths:
             type: string
         - name: since_id
           in: query
-          description: Return events with a strictly greater id.
+          description: Return events with a strictly greater id, ascending.
+          schema:
+            type: integer
+            format: int64
+        - name: before_id
+          in: query
+          description: Return events with a strictly smaller id, newest first; for loading older rows.
           schema:
             type: integer
             format: int64
@@ -1153,10 +1163,24 @@ components:
           type: string
           description: Hash of the compiled-in policy; changing it makes tagged files eligible again.
 
-    PlanKind:
+    PlanLabel:
       type: string
-      description: The shape of the work a file needs.
-      enum: [skip, remux, audio_only, full]
+      description: One kind of work a plan carries (plan.md 7).
+      enum: [video, audio, subtitles, remux]
+
+    PlanKind:
+      type: array
+      description: >
+        The work a file needs, as the set of labels it carries in fixed order.
+        Empty means every stream is already compatible; the UI renders that as
+        "skipped".
+      items:
+        $ref: '#/components/schemas/PlanLabel'
+
+    PlanKindFilter:
+      type: string
+      description: Files carrying the label, or `skip` for analysed files that need nothing.
+      enum: [skip, video, audio, subtitles, remux]
 
     MediaStatus:
       type: string
@@ -1244,6 +1268,8 @@ components:
         - -status
         - provenance
         - -provenance
+        - codarr_processed_at
+        - -codarr_processed_at
         - updated_at
         - -updated_at
 
@@ -1278,7 +1304,7 @@ components:
           type: boolean
         prioritise_quick_jobs:
           type: boolean
-          description: Give remux and audio_only a better default priority than full.
+          description: Give plans without a video encode a better default priority than the ones with one.
         full_hash_enabled:
           type: boolean
           description: Compute a whole-file hash at promotion as well (plan.md 12.2).
@@ -1861,6 +1887,11 @@ components:
           type: boolean
         codarr_tagged:
           type: boolean
+        codarr_processed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When Codarr last promoted its own output over this path.
         analyzed_at:
           type: string
           format: date-time
@@ -2642,15 +2673,20 @@ components:
 
     PlanKindBreakdown:
       type: object
-      required: [skip, remux, audio_only, full]
+      description: >
+        A file counts under every label it carries, so the label counts
+        overlap. skip is disjoint.
+      required: [skip, video, audio, subtitles, remux]
       properties:
         skip:
           type: integer
+        video:
+          type: integer
+        audio:
+          type: integer
+        subtitles:
+          type: integer
         remux:
-          type: integer
-        audio_only:
-          type: integer
-        full:
           type: integer
 
     RecheckAllRequest:
@@ -2673,7 +2709,7 @@ components:
         status:
           $ref: '#/components/schemas/MediaStatus'
         plan_kind:
-          $ref: '#/components/schemas/PlanKind'
+          $ref: '#/components/schemas/PlanKindFilter'
         video_codec:
           type: string
         arr_instance_id:
@@ -3204,7 +3240,9 @@ components:
         - queue
         - awaiting_stream_end
         - recent_completions
+        - completions_total
         - failures
+        - failures_total
         - stats
         - compatibility
       properties:
@@ -3228,13 +3266,18 @@ components:
             $ref: '#/components/schemas/AwaitingStreamEnd'
         recent_completions:
           type: array
+          description: Newest finished first, capped; `completions_total` says how many exist.
           items:
             $ref: '#/components/schemas/JobSummary'
+        completions_total:
+          type: integer
         failures:
           type: array
-          description: Failed jobs needing attention, newest first.
+          description: Failed jobs needing attention, newest first, capped; `failures_total` says how many exist.
           items:
             $ref: '#/components/schemas/JobSummary'
+        failures_total:
+          type: integer
         stats:
           $ref: '#/components/schemas/Stats'
         compatibility:
@@ -3271,13 +3314,13 @@ components:
       properties:
         items:
           type: array
-          description: Ascending by id.
+          description: Ascending by id when `since_id` was given, otherwise newest first.
           items:
             $ref: '#/components/schemas/Event'
         next_since_id:
           type: integer
           format: int64
-          description: Pass as `since_id` on the next poll.
+          description: The highest id in the page, to pass as `since_id` on the next poll.
         has_more:
           type: boolean
           description: More events matched than the limit allowed.

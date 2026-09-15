@@ -391,10 +391,10 @@ func TestVerify_FullPlanThatGrewTheFileFails(t *testing.T) {
 	h.fs.addFile(stagingPath, sourceSize+1)
 
 	req := request()
-	req.Plan.Kind = domain.KindFull
+	req.Plan.Kind = domain.KindOf(domain.LabelVideo)
 
 	_, err := h.promoter.Verify(t.Context(), req)
-	requireFailure(t, err, domain.FailVerification, "larger than the 8.0 GiB (8589934592 bytes) source", "full transcode")
+	requireFailure(t, err, domain.FailVerification, "larger than the 8.0 GiB (8589934592 bytes) source", "re-encodes video")
 }
 
 func TestVerify_AudioOnlyPlanMayGrowTheFile(t *testing.T) {
@@ -414,7 +414,7 @@ func TestVerify_FullPlanOfExactlyTheSourceSizePasses(t *testing.T) {
 	h.fs.addFile(stagingPath, sourceSize)
 
 	req := request()
-	req.Plan.Kind = domain.KindFull
+	req.Plan.Kind = domain.KindOf(domain.LabelVideo)
 
 	_, err := h.promoter.Verify(t.Context(), req)
 	require.NoError(t, err)

@@ -18,11 +18,11 @@ func TestJobStore_EnqueueIsIdempotent(t *testing.T) {
 	s := storetest.NewDB(t)
 	media := seedMedia(t, s, "/library/movies/idempotent.mkv")
 
-	first := seedJob(t, s, media.ID, domain.KindFull, domain.PriorityFull)
+	first := seedJob(t, s, media.ID, domain.KindOf(domain.LabelVideo), domain.PriorityFull)
 
 	second, created, err := s.EnqueueJob(t.Context(), domain.Job{
 		MediaFileID: media.ID,
-		Kind:        domain.KindFull,
+		Kind:        domain.KindOf(domain.LabelVideo),
 		Origin:      domain.OriginManual,
 		Priority:    domain.PriorityNormal,
 		QueuedAt:    testTime(),
@@ -47,12 +47,12 @@ func TestJobStore_EnqueueAfterTerminalStateCreatesANewJob(t *testing.T) {
 	s := storetest.NewDB(t)
 	media := seedMedia(t, s, "/library/movies/retry.mkv")
 
-	first := seedJob(t, s, media.ID, domain.KindFull, domain.PriorityFull)
+	first := seedJob(t, s, media.ID, domain.KindOf(domain.LabelVideo), domain.PriorityFull)
 	require.NoError(t, s.CancelJob(t.Context(), first.ID))
 
 	second, created, err := s.EnqueueJob(t.Context(), domain.Job{
 		MediaFileID: media.ID,
-		Kind:        domain.KindFull,
+		Kind:        domain.KindOf(domain.LabelVideo),
 		Origin:      domain.OriginManual,
 		Priority:    domain.PriorityNormal,
 		QueuedAt:    testTime(),
@@ -68,7 +68,7 @@ func TestJobStore_EnqueueMarksMediaQueued(t *testing.T) {
 	s := storetest.NewDB(t)
 	media := seedMedia(t, s, "/library/movies/queued.mkv")
 
-	seedJob(t, s, media.ID, domain.KindRemux, domain.PriorityQuick)
+	seedJob(t, s, media.ID, domain.KindOf(domain.LabelRemux), domain.PriorityQuick)
 
 	reloaded, err := s.GetMediaFile(t.Context(), media.ID)
 	require.NoError(t, err)
@@ -80,8 +80,8 @@ func TestJobStore_ClaimNextJobTakesLowestPriorityThenOldest(t *testing.T) {
 
 	s := storetest.NewDB(t)
 
-	full := seedJob(t, s, seedMedia(t, s, "/library/a.mkv").ID, domain.KindFull, domain.PriorityFull)
-	quick := seedJob(t, s, seedMedia(t, s, "/library/b.mkv").ID, domain.KindRemux, domain.PriorityQuick)
+	full := seedJob(t, s, seedMedia(t, s, "/library/a.mkv").ID, domain.KindOf(domain.LabelVideo), domain.PriorityFull)
+	quick := seedJob(t, s, seedMedia(t, s, "/library/b.mkv").ID, domain.KindOf(domain.LabelRemux), domain.PriorityQuick)
 
 	first, ok, err := s.ClaimNextJob(t.Context())
 	require.NoError(t, err)
@@ -105,7 +105,7 @@ func TestJobStore_ClaimNextJobMarksMediaProcessing(t *testing.T) {
 
 	s := storetest.NewDB(t)
 	media := seedMedia(t, s, "/library/movies/processing.mkv")
-	seedJob(t, s, media.ID, domain.KindFull, domain.PriorityFull)
+	seedJob(t, s, media.ID, domain.KindOf(domain.LabelVideo), domain.PriorityFull)
 
 	_, ok, err := s.ClaimNextJob(t.Context())
 	require.NoError(t, err)
@@ -127,7 +127,7 @@ func TestJobStore_ConcurrentClaimsNeverReturnTheSameJob(t *testing.T) {
 
 	for i := range jobs {
 		media := seedMedia(t, s, "/library/movies/claim-"+string(rune('a'+i))+".mkv")
-		seedJob(t, s, media.ID, domain.KindFull, domain.PriorityNormal)
+		seedJob(t, s, media.ID, domain.KindOf(domain.LabelVideo), domain.PriorityNormal)
 	}
 
 	const claimers = 8
@@ -186,9 +186,9 @@ func TestJobStore_SweepRequeuesInterruptedJobsAtTheFront(t *testing.T) {
 	s := storetest.NewStore(t, db)
 
 	interrupted := seedJob(t, s, seedMedia(t, s, "/library/interrupted.mkv").ID,
-		domain.KindFull, domain.PriorityFull)
+		domain.KindOf(domain.LabelVideo), domain.PriorityFull)
 	queued := seedJob(t, s, seedMedia(t, s, "/library/waiting.mkv").ID,
-		domain.KindRemux, domain.PriorityQuick)
+		domain.KindOf(domain.LabelRemux), domain.PriorityQuick)
 
 	forceJobState(t, db, interrupted.ID, domain.JobRunning, 0, "/library/.codarr-staging-1.mkv")
 
@@ -223,7 +223,7 @@ func TestJobStore_SweepRequeuesVerifyingJobs(t *testing.T) {
 	db := storetest.NewRawDB(t)
 	s := storetest.NewStore(t, db)
 
-	job := seedJob(t, s, seedMedia(t, s, "/library/verifying.mkv").ID, domain.KindAudioOnly, domain.PriorityNormal)
+	job := seedJob(t, s, seedMedia(t, s, "/library/verifying.mkv").ID, domain.KindOf(domain.LabelAudio), domain.PriorityNormal)
 	forceJobState(t, db, job.ID, domain.JobVerifying, 1, "")
 
 	results, err := s.SweepInterruptedJobs(t.Context())
@@ -242,7 +242,7 @@ func TestJobStore_SweepFailsAtTheAttemptCap(t *testing.T) {
 	s := storetest.NewStore(t, db)
 
 	media := seedMedia(t, s, "/library/cursed.mkv")
-	job := seedJob(t, s, media.ID, domain.KindFull, domain.PriorityFull)
+	job := seedJob(t, s, media.ID, domain.KindOf(domain.LabelVideo), domain.PriorityFull)
 
 	forceJobState(t, db, job.ID, domain.JobRunning, domain.MaxAutoAttempts, "")
 
@@ -271,7 +271,7 @@ func TestJobStore_SweepStopsShortOfTheCap(t *testing.T) {
 	db := storetest.NewRawDB(t)
 	s := storetest.NewStore(t, db)
 
-	job := seedJob(t, s, seedMedia(t, s, "/library/nearly.mkv").ID, domain.KindFull, domain.PriorityFull)
+	job := seedJob(t, s, seedMedia(t, s, "/library/nearly.mkv").ID, domain.KindOf(domain.LabelVideo), domain.PriorityFull)
 	forceJobState(t, db, job.ID, domain.JobRunning, domain.MaxAutoAttempts-1, "")
 
 	results, err := s.SweepInterruptedJobs(t.Context())
@@ -289,9 +289,9 @@ func TestJobStore_SweepLeavesPromotingForTheCaller(t *testing.T) {
 	s := storetest.NewStore(t, db)
 
 	promoting := seedJob(t, s, seedMedia(t, s, "/library/promoting.mkv").ID,
-		domain.KindFull, domain.PriorityFull)
+		domain.KindOf(domain.LabelVideo), domain.PriorityFull)
 	awaiting := seedJob(t, s, seedMedia(t, s, "/library/awaiting.mkv").ID,
-		domain.KindRemux, domain.PriorityQuick)
+		domain.KindOf(domain.LabelRemux), domain.PriorityQuick)
 
 	forceJobState(t, db, promoting.ID, domain.JobPromoting, 0, "/library/.codarr-staging-1.mkv")
 	forceJobState(t, db, awaiting.ID, domain.JobAwaitingStreamEnd, 0, "/library/.codarr-staging-2.mkv")
@@ -331,7 +331,7 @@ func TestJobStore_FailJobRequiresACodeAndAMessage(t *testing.T) {
 	t.Parallel()
 
 	s := storetest.NewDB(t)
-	job := seedJob(t, s, seedMedia(t, s, "/library/bare.mkv").ID, domain.KindFull, domain.PriorityFull)
+	job := seedJob(t, s, seedMedia(t, s, "/library/bare.mkv").ID, domain.KindOf(domain.LabelVideo), domain.PriorityFull)
 
 	require.ErrorIs(t, s.FailJob(t.Context(), job.ID, domain.FailFfmpeg, "", ""), store.ErrInvalidFailure)
 	require.ErrorIs(t, s.FailJob(t.Context(), job.ID, "", "something broke", ""), store.ErrInvalidFailure)
@@ -355,7 +355,7 @@ func TestJobStore_RestartResetsTheAttemptCounter(t *testing.T) {
 	db := storetest.NewRawDB(t)
 	s := storetest.NewStore(t, db)
 
-	job := seedJob(t, s, seedMedia(t, s, "/library/restart.mkv").ID, domain.KindFull, domain.PriorityFull)
+	job := seedJob(t, s, seedMedia(t, s, "/library/restart.mkv").ID, domain.KindOf(domain.LabelVideo), domain.PriorityFull)
 	forceJobState(t, db, job.ID, domain.JobRunning, domain.MaxAutoAttempts, "")
 
 	_, err := s.SweepInterruptedJobs(t.Context())
@@ -380,7 +380,7 @@ func TestJobStore_ActiveJobForMedia(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, ok)
 
-	job := seedJob(t, s, media.ID, domain.KindFull, domain.PriorityFull)
+	job := seedJob(t, s, media.ID, domain.KindOf(domain.LabelVideo), domain.PriorityFull)
 
 	active, ok, err := s.ActiveJobForMedia(t.Context(), media.ID)
 	require.NoError(t, err)
@@ -398,7 +398,7 @@ func TestJobStore_TransformRecordRoundTrips(t *testing.T) {
 	t.Parallel()
 
 	s := storetest.NewDB(t)
-	job := seedJob(t, s, seedMedia(t, s, "/library/transform.mkv").ID, domain.KindAudioOnly, domain.PriorityNormal)
+	job := seedJob(t, s, seedMedia(t, s, "/library/transform.mkv").ID, domain.KindOf(domain.LabelAudio), domain.PriorityNormal)
 
 	outputIndex := 0
 	record := domain.TransformRecord{
@@ -433,7 +433,7 @@ func TestJobStore_ExecutionAndProgressUpdates(t *testing.T) {
 	t.Parallel()
 
 	s := storetest.NewDB(t)
-	job := seedJob(t, s, seedMedia(t, s, "/library/exec.mkv").ID, domain.KindFull, domain.PriorityFull)
+	job := seedJob(t, s, seedMedia(t, s, "/library/exec.mkv").ID, domain.KindOf(domain.LabelVideo), domain.PriorityFull)
 
 	require.NoError(t, s.UpdateJobExecution(t.Context(), store.ExecutionUpdate{
 		JobID:            job.ID,
@@ -475,4 +475,50 @@ func TestJobStore_GetJobNotFound(t *testing.T) {
 
 	_, err := s.GetJob(t.Context(), 404)
 	require.ErrorIs(t, err, store.ErrNotFound)
+}
+
+// The dashboard's completions and failures are the newest finished first, while the
+// queue keeps its execution order; a filter with no state is plain history.
+func TestJobStore_ListOrderFollowsTheStatesAskedFor(t *testing.T) {
+	t.Parallel()
+
+	db := storetest.NewRawDB(t)
+	s := storetest.NewStore(t, db)
+
+	ids := make([]int64, 0, 3)
+
+	for _, path := range []string{"/library/a.mkv", "/library/b.mkv", "/library/c.mkv"} {
+		m := seedMedia(t, s, path)
+		ids = append(ids, seedJob(t, s, m.ID, domain.KindOf(domain.LabelAudio), domain.PriorityNormal).ID)
+	}
+
+	fail := func(id int64, finishedAt string) {
+		t.Helper()
+		require.NoError(t, s.FailJob(t.Context(), id, domain.FailFfmpeg, "boom", ""))
+		_, err := db.Writer().ExecContext(t.Context(), `UPDATE jobs SET finished_at = ? WHERE id = ?`, finishedAt, id)
+		require.NoError(t, err)
+	}
+
+	fail(ids[0], "2026-01-01T03:00:00.000000000Z")
+	fail(ids[1], "2026-01-01T01:00:00.000000000Z")
+
+	list := func(f store.JobFilter) []int64 {
+		t.Helper()
+
+		jobs, _, err := s.ListJobs(t.Context(), f)
+		require.NoError(t, err)
+
+		out := make([]int64, 0, len(jobs))
+		for _, j := range jobs {
+			out = append(out, j.ID)
+		}
+
+		return out
+	}
+
+	require.Equal(t, []int64{ids[0], ids[1]}, list(store.JobFilter{State: []domain.JobState{domain.JobFailed}}))
+	require.Equal(t, []int64{ids[2]}, list(store.JobFilter{State: []domain.JobState{domain.JobQueued}}))
+	require.Equal(t, []int64{ids[2], ids[1], ids[0]}, list(store.JobFilter{}))
+	require.Equal(t, []int64{ids[1], ids[0]},
+		list(store.JobFilter{State: []domain.JobState{domain.JobFailed}, Order: store.OrderNewest}))
 }

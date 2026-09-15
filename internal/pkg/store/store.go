@@ -27,21 +27,26 @@ const timeLayout = "2006-01-02T15:04:05.000000000Z07:00"
 type MediaSort string
 
 const (
-	SortPath       MediaSort = "path"
-	SortSize       MediaSort = "size"
-	SortStatus     MediaSort = "status"
-	SortPlanKind   MediaSort = "plan_kind"
-	SortVideoCodec MediaSort = "video_codec"
-	SortBitrate    MediaSort = "bitrate"
-	SortUpdatedAt  MediaSort = "updated_at"
-	SortProvenance MediaSort = "provenance"
+	SortPath        MediaSort = "path"
+	SortSize        MediaSort = "size"
+	SortStatus      MediaSort = "status"
+	SortPlanKind    MediaSort = "plan_kind"
+	SortVideoCodec  MediaSort = "video_codec"
+	SortBitrate     MediaSort = "bitrate"
+	SortUpdatedAt   MediaSort = "updated_at"
+	SortProvenance  MediaSort = "provenance"
+	SortProcessedAt MediaSort = "codarr_processed_at"
 )
 
+// PlanKindSkip selects analysed files whose plan carries no label.
+const PlanKindSkip = "skip"
+
 // MediaFilter is the server-side filter, sort and pagination of plan.md 18.2.
+// PlanKind entries are domain labels or PlanKindSkip, OR'd together.
 type MediaFilter struct {
 	Query          string
 	Status         []domain.MediaStatus
-	PlanKind       []domain.Kind
+	PlanKind       []string
 	VideoCodec     []string
 	ArrInstanceID  *int64
 	Provenance     []domain.Provenance
@@ -53,20 +58,38 @@ type MediaFilter struct {
 	Offset     int
 }
 
+// JobOrder is how a job list is sorted. Empty derives one from the states asked
+// for: terminal states newest finished first, in-flight states by start, the
+// queue by priority, and anything else newest first.
+type JobOrder string
+
+// The three orders a job list can carry explicitly.
+const (
+	OrderQueue    JobOrder = "queue"
+	OrderStarted  JobOrder = "started"
+	OrderFinished JobOrder = "finished"
+	OrderNewest   JobOrder = "newest"
+)
+
 // JobFilter selects jobs for the queue and history views.
 type JobFilter struct {
 	State       []domain.JobState
 	MediaFileID *int64
+	Order       JobOrder
 	Limit       int
 	Offset      int
 }
 
-// EventFilter is the cursor read behind GET /api/events.
+// EventFilter is the cursor read behind GET /api/events: SinceID reads forward
+// from a poll cursor, BeforeID reads back into history, Descending flips the
+// order for the initial page and the history pages.
 type EventFilter struct {
-	Level    []string
-	Category []string
-	SinceID  int64
-	Limit    int
+	Level      []string
+	Category   []string
+	SinceID    int64
+	BeforeID   int64
+	Descending bool
+	Limit      int
 }
 
 // AnalysisUpdate carries everything one analysis pass learned about a file; provenance
@@ -265,7 +288,7 @@ type Store interface { //nolint:interfacebloat // one database, one mock; splitt
 
 	// Throughput.
 	UpsertThroughputStat(ctx context.Context, s domain.ThroughputStat) error
-	GetThroughputStat(ctx context.Context, kind domain.Kind, encoder, resolution string) (domain.ThroughputStat, error)
+	GetThroughputStat(ctx context.Context, kind domain.ThroughputKind, encoder, resolution string) (domain.ThroughputStat, error)
 	ListThroughputStats(ctx context.Context) ([]domain.ThroughputStat, error)
 }
 

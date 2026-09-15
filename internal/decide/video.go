@@ -243,15 +243,15 @@ func ForceVideoEncode(p domain.Plan, reason string) (domain.Plan, bool) {
 	}
 
 	p.Streams = streams
-	p.Kind = domain.KindFull
 
 	// The stream is being re-encoded, so there is no level flag left to rewrite.
 	p.LevelRewrite = false
+	p.Kind = deriveKind(p)
 	// Rewritten in place, not appended to: a "video: COPY" line next to a new
 	// "video: ENCODE" one puts two contradictory statements to the user (plan.md 7).
 	p.Reasons = rewriteReasons(p.Reasons,
 		"video: "+strings.ToUpper(string(domain.DecisionEncode))+" - "+reason,
-		"plan: "+strings.ToUpper(string(domain.KindFull))+" - "+summarise(p))
+		planLine(p))
 
 	return p, true
 }

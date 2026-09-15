@@ -11,7 +11,7 @@ import (
 const throughputColumns = `id, kind, encoder, resolution, samples, avg_value, updated_at`
 
 // UpsertThroughputStat keys on (kind, encoder, resolution), matched through COALESCE
-// because encoder and resolution are NULL for audio_only and remux (migration 002).
+// because encoder and resolution are NULL for I/O bound work (migration 002).
 func (s *store) UpsertThroughputStat(ctx context.Context, st domain.ThroughputStat) error {
 	return s.write(ctx, func(tx *sql.Tx) error {
 		const update = `
@@ -47,7 +47,7 @@ func (s *store) UpsertThroughputStat(ctx context.Context, st domain.ThroughputSt
 }
 
 func (s *store) GetThroughputStat(
-	ctx context.Context, kind domain.Kind, encoder, resolution string,
+	ctx context.Context, kind domain.ThroughputKind, encoder, resolution string,
 ) (domain.ThroughputStat, error) {
 	const query = `
 		SELECT ` + throughputColumns + ` FROM throughput_stats
@@ -107,7 +107,7 @@ func scanThroughput(row rowScanner) (domain.ThroughputStat, error) {
 		return domain.ThroughputStat{}, err //nolint:wrapcheck // sql.ErrNoRows must stay comparable for the caller
 	}
 
-	st.Kind = domain.Kind(kind)
+	st.Kind = domain.ThroughputKind(kind)
 	st.Encoder = encoder.String
 	st.Resolution = resolution.String
 

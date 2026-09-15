@@ -19,10 +19,14 @@ func reasonLines(probe *ffprobe.Result, p domain.Plan) []string {
 
 	lines = append(lines,
 		fmt.Sprintf("container: %s -> %s", p.SourceContainer, p.OutputContainer),
-		fmt.Sprintf("plan: %s - %s", strings.ToUpper(string(p.Kind)), summarise(p)),
+		planLine(p),
 	)
 
 	return lines
+}
+
+func planLine(p domain.Plan) string {
+	return fmt.Sprintf("plan: %s - %s", strings.ToUpper(p.Kind.Display()), summarise(p))
 }
 
 func streamLine(probe *ffprobe.Result, s domain.StreamPlan) string {
@@ -69,7 +73,7 @@ func sourceStream(probe *ffprobe.Result, codecType string, ordinal int) ffprobe.
 }
 
 func summarise(p domain.Plan) string {
-	if p.Kind == domain.KindSkip {
+	if p.Kind.Skip() {
 		return "every stream is already compatible"
 	}
 

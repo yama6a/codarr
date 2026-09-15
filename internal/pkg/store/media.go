@@ -23,14 +23,15 @@ const mediaColumns = `id, path, root_id, arr_instance_id, arr_entity_id, size_by
 //
 //nolint:gochecknoglobals // lookup table, immutable
 var mediaSortColumns = map[MediaSort]string{
-	SortPath:       "path",
-	SortSize:       "size_bytes",
-	SortStatus:     "status",
-	SortPlanKind:   "plan_kind",
-	SortVideoCodec: "video_codec",
-	SortBitrate:    "video_bitrate",
-	SortUpdatedAt:  "updated_at",
-	SortProvenance: "provenance",
+	SortPath:        "path",
+	SortSize:        "size_bytes",
+	SortStatus:      "status",
+	SortPlanKind:    "plan_kind",
+	SortVideoCodec:  "video_codec",
+	SortBitrate:     "video_bitrate",
+	SortUpdatedAt:   "updated_at",
+	SortProvenance:  "provenance",
+	SortProcessedAt: "codarr_processed_at",
 }
 
 // UpsertMediaFile inserts a file seen by a scan or webhook, or refreshes the identity
@@ -236,7 +237,7 @@ func (s *store) UpdateMediaAnalysis(ctx context.Context, u AnalysisUpdate) error
 		res, err := tx.ExecContext(ctx, update,
 			u.SizeBytes, u.MTime, nullInt64(int64(u.NLink)), nullString(u.Fingerprint),
 			nullString(u.FingerprintAlgo), nullString(u.ProbeJSON), nullString(u.MediaInfoJSON),
-			formatTime(u.AnalyzedAt), planJSON, nullString(string(u.PlanKind)), reasons,
+			formatTime(u.AnalyzedAt), planJSON, string(u.PlanKind), reasons,
 			nullString(u.Container), nullString(u.VideoCodec), nullString(u.VideoProfile),
 			nullString(u.VideoLevel), nullInt64(int64(u.VideoBitrate)),
 			nullString(string(u.VideoBitrateSrc)), u.IsHDR, u.CodarrTagged,
@@ -462,6 +463,29 @@ func (s *store) mediaRow(row *sql.Row) (domain.MediaFile, error) {
 	return m, nil
 }
 
+// planKindWhere matches a label anywhere in the pipe-joined set, or the empty
+// set for "skip"; entries OR together, and an unanalysed NULL never matches.
+func planKindWhere(c *conds, values []string) {
+	if len(values) == 0 {
+		return
+	}
+
+	clauses := make([]string, 0, len(values))
+
+	for _, v := range values {
+		if v == PlanKindSkip {
+			clauses = append(clauses, "plan_kind = ''")
+
+			continue
+		}
+
+		clauses = append(clauses, "instr('|' || plan_kind || '|', ?) > 0")
+		c.args = append(c.args, "|"+v+"|")
+	}
+
+	c.clauses = append(c.clauses, "("+strings.Join(clauses, " OR ")+")")
+}
+
 func mediaWhere(f MediaFilter) (string, []any) {
 	var c conds
 
@@ -470,7 +494,7 @@ func mediaWhere(f MediaFilter) (string, []any) {
 	}
 
 	c.in("status", strs(f.Status))
-	c.in("plan_kind", strs(f.PlanKind))
+	planKindWhere(&c, f.PlanKind)
 	c.in("video_codec", f.VideoCodec)
 	c.in("provenance", strs(f.Provenance))
 

@@ -50,7 +50,7 @@ func TestService_RecheckAllPreviewsWithoutQueueingAnything(t *testing.T) {
 	require.True(t, res.Irreversible)
 	require.Equal(t, 3, res.Examined, "only the done files are re-checked")
 	require.Equal(t, 2, res.Count, "the one already matching the policy is skipped")
-	require.Equal(t, job.PlanKindBreakdown{AudioOnly: 1, Full: 1}, res.ByPlanKind)
+	require.Equal(t, domain.KindCounts{Video: 1, Audio: 1, Subtitles: 2}, res.ByPlanKind)
 	require.Equal(t, []int64{11, 13}, res.MediaFileIDs)
 	require.Empty(t, res.QueuedJobIDs)
 	require.Len(t, h.analyzer.AnalyzeCalls(), 3, "a re-check re-probes before it decides")
@@ -153,7 +153,7 @@ func TestService_SpaceSweepKeepsAFileAboveTheSavingThreshold(t *testing.T) {
 
 	require.True(t, res.Irreversible)
 	require.Equal(t, 1, res.Count)
-	require.Equal(t, job.PlanKindBreakdown{Full: 1}, res.ByPlanKind)
+	require.Equal(t, domain.KindCounts{Video: 1, Audio: 1, Subtitles: 1}, res.ByPlanKind)
 	require.Empty(t, res.QueuedJobIDs, "a preview queues nothing")
 
 	candidate := res.Candidates[0]
@@ -212,7 +212,7 @@ func TestService_SpaceSweepRunQueuesTheCandidatesItReEvaluated(t *testing.T) {
 
 	queued := h.jobRow(res.QueuedJobIDs[0])
 	require.Equal(t, domain.OriginSpaceSweep, queued.Origin)
-	require.Equal(t, domain.KindFull, queued.Kind, "the sweep re-encodes video the policy would copy")
+	require.Equal(t, domain.KindOf(domain.LabelVideo, domain.LabelAudio, domain.LabelSubtitles), queued.Kind, "the sweep re-encodes video the policy would copy")
 }
 
 func TestService_SpaceSweepRunSkipsAFileThatNoLongerClearsTheThreshold(t *testing.T) {

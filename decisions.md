@@ -269,8 +269,8 @@ under `web/`.
 ### Renaming stays on, and the formats no longer defeat it
 
 `plan.md` 23.2 requires renaming off, or a naming format with no
-`{MediaInfo ...}` tokens, because Codarr changes the codec on a `full` job and
-the audio on an `audio_only` one. All four instances originally failed both
+`{MediaInfo ...}` tokens, because Codarr changes the codec on a `video` job and
+the audio on an `audio` one. All four instances originally failed both
 limbs.
 
 The user rewrote the four formats to title, year and id only, which satisfies

@@ -1,24 +1,37 @@
-import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
 import { Panel } from '../ui/Panel';
+import { PlanKindBadges } from '../ui/PlanKindBadges';
+import { LoadMore } from './LoadMore';
 import {
   deltaPercent,
   formatBytes,
+  formatDateTime,
   formatDuration,
   formatSignedBytes,
-  humanise,
 } from '../../lib/format';
-import { planKindTone } from '../../lib/tone';
 import type { JobSummary } from '../../api/types';
 
 interface CompletionsPanelProps {
   jobs: JobSummary[];
+  total: number;
+  loadingMore: boolean;
+  onLoadMore: () => void;
   onOpen: (job: JobSummary) => void;
 }
 
-export function CompletionsPanel({ jobs, onOpen }: CompletionsPanelProps) {
+export function CompletionsPanel({
+  jobs,
+  total,
+  loadingMore,
+  onLoadMore,
+  onOpen,
+}: CompletionsPanelProps) {
+  const title =
+    total > jobs.length
+      ? `Completions (latest ${jobs.length} of ${total})`
+      : `Completions (${jobs.length})`;
   return (
-    <Panel title="Recent completions" icon="check">
+    <Panel title={title} icon="check">
       {jobs.length === 0 ? (
         <EmptyState icon="check" message="Nothing finished yet." />
       ) : (
@@ -38,7 +51,7 @@ export function CompletionsPanel({ jobs, onOpen }: CompletionsPanelProps) {
                     <span className="min-w-0 flex-1 truncate text-sm text-slate-200">
                       {job.media_filename}
                     </span>
-                    <Badge tone={planKindTone(job.kind)}>{humanise(job.kind)}</Badge>
+                    <PlanKindBadges kind={job.kind} />
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-slate-400">
                     <span>
@@ -53,6 +66,7 @@ export function CompletionsPanel({ jobs, onOpen }: CompletionsPanelProps) {
                       {pct !== null ? ` (${pct > 0 ? '+' : ''}${pct.toFixed(1)}%)` : ''}
                     </span>
                     <span>took {formatDuration(job.actual_seconds)}</span>
+                    <span className="text-slate-500">{formatDateTime(job.finished_at)}</span>
                     {job.fell_back && (
                       <span className="font-semibold text-red-400">software fallback</span>
                     )}
@@ -63,6 +77,7 @@ export function CompletionsPanel({ jobs, onOpen }: CompletionsPanelProps) {
           })}
         </ul>
       )}
+      <LoadMore shown={jobs.length} total={total} loading={loadingMore} onLoadMore={onLoadMore} />
     </Panel>
   );
 }

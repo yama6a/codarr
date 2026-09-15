@@ -47,7 +47,7 @@ func TestService_FullJobRunsTheSampleProbeBeforeTheEncode(t *testing.T) {
 	h.store.putMedia(mediaFile(fullProbe()))
 	encoderWithSamples(h)
 
-	j := h.queue(domain.KindFull, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelVideo), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	ran, err := h.svc.RunOnce(t.Context())
@@ -111,7 +111,7 @@ func TestService_FullJobFallsBackToTheFormulaWhenTheSampleProbeFails(t *testing.
 		return ffmpeg.RunResult{Argv: args, FinalOutTime: time.Duration(mediaDur) * time.Second}, nil
 	}
 
-	j := h.queue(domain.KindFull, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelVideo), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	_, err := h.svc.RunOnce(t.Context())
@@ -155,7 +155,7 @@ func TestService_IdetSampleDecidesTheScanAndRePlansTheJob(t *testing.T) {
 		}
 	}
 
-	j := h.queue(domain.KindFull, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelVideo), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	ran, err := h.svc.RunOnce(t.Context())
@@ -195,7 +195,7 @@ func TestService_IdetSampleFailureLeavesTheSourceProgressive(t *testing.T) {
 		}
 	}
 
-	j := h.queue(domain.KindFull, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelVideo), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	_, err := h.svc.RunOnce(t.Context())
@@ -232,7 +232,7 @@ func TestService_HardwareDecodeFailureRetriesOnceInSoftware(t *testing.T) {
 		return ffmpeg.RunResult{Argv: args, FinalOutTime: time.Duration(mediaDur) * time.Second}, nil
 	}
 
-	j := h.queue(domain.KindFull, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelVideo), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	ran, err := h.svc.RunOnce(t.Context())
@@ -258,7 +258,7 @@ func TestService_SoftwareEncoderFallbackIsRecordedOnTheJob(t *testing.T) {
 		return softwareOnly(), nil
 	}
 
-	j := h.queue(domain.KindFull, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelVideo), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	_, err := h.svc.RunOnce(t.Context())
@@ -278,9 +278,9 @@ func TestService_SpaceSweepJobForcesAVideoEncodeThePolicyWouldCopy(t *testing.T)
 
 	// The default fixture plans as audio_only: its H.264 video passes the copy
 	// test. Only the sweep re-encodes it (11).
-	require.Equal(t, domain.KindAudioOnly, h.mediaRow().PlanKind)
+	require.Equal(t, domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), h.mediaRow().PlanKind)
 
-	j := h.queue(domain.KindFull, domain.OriginSpaceSweep)
+	j := h.queue(domain.KindOf(domain.LabelVideo), domain.OriginSpaceSweep)
 	h.addFile(stagingPath, sourceSize/2)
 
 	ran, err := h.svc.RunOnce(t.Context())
@@ -300,7 +300,7 @@ func TestService_ThroughputIsMeasuredAtCompletion(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	h.encoder.RunFunc = func(_ context.Context, args []string, _ func(ffmpeg.Progress)) (ffmpeg.RunResult, error) {
@@ -313,7 +313,7 @@ func TestService_ThroughputIsMeasuredAtCompletion(t *testing.T) {
 	_, err := h.svc.RunOnce(t.Context())
 	require.NoError(t, err)
 
-	stat, err := h.store.GetThroughputStat(t.Context(), domain.KindAudioOnly, "", "")
+	stat, err := h.store.GetThroughputStat(t.Context(), domain.ThroughputIO, "", "")
 	require.NoError(t, err)
 	require.Equal(t, 1, stat.Samples)
 
@@ -349,7 +349,7 @@ func TestService_ExhaustingBothFallbackChainsFailsOnceNamingEveryAttempt(t *test
 			fmt.Errorf("%w: exit status 1", ffmpeg.ErrFfmpegFailed)
 	}
 
-	j := h.queue(domain.KindFull, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelVideo), domain.OriginIngest)
 
 	ran, err := h.svc.RunOnce(t.Context())
 	require.NoError(t, err)
@@ -386,7 +386,7 @@ func TestService_EncoderChainIsNotSteppedForAJobThatCopiesVideo(t *testing.T) {
 			fmt.Errorf("%w: exit status 1", ffmpeg.ErrFfmpegFailed)
 	}
 
-	j := h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 
 	_, err := h.svc.RunOnce(t.Context())
 	require.NoError(t, err)
@@ -399,7 +399,7 @@ func TestService_TheFinalOutTimeIsPersistedWhenTheEncodeEnds(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	j := h.queue(domain.KindAudioOnly, domain.OriginIngest)
+	j := h.queue(domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), domain.OriginIngest)
 	h.addFile(stagingPath, sourceSize/2)
 
 	_, err := h.svc.RunOnce(t.Context())

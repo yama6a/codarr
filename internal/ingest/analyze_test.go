@@ -162,7 +162,7 @@ func TestAnalyzer_AnalyzeInPlansAndEnqueues(t *testing.T) {
 		MediaFileID: 7,
 		SkipReason:  "no CODARR tag",
 		Provenance:  domain.ProvenanceUntouched,
-		PlanKind:    domain.KindAudioOnly,
+		PlanKind:    domain.KindOf(domain.LabelAudio, domain.LabelSubtitles),
 		JobID:       99,
 		Queued:      true,
 	}, res)
@@ -182,7 +182,7 @@ func TestAnalyzer_AnalyzeInPlansAndEnqueues(t *testing.T) {
 	}, state.upserted)
 
 	require.Equal(t, domain.MediaAnalyzed, state.analysis.Status)
-	require.Equal(t, domain.KindAudioOnly, state.analysis.PlanKind)
+	require.Equal(t, domain.KindOf(domain.LabelAudio, domain.LabelSubtitles), state.analysis.PlanKind)
 	require.Equal(t, "h264", state.analysis.VideoCodec)
 	require.Equal(t, "matroska", state.analysis.Container)
 	require.False(t, state.analysis.CodarrTagged)
@@ -191,7 +191,7 @@ func TestAnalyzer_AnalyzeInPlansAndEnqueues(t *testing.T) {
 
 	require.Equal(t, domain.Job{
 		MediaFileID: 7,
-		Kind:        domain.KindAudioOnly,
+		Kind:        domain.KindOf(domain.LabelAudio, domain.LabelSubtitles),
 		Origin:      domain.OriginIngest,
 		Priority:    domain.PriorityQuick,
 		Transform:   decide.NewTransform(probe, *state.analysis.Plan, 0),
@@ -403,16 +403,6 @@ func TestAnalyzer_AnalyzeSurfacesAnEnvFailure(t *testing.T) {
 	require.ErrorContains(t, err, "list roots: database is locked")
 }
 
-func TestPriorityFor_QuickWinsClearAheadOfEncodes(t *testing.T) {
-	t.Parallel()
-
-	require.Equal(t, domain.PriorityFull, ingest.PriorityFor(domain.KindFull, true))
-	require.Equal(t, domain.PriorityQuick, ingest.PriorityFor(domain.KindRemux, true))
-	require.Equal(t, domain.PriorityQuick, ingest.PriorityFor(domain.KindAudioOnly, true))
-	require.Equal(t, domain.PriorityNormal, ingest.PriorityFor(domain.KindAudioOnly, false))
-	require.Equal(t, domain.PriorityNormal, ingest.PriorityFor(domain.KindSkip, true))
-}
-
 func TestAnalyzer_AnalyzeInSurfacesAFingerprintFailure(t *testing.T) {
 	t.Parallel()
 
@@ -528,5 +518,5 @@ func TestAnalyzer_AnalyzeInReportsWhenAnIdetSampleIsStillOwed(t *testing.T) {
 		AnalyzeIn(t.Context(), "/media/yama/movies/Old/Old.mpg", env())
 	require.NoError(t, err)
 
-	require.Equal(t, domain.KindFull, res.PlanKind)
+	require.Equal(t, domain.KindOf(domain.LabelVideo, domain.LabelSubtitles, domain.LabelRemux), res.PlanKind)
 }

@@ -59,7 +59,11 @@ type Plan struct {
 }
 
 // NeedsWrite reports whether executing this plan produces a new file.
-func (p Plan) NeedsWrite() bool { return p.Kind != KindSkip }
+func (p Plan) NeedsWrite() bool { return !p.Kind.Skip() }
+
+// EncodesVideo reports whether the plan re-encodes the primary video stream,
+// which is the one thing that makes a job CPU or GPU bound (plan.md 7).
+func (p Plan) EncodesVideo() bool { return p.Kind.Has(LabelVideo) }
 
 // VideoStream returns the plan for the primary video stream, which is the first
 // video stream that is not an attached picture.

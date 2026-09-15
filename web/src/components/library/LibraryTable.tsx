@@ -1,14 +1,17 @@
 import { Badge } from '../ui/Badge';
 import { Icon } from '../ui/Icon';
+import { PlanKindBadges } from '../ui/PlanKindBadges';
 import {
+  codecCounts,
   formatBitrate,
   formatBytes,
+  formatDateTime,
   formatResolution,
   humanise,
   provenanceLabel,
   titleFromPath,
 } from '../../lib/format';
-import { mediaStatusTone, planKindTone, provenanceTone } from '../../lib/tone';
+import { mediaStatusTone, provenanceTone } from '../../lib/tone';
 import type { MediaListItem, MediaSort } from '../../api/types';
 
 interface LibraryTableProps {
@@ -33,6 +36,7 @@ const columns: { key: string; label: string; sort?: MediaSort }[] = [
   { key: 'plan', label: 'Plan', sort: 'plan_kind' },
   { key: 'status', label: 'Status', sort: 'status' },
   { key: 'provenance', label: 'Provenance', sort: 'provenance' },
+  { key: 'completed', label: 'Completed', sort: 'codarr_processed_at' },
 ];
 
 function nextSort(current: MediaSort, column: MediaSort): MediaSort {
@@ -138,16 +142,14 @@ export function LibraryTable({
                     : item.audio.map((track) => `${track.codec} ${track.channels}ch`).join(', ')}
                 </td>
                 <td className="px-3 py-2.5 text-xs text-slate-300">
-                  {item.subtitles.length === 0
-                    ? 'none'
-                    : item.subtitles.map((track) => track.codec).join(', ')}
+                  {codecCounts(item.subtitles)}
                 </td>
                 <td className="px-3 py-2.5 whitespace-nowrap text-slate-300">
                   {formatBytes(item.size_bytes)}
                 </td>
                 <td className="px-3 py-2.5">
                   {item.plan_kind ? (
-                    <Badge tone={planKindTone(item.plan_kind)}>{humanise(item.plan_kind)}</Badge>
+                    <PlanKindBadges kind={item.plan_kind} />
                   ) : (
                     <span className="text-xs text-slate-500">not planned</span>
                   )}
@@ -160,6 +162,9 @@ export function LibraryTable({
                     {modified && <Icon name="shield" size={12} />}
                     {provenanceLabel(item.provenance)}
                   </Badge>
+                </td>
+                <td className="px-3 py-2.5 text-xs whitespace-nowrap text-slate-400">
+                  {formatDateTime(item.codarr_processed_at)}
                 </td>
               </tr>
             );

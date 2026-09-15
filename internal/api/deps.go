@@ -85,6 +85,7 @@ type MediaStore interface {
 type JobStore interface {
 	GetJob(ctx context.Context, id int64) (domain.Job, error)
 	ListJobs(ctx context.Context, f store.JobFilter) ([]domain.Job, int, error)
+	ListCompletions(ctx context.Context, limit, offset int) ([]domain.Completion, int, error)
 	CountJobsByState(ctx context.Context) (map[domain.JobState]int, error)
 	Stats(ctx context.Context) (store.Stats, error)
 }

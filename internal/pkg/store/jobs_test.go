@@ -3,6 +3,7 @@ package store_test
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yama6a/codarr/internal/pkg/domain"
@@ -521,4 +522,55 @@ func TestJobStore_ListOrderFollowsTheStatesAskedFor(t *testing.T) {
 	require.Equal(t, []int64{ids[2], ids[1], ids[0]}, list(store.JobFilter{}))
 	require.Equal(t, []int64{ids[1], ids[0]},
 		list(store.JobFilter{State: []domain.JobState{domain.JobFailed}, Order: store.OrderNewest}))
+}
+
+// A file the policy already accepts never gets a job, so the completions list
+// merges skipped analyses with done jobs and orders the union by time.
+func TestJobStore_ListCompletionsMergesDoneJobsWithSkippedFiles(t *testing.T) {
+	t.Parallel()
+
+	db := storetest.NewRawDB(t)
+	s := storetest.NewStore(t, db)
+
+	done := seedMedia(t, s, "/library/done.mkv")
+	job := seedJob(t, s, done.ID, domain.KindOf(domain.LabelAudio), domain.PriorityNormal)
+	require.NoError(t, s.FailJob(t.Context(), job.ID, domain.FailFfmpeg, "placeholder", ""))
+
+	_, err := db.Writer().ExecContext(t.Context(),
+		`UPDATE jobs SET state = 'done', failure_code = NULL, failure_message = NULL, source_size = 100, output_size = 80,
+		 actual_seconds = 30, finished_at = '2026-01-01T02:00:00.000000000Z' WHERE id = ?`, job.ID)
+	require.NoError(t, err)
+
+	skipped := seedMedia(t, s, "/library/skipped.mkv")
+	require.NoError(t, s.UpdateMediaAnalysis(t.Context(), store.AnalysisUpdate{
+		MediaFileID: skipped.ID, SizeBytes: 1, MTime: 1, PlanKind: domain.KindSkip,
+		Status: domain.MediaSkipped, AnalyzedAt: testTime().Add(3 * time.Hour),
+	}))
+
+	pending := seedMedia(t, s, "/library/pending.mkv")
+	require.NoError(t, s.UpdateMediaAnalysis(t.Context(), store.AnalysisUpdate{
+		MediaFileID: pending.ID, SizeBytes: 1, MTime: 1, PlanKind: domain.KindOf(domain.LabelAudio),
+		Status: domain.MediaAnalyzed, AnalyzedAt: testTime().Add(4 * time.Hour),
+	}))
+
+	rows, total, err := s.ListCompletions(t.Context(), 10, 0)
+	require.NoError(t, err)
+	require.Equal(t, 2, total)
+	require.Equal(t, []domain.Completion{
+		{
+			MediaFileID: skipped.ID, Path: "/library/skipped.mkv", Kind: domain.KindSkip, Skipped: true,
+			At: testTime().Add(3 * time.Hour),
+		},
+		{
+			JobID: &job.ID, MediaFileID: done.ID, Path: "/library/done.mkv", Kind: domain.KindOf(domain.LabelAudio),
+			SourceSize: 100, OutputSize: 80, ActualSeconds: 30,
+			At: time.Date(2026, 1, 1, 2, 0, 0, 0, time.UTC),
+		},
+	}, rows)
+
+	second, total, err := s.ListCompletions(t.Context(), 1, 1)
+	require.NoError(t, err)
+	require.Equal(t, 2, total)
+	require.Len(t, second, 1)
+	require.Equal(t, done.ID, second[0].MediaFileID)
 }

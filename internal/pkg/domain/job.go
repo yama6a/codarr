@@ -111,3 +111,18 @@ type Job struct {
 	StartedAt  *time.Time
 	FinishedAt *time.Time
 }
+
+// Completion is one row of the dashboard's completions list: a done job, or a
+// file the analysis found nothing to do for, which never gets a job.
+type Completion struct {
+	JobID         *int64
+	MediaFileID   int64
+	Path          string
+	Kind          Kind
+	Skipped       bool
+	SourceSize    int64
+	OutputSize    int64
+	ActualSeconds int
+	FellBack      bool
+	At            time.Time
+}

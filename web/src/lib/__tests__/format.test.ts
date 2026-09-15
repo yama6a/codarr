@@ -1,6 +1,7 @@
 import {
   codecCounts,
   deltaPercent,
+  formatDateParts,
   elapsedSeconds,
   failureLabel,
   formatBitrate,
@@ -83,6 +84,14 @@ describe('labels', () => {
 
   it('humanises snake case', () => {
     expect(humanise('awaiting_stream_end')).toBe('Awaiting stream end');
+  });
+
+  it('splits a timestamp into a date line and a time line', () => {
+    const [date, time] = formatDateParts('2026-08-01T10:00:00.000000000Z');
+    expect(date).not.toBe('');
+    expect(time).not.toBeNull();
+    expect(formatDateParts(null)).toEqual(['never', null]);
+    expect(formatDateParts('garbage')).toEqual(['garbage', null]);
   });
 
   it('names a label set and reads an empty one as skipped', () => {

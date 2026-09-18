@@ -34,6 +34,14 @@
       automerge: true,
     },
     {
+      // go-yit's node type moved to go.yaml.in/yaml/v4, but yaml-jsonpath (its only consumer here, via
+      // oapi-codegen's kin-openapi) is archived on gopkg.in/yaml.v3, so any newer digest fails to compile
+      // in `go generate`. Lift this if yaml-jsonpath ever ships a yaml/v4 release.
+      description: "go-yit is held: yaml-jsonpath is unmaintained and cannot follow it to yaml/v4",
+      matchPackageNames: ["github.com/dprotaso/go-yit"],
+      enabled: false,
+    },
+    {
       // openapi-typescript 7.13 peers typescript ^5, and a TS 6 bump takes `npm run generate` down.
       // Lift this once openapi-typescript widens the peer range.
       description: "openapi-typescript@7.13 peers typescript ^5",

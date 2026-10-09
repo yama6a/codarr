@@ -1,12 +1,12 @@
 module github.com/yama6a/codarr
 
-go 1.27.1
+go 1.27.2
 
 require (
 	github.com/getkin/kin-openapi v0.149.0
 	github.com/go-chi/chi/v5 v5.3.2
 	github.com/oapi-codegen/runtime v1.7.0
-	github.com/prometheus/client_golang v1.24.1
+	github.com/prometheus/client_golang v1.25.0
 	github.com/rubenv/sql-migrate v1.8.1
 	github.com/stretchr/testify v1.12.1
 	github.com/zeebo/xxh3 v1.1.0

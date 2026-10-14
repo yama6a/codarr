@@ -3,7 +3,7 @@ module github.com/yama6a/codarr
 go 1.27.2
 
 require (
-	github.com/getkin/kin-openapi v0.149.0
+	github.com/getkin/kin-openapi v0.150.0
 	github.com/go-chi/chi/v5 v5.4.0
 	github.com/oapi-codegen/runtime v1.7.0
 	github.com/prometheus/client_golang v1.25.0

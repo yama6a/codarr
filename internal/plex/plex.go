@@ -92,9 +92,8 @@ func New(cfg Config) (*Client, error) {
 		tr: &transport{
 			base:    base,
 			headers: serverHeaders(cfg.Token, cfg.ClientIdentifier),
-			client:  cfg.HTTPClient,
-			clk:     cfg.Clock,
-			retry:   cfg.Retry.normalise(),
+			client:  retryingClient(cfg.HTTPClient, cfg.Clock),
+			policy:  cfg.Retry.policy(),
 		},
 		mapper:       cfg.Mapper,
 		log:          cfg.Logger,

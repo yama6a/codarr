@@ -61,9 +61,8 @@ func NewAuth(cfg AuthConfig) (*Auth, error) {
 		tr: &transport{
 			base:    base,
 			headers: http.Header{"Accept": {"application/json"}},
-			client:  cfg.HTTPClient,
-			clk:     cfg.Clock,
-			retry:   cfg.Retry.normalise(),
+			client:  retryingClient(cfg.HTTPClient, cfg.Clock),
+			policy:  cfg.Retry.policy(),
 		},
 		product: cfg.Product,
 	}, nil

@@ -3,7 +3,6 @@ package plex
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/yama6a/codarr/internal/pkg/clock"
+	"github.com/yama6a/gokit/retryhttp"
 )
 
 // maxResponseBytes caps what a single answer may cost in memory. A whole
@@ -47,16 +47,10 @@ func (r Retry) normalise() Retry {
 	return r
 }
 
-func (r Retry) wait(attempt int) time.Duration {
-	d := r.Base
-	for range attempt {
-		d *= 2
-		if d >= r.Max {
-			return r.Max
-		}
-	}
+func (r Retry) policy() retryhttp.Policy {
+	r = r.normalise()
 
-	return d
+	return retryhttp.Policy{Attempts: r.Attempts, Base: r.Base, Max: r.Max}
 }
 
 // transport injects X-Plex-Token and Accept: application/json on every call, and never
@@ -65,8 +59,25 @@ type transport struct {
 	base    *url.URL
 	headers http.Header
 	client  *http.Client
-	clk     clock.Clock
-	retry   Retry
+	policy  retryhttp.Policy
+}
+
+// retryingClient copies c with a transport that retries per the request's policy and
+// waits on clk, so tests never sleep.
+func retryingClient(c *http.Client, clk clock.Clock) *http.Client {
+	rc := *c
+	rc.Transport = retryhttp.New(c.Transport,
+		retryhttp.WithNow(clk.Now),
+		retryhttp.WithSleep(func(ctx context.Context, d time.Duration) error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-clk.After(d):
+				return nil
+			}
+		}))
+
+	return &rc
 }
 
 type request struct {
@@ -77,35 +88,15 @@ type request struct {
 	out    any
 }
 
-// do runs req, retrying transient failures. An empty body with an out target is not an
-// error, because refresh and analyze both answer with nothing.
+// do runs req, retrying 5xx, 429 and connection errors. An empty body with an out
+// target is not an error, because refresh and analyze both answer with nothing.
 func (t *transport) do(ctx context.Context, req request) error {
-	var lastErr error
-
-	attempts := t.retry.Attempts
-
-	for attempt := range attempts {
-		if attempt > 0 {
-			select {
-			case <-ctx.Done():
-				return fmt.Errorf("%s %s: %w", req.method, req.path, ctx.Err())
-			case <-t.clk.After(t.retry.wait(attempt - 1)):
-			}
-		}
-
-		body, err := t.attempt(ctx, req)
-		if err == nil {
-			return decode(req, body)
-		}
-
-		if !retryable(err) {
-			return err
-		}
-
-		lastErr = err
+	body, err := t.send(retryhttp.WithPolicy(ctx, t.policy), req)
+	if err != nil {
+		return err
 	}
 
-	return lastErr
+	return decode(req, body)
 }
 
 func decode(req request, body []byte) error {
@@ -120,7 +111,7 @@ func decode(req request, body []byte) error {
 	return nil
 }
 
-func (t *transport) attempt(ctx context.Context, req request) ([]byte, error) {
+func (t *transport) send(ctx context.Context, req request) ([]byte, error) {
 	u := t.base.JoinPath(req.path)
 	if len(req.query) > 0 {
 		u.RawQuery = req.query.Encode()
@@ -141,14 +132,14 @@ func (t *transport) attempt(ctx context.Context, req request) ([]byte, error) {
 
 	resp, err := t.client.Do(httpReq)
 	if err != nil {
-		return nil, &transientError{err: fmt.Errorf("%s %s: %w", req.method, req.path, err)}
+		return nil, fmt.Errorf("%s %s: %w", req.method, req.path, err)
 	}
 
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return nil, &transientError{err: fmt.Errorf("%s %s: reading the response failed: %w", req.method, req.path, err)}
+		return nil, fmt.Errorf("%s %s: reading the response failed: %w", req.method, req.path, err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
@@ -159,25 +150,7 @@ func (t *transport) attempt(ctx context.Context, req request) ([]byte, error) {
 }
 
 func statusError(req request, status int, body []byte) error {
-	err := &StatusError{Method: req.method, Path: req.path, Status: status, Body: bodyPreview(body)}
-	if status >= 500 || status == http.StatusTooManyRequests {
-		return &transientError{err: err}
-	}
-
-	return err
-}
-
-// transientError marks the failures worth retrying: connection errors, a short
-// read, 5xx and 429. Everything else, 4xx above all, is retried never.
-type transientError struct{ err error }
-
-func (e *transientError) Error() string { return e.err.Error() }
-func (e *transientError) Unwrap() error { return e.err }
-
-func retryable(err error) bool {
-	var t *transientError
-
-	return errors.As(err, &t)
+	return &StatusError{Method: req.method, Path: req.path, Status: status, Body: bodyPreview(body)}
 }
 
 func normaliseBaseURL(raw string) (*url.URL, error) {

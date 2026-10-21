@@ -9,6 +9,7 @@ require (
 	github.com/prometheus/client_golang v1.25.0
 	github.com/rubenv/sql-migrate v1.8.1
 	github.com/stretchr/testify v1.12.1
+	github.com/yama6a/gokit v0.1.0
 	github.com/zeebo/xxh3 v1.1.0
 	go.uber.org/zap v1.28.0
 	modernc.org/sqlite v1.60.1

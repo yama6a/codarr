@@ -21,10 +21,9 @@
 
   packageRules: [
     {
-      // Deliberately left on automerge. bolan-admin-fe holds its codegen back because its CI cannot see
-      // generated-type drift; ours regenerates and runs `git diff --exit-code` over api/ and web/src/api/,
-      // so a codegen bump that changes the output fails CI and the automerge never happens. Keep those two
-      // checks in ci.yaml or this comment stops being true.
+      // Deliberately left on automerge. CI regenerates and runs `git diff --exit-code` over api/ and
+      // web/src/api/, so a codegen bump that changes the output fails CI and the automerge never happens.
+      // Keep those two checks in ci.yaml or this comment stops being true.
       description: "oapi-codegen and openapi-typescript stay on automerge: CI catches generated-code drift",
       matchUpdateTypes: ["minor", "patch", "digest", "pin"], // majors still get reviewed, like everything else
       matchPackageNames: [

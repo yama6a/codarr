@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	gen "github.com/yama6a/codarr/api"
 	"github.com/yama6a/codarr/internal/web"
+	"github.com/yama6a/gokit/httpserver"
 	"go.uber.org/zap"
 )
 
@@ -21,12 +22,11 @@ import (
 // pod's terminationGracePeriodSeconds or the kubelet sends SIGKILL mid-drain.
 const DrainTimeout = 20 * time.Second
 
-// ReadHeaderTimeout bounds a slow-header client; every other timeout is
-// deliberately unbounded because *arr rescans can be slow.
-const ReadHeaderTimeout = 10 * time.Second
-
 func (a *app) serve(ctx context.Context) error {
 	a.startup(ctx)
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	var wg sync.WaitGroup
 
@@ -52,43 +52,26 @@ func (a *app) serve(ctx context.Context) error {
 		}()
 	}
 
-	server := &http.Server{
-		Addr:              a.cfg.listen,
-		Handler:           a.handler(),
-		ReadHeaderTimeout: ReadHeaderTimeout,
-	}
+	// A failed readiness ping is what drops a pod with an unreachable volume out of
+	// the endpoints list.
+	err := httpserver.New(httpserver.Options{
+		Addr:         a.cfg.listen,
+		Ready:        a.db.Reader().PingContext,
+		Metrics:      a.metrics.Handler(),
+		API:          a.router(),
+		DrainTimeout: DrainTimeout,
+		Logger:       a.logger,
+	}).Run(ctx)
 
-	errCh := make(chan error, 1)
-
-	go func() {
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			errCh <- fmt.Errorf("listen on %s: %w", a.cfg.listen, err)
-
-			return
-		}
-
-		errCh <- nil
-	}()
-
-	select {
-	case err := <-errCh:
-		return err
-	case <-ctx.Done():
-	}
-
-	a.logger.Info("shutting down", zap.Duration("drain_timeout", DrainTimeout))
-
-	drainCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), DrainTimeout)
-	defer cancel()
-
-	if err := server.Shutdown(drainCtx); err != nil {
-		a.logger.Error("draining connections failed", zap.Error(err))
-	}
-
+	cancel()
 	wg.Wait()
 	a.logger.Info("stopped")
 
-	return <-errCh
+	if err != nil {
+		return fmt.Errorf("http server: %w", err)
+	}
+
+	return nil
 }
 
 // startup runs the sweeps of plan.md 19.2 in order: the orphan staging sweep is
@@ -111,36 +94,6 @@ func (a *app) startup(ctx context.Context) {
 		zap.String("device", caps.Device),
 		zap.String("encoder", string(caps.Select(false).Encoder)),
 		zap.Bool("software_fallback", caps.Select(false).Software))
-}
-
-// /healthz, /readyz and /metrics sit on a plain mux above the chi router so a
-// kubelet probe and a Prometheus scrape skip every middleware.
-func (a *app) handler() http.Handler {
-	root := http.NewServeMux()
-
-	root.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusOK, probeResult{Status: "ok"})
-	})
-
-	root.HandleFunc("GET /readyz", a.readyz)
-	root.Handle("GET /metrics", a.metrics.Handler())
-	root.Handle("/", a.router())
-
-	return root
-}
-
-// A 503 here is what drops a pod with an unreachable volume out of the endpoints list.
-func (a *app) readyz(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-	defer cancel()
-
-	if err := a.db.Reader().PingContext(ctx); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, probeResult{Status: "unavailable", Error: err.Error()})
-
-		return
-	}
-
-	writeJSON(w, http.StatusOK, probeResult{Status: "ok"})
 }
 
 // There is no auth middleware here and there must not be one (plan.md 21).
@@ -170,6 +123,8 @@ func (a *app) notFound(w http.ResponseWriter, r *http.Request) {
 	web.Handler().ServeHTTP(w, r)
 }
 
+// requestLogger logs at debug, not httpserver.Middleware's info: info and above reach
+// the events table, and the UI polls every 10 seconds.
 func (a *app) requestLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
@@ -185,16 +140,10 @@ func (a *app) requestLogger(next http.Handler) http.Handler {
 	})
 }
 
-// probeResult is a named type rather than a map so the encode cannot fail.
-type probeResult struct {
-	Status string `json:"status"`
-	Error  string `json:"error,omitempty"`
-}
-
-func writeJSON[T probeResult | gen.Error](w http.ResponseWriter, status int, body T) {
+func writeJSON(w http.ResponseWriter, status int, body gen.Error) {
 	raw, err := json.Marshal(body)
 	if err != nil {
-		raw = []byte(`{"status":"unavailable"}`)
+		raw = []byte(`{"error":"internal"}`)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

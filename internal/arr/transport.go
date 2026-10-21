@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/yama6a/codarr/internal/pkg/clock"
+	"github.com/yama6a/gokit/retryhttp"
 )
 
 // maxResponseBytes caps one answer. A whole movie resource is the largest thing
@@ -48,16 +48,10 @@ func (r Retry) normalise() Retry {
 	return r
 }
 
-func (r Retry) backoff(previous int) time.Duration {
-	d := r.Base
-	for range previous {
-		d *= 2
-		if d >= r.Max {
-			return r.Max
-		}
-	}
+func (r Retry) policy() retryhttp.Policy {
+	r = r.normalise()
 
-	return d
+	return retryhttp.Policy{Attempts: r.Attempts, Base: r.Base, Max: r.Max}
 }
 
 // transport is one instance's request plumbing. The API key lives in the header
@@ -67,8 +61,25 @@ type transport struct {
 	base     *url.URL
 	apiKey   string
 	client   *http.Client
-	clk      clock.Clock
-	retry    Retry
+	policy   retryhttp.Policy
+}
+
+// retryingClient copies c with a transport that retries per the request's policy and
+// waits on clk, so tests never sleep.
+func retryingClient(c *http.Client, clk clock.Clock) *http.Client {
+	rc := *c
+	rc.Transport = retryhttp.New(c.Transport,
+		retryhttp.WithNow(clk.Now),
+		retryhttp.WithSleep(func(ctx context.Context, d time.Duration) error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-clk.After(d):
+				return nil
+			}
+		}))
+
+	return &rc
 }
 
 type call struct {
@@ -84,30 +95,12 @@ func (t *transport) do(ctx context.Context, c call) error {
 		return err
 	}
 
-	var lastErr error
-
-	for attempt := range t.retry.Attempts {
-		if attempt > 0 {
-			select {
-			case <-ctx.Done():
-				return fmt.Errorf("%s %s: %w", c.method, c.path, ctx.Err())
-			case <-t.clk.After(t.retry.backoff(attempt - 1)):
-			}
-		}
-
-		raw, err := t.attempt(ctx, c, payload)
-		if err == nil {
-			return unmarshal(c, raw)
-		}
-
-		if !retryable(err) {
-			return err
-		}
-
-		lastErr = err
+	raw, err := t.send(retryhttp.WithPolicy(ctx, t.policy), c, payload)
+	if err != nil {
+		return err
 	}
 
-	return lastErr
+	return unmarshal(c, raw)
 }
 
 func encodeBody(c call) ([]byte, error) {
@@ -135,7 +128,7 @@ func unmarshal(c call, raw []byte) error {
 	return nil
 }
 
-func (t *transport) attempt(ctx context.Context, c call, payload []byte) ([]byte, error) {
+func (t *transport) send(ctx context.Context, c call, payload []byte) ([]byte, error) {
 	var body io.Reader
 	if payload != nil {
 		body = bytes.NewReader(payload)
@@ -155,16 +148,14 @@ func (t *transport) attempt(ctx context.Context, c call, payload []byte) ([]byte
 
 	resp, err := t.client.Do(req)
 	if err != nil {
-		return nil, &transientError{err: fmt.Errorf("%s: %s %s: %w", t.instance, c.method, c.path, err)}
+		return nil, fmt.Errorf("%s: %s %s: %w", t.instance, c.method, c.path, err)
 	}
 
 	defer func() { _ = resp.Body.Close() }()
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return nil, &transientError{
-			err: fmt.Errorf("%s: %s %s: reading the response failed: %w", t.instance, c.method, c.path, err),
-		}
+		return nil, fmt.Errorf("%s: %s %s: reading the response failed: %w", t.instance, c.method, c.path, err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
@@ -175,30 +166,13 @@ func (t *transport) attempt(ctx context.Context, c call, payload []byte) ([]byte
 }
 
 func (t *transport) statusError(c call, status int, raw []byte) error {
-	err := &StatusError{
+	return &StatusError{
 		Instance: t.instance,
 		Method:   c.method,
 		Path:     c.path,
 		Status:   status,
 		Body:     bodyPreview(raw),
 	}
-
-	if status >= 500 || status == http.StatusTooManyRequests {
-		return &transientError{err: err}
-	}
-
-	return err
-}
-
-type transientError struct{ err error }
-
-func (e *transientError) Error() string { return e.err.Error() }
-func (e *transientError) Unwrap() error { return e.err }
-
-func retryable(err error) bool {
-	var t *transientError
-
-	return errors.As(err, &t)
 }
 
 func normaliseBaseURL(raw string) (*url.URL, error) {

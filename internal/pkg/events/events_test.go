@@ -20,6 +20,8 @@ import (
 
 var errSinkDown = errors.New("events table is unavailable")
 
+const redacted = "[REDACTED]"
+
 // fakeSink records what reached the events table and can be made to fail.
 type fakeSink struct {
 	mu      sync.Mutex
@@ -144,8 +146,8 @@ func TestRedacting_MasksSecretsInBothSinks(t *testing.T) {
 		Info("calling plex", zap.String("api_key", "radarr-secret-key"))
 
 	fields := logs.All()[0].ContextMap()
-	require.Equal(t, domain.MaskedSecret, fields["token"])
-	require.Equal(t, domain.MaskedSecret, fields["api_key"])
+	require.Equal(t, redacted, fields["token"])
+	require.Equal(t, redacted, fields["api_key"])
 }
 
 // A secret nested under a map is still a secret, so redaction walks into it.
@@ -162,7 +164,7 @@ func TestRedacting_MasksNestedSecrets(t *testing.T) {
 
 	headers, ok := logs.All()[0].ContextMap()["headers"].(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, domain.MaskedSecret, headers["X-Api-Key"])
+	require.Equal(t, redacted, headers["X-Api-Key"])
 	require.Equal(t, "application/json", headers["Accept"])
 }
 

@@ -29,7 +29,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build,id=go-build-$TARGETARCH \
     go build -trimpath -ldflags='-s -w' -o /codarr ./cmd/codarr
 
 # --- runtime ---
-FROM debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587
+FROM debian:bookworm-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8
 
 # The jellyfin key is fetched through a pipe, and the default /bin/sh -c would let curl fail
 # silently while gpg still succeeds.

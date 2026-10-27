@@ -13,7 +13,7 @@ RUN npm run build
 # --- backend ---
 # Build runs on the builder's native arch and cross-compiles to the target (TARGETOS/TARGETARCH come
 # from buildx), so no QEMU emulation is needed.
-FROM --platform=$BUILDPLATFORM golang:1.27-alpine@sha256:b8c9b82affbbb82a020bbcf998dad2ba9516944ac7e883524642a481a9505e9c AS build
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS build
 ARG TARGETOS TARGETARCH
 WORKDIR /src
 

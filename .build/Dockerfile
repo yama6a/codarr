@@ -1,7 +1,7 @@
 # --- frontend ---
 # Built here rather than on the runner: go:embed needs internal/web/dist populated before `go build`,
 # and this image is single-arch so there is nothing to share across platforms.
-FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS web
+FROM node:26-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797 AS web
 # The repo layout is mirrored so vite's outDir of ../internal/web/dist lands where the build stage
 # expects it.
 WORKDIR /src/web

@@ -3,7 +3,9 @@ package ffprobe_test
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -21,8 +23,11 @@ func fakeBinary(t *testing.T, body string, exitCode int) (path, argvFile string)
 
 	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + argvFile + "\n" + body + "\nexit " + itoa(exitCode) + "\n"
 
-	//nolint:gosec // a stand-in binary has to be executable
-	require.NoError(t, os.WriteFile(path, []byte(script), 0o755))
+	// A child shell writes the script, so no parallel test's fork can inherit a write handle to it
+	// and fail the exec with "text file busy" (golang/go#22315).
+	write := exec.CommandContext(t.Context(), "sh", "-c", `cat > "$1" && chmod 755 "$1"`, "sh", path)
+	write.Stdin = strings.NewReader(script)
+	require.NoError(t, write.Run())
 
 	return path, argvFile
 }

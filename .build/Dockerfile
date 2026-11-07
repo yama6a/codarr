@@ -1,7 +1,7 @@
 # --- frontend ---
 # Built here rather than on the runner: go:embed needs internal/web/dist populated before `go build`,
 # and this image is single-arch so there is nothing to share across platforms.
-FROM node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94 AS web
+FROM node:26-alpine@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216 AS web
 # The repo layout is mirrored so vite's outDir of ../internal/web/dist lands where the build stage
 # expects it.
 WORKDIR /src/web
@@ -13,7 +13,7 @@ RUN npm run build
 # --- backend ---
 # Build runs on the builder's native arch and cross-compiles to the target (TARGETOS/TARGETARCH come
 # from buildx), so no QEMU emulation is needed.
-FROM --platform=$BUILDPLATFORM golang:1.27-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS build
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine@sha256:fa3d596898d9f126af7c01d14ee7597bab3f39cccf392ef36b69fe77cd681f18 AS build
 ARG TARGETOS TARGETARCH
 WORKDIR /src
 

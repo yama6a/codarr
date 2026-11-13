@@ -143,8 +143,8 @@ github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWD
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
 github.com/vmware-labs/yaml-jsonpath v0.3.2 h1:/5QKeCBGdsInyDCyVNLbXyilb61MXGi9NP674f9Hobk=
 github.com/vmware-labs/yaml-jsonpath v0.3.2/go.mod h1:U6whw1z03QyqgWdgXxvVnQ90zN1BWz5V+51Ewf8k+rQ=
-github.com/yama6a/gokit v1.0.4 h1:qQga6Dy2j0Zl6ATveE6FQX5fdwGTApDdMktNP3HK6/M=
-github.com/yama6a/gokit v1.0.4/go.mod h1:u86A6jktBcS3nfptclxeaHXLrRBFFm2/t5RpaOLMZjs=
+github.com/yama6a/gokit v1.0.5 h1:rVeTFssifUxco6COnYYTMH8HsS7KZ3jOBgxsFwS7V3o=
+github.com/yama6a/gokit v1.0.5/go.mod h1:9ddFRBr2cZJoRi6s2CdzCOp0mk4jv05W3asPDLGzj60=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/zeebo/assert v1.3.0 h1:g7C04CbJuIDKNPFHmsk4hwZDO5O+kntRxzaUoNXj+IQ=
 github.com/zeebo/assert v1.3.0/go.mod h1:Pq9JiuJQpG8JLJdtkwrJESF0Foym2/D9XMU5ciN/wJ0=

@@ -9,10 +9,10 @@ require (
 	github.com/prometheus/client_golang v1.25.0
 	github.com/rubenv/sql-migrate v1.8.1
 	github.com/stretchr/testify v1.12.1
-	github.com/yama6a/gokit v1.0.6
+	github.com/yama6a/gokit v1.1.0
 	github.com/zeebo/xxh3 v1.1.0
 	go.uber.org/zap v1.28.0
-	modernc.org/sqlite v1.62.0
+	modernc.org/sqlite v1.63.0
 )
 
 require (
@@ -48,7 +48,7 @@ require (
 	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/tools v0.53.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
-	modernc.org/libc v1.82.10 // indirect
+	modernc.org/libc v1.82.12 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.13.0 // indirect
 )

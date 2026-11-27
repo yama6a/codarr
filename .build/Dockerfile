@@ -40,9 +40,12 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # jellyfin-ffmpeg7 rather than distro ffmpeg: it is patched for this workload and handles HDR metadata
 # better. intel-media-va-driver-non-free is required for QSV on Gen 9.5; the free driver will not do
 # HEVC encode. See plan.md 22.
+# apt-get upgrade pulls bookworm-security fixes that the debian image has not picked up yet. Without it
+# the image scan fails until Docker rebuilds the base image.
 RUN sed -i 's/Components: main/Components: main contrib non-free non-free-firmware/' \
       /etc/apt/sources.list.d/debian.sources \
- && apt-get update && apt-get install -y --no-install-recommends \
+ && apt-get update && apt-get upgrade -y \
+ && apt-get install -y --no-install-recommends \
       ca-certificates tzdata gnupg curl \
  && curl -fsSL https://repo.jellyfin.org/jellyfin_team.gpg.key \
       | gpg --dearmor -o /usr/share/keyrings/jellyfin.gpg \

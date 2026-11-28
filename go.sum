@@ -94,8 +94,8 @@ github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWD
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
 github.com/theory/jsonpath v0.12.3 h1:hRYcJGqnIetJJKJNS5yLLW0LDtY1kzo8S0zHAOTxUQs=
 github.com/theory/jsonpath v0.12.3/go.mod h1:fYTXa8TVFAnyGzDL5JyaFlfaHzKMm+2XfwK3rbEzTC4=
-github.com/yama6a/gokit v1.3.1 h1:O4xQF0RR92Mti2WGmN0FPPGI8oFuU2x7THQln8ez9Yc=
-github.com/yama6a/gokit v1.3.1/go.mod h1:FvQl9AmE7uPRmWcUVza3tUiscATi0zvLzBkT2W+NZhs=
+github.com/yama6a/gokit v1.3.2 h1:+HUkIbDqP0cL+Bu7ZvyEQ4QVLXSERViOwO4T6Ga/uL8=
+github.com/yama6a/gokit v1.3.2/go.mod h1:FvQl9AmE7uPRmWcUVza3tUiscATi0zvLzBkT2W+NZhs=
 github.com/zeebo/assert v1.3.0 h1:g7C04CbJuIDKNPFHmsk4hwZDO5O+kntRxzaUoNXj+IQ=
 github.com/zeebo/assert v1.3.0/go.mod h1:Pq9JiuJQpG8JLJdtkwrJESF0Foym2/D9XMU5ciN/wJ0=
 github.com/zeebo/xxh3 v1.1.0 h1:s7DLGDK45Dyfg7++yxI0khrfwq9661w9EN78eP/UZVs=
